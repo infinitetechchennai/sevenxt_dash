@@ -1,31 +1,20 @@
 from datetime import datetime, timedelta
-<<<<<<< HEAD
 from typing import Optional, List, Union
-=======
-from typing import Optional, List
->>>>>>> 1e65977e (connnect)
 from jose import JWTError, jwt
 # from passlib.context import CryptContext  # Causing crashes on Windows
 from sqlalchemy.orm import Session
 from app.config import settings
-<<<<<<< HEAD
 from app.modules.auth.models import EmployeeUser, User, AdminUser
-=======
-from app.modules.auth.models import EmployeeUser, User
->>>>>>> 1e65977e (connnect)
 
 # pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 import hashlib
 import os
-<<<<<<< HEAD
 import random
 
 def generate_otp(length: int = 6) -> str:
     """Generate a random numeric OTP"""
     return "".join([str(random.randint(0, 9)) for _ in range(length)])
-=======
->>>>>>> 1e65977e (connnect)
 
 def get_password_hash(password: str) -> str:
     """Hash a password using SHA-256 with a salt"""
@@ -66,7 +55,6 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-<<<<<<< HEAD
 def authenticate_employee(db: Session, email: str, password: str) -> Optional[Union[EmployeeUser, AdminUser]]:
     """Authenticate an employee (admin/staff) by email and password"""
     
@@ -89,17 +77,11 @@ def authenticate_employee(db: Session, email: str, password: str) -> Optional[Un
             return admin
             
     # Check EmployeeUser
-=======
-def authenticate_employee(db: Session, email: str, password: str) -> Optional[EmployeeUser]:
-    """Authenticate an employee (admin/staff) by email and password"""
-    # Check if employee exists and is not deleted
->>>>>>> 1e65977e (connnect)
     employee = db.query(EmployeeUser).filter(
         EmployeeUser.email == email,
         EmployeeUser.deleted_at.is_(None)
     ).first()
     
-<<<<<<< HEAD
     if employee:
         if employee.status and employee.status.lower() != "active": return None
         if verify_password(password, employee.password):
@@ -137,72 +119,6 @@ def get_employee_by_email(db: Session, email: str) -> Optional[Union[EmployeeUse
     return None
 
 
-=======
-    if not employee:
-        return None
-    
-    # Check if employee is active
-    if employee.status and employee.status.lower() != "active":
-        return None
-    
-    # Verify password
-    if not verify_password(password, employee.password):
-        return None
-    
-    # Update last login
-    try:
-        employee.last_login = datetime.utcnow()
-        db.commit()
-        db.refresh(employee)
-    except Exception:
-        db.rollback()
-    
-    return employee
-
-def get_employee_by_email(db: Session, email: str) -> Optional[EmployeeUser]:
-    """Get an employee by email"""
-    return db.query(EmployeeUser).filter(
-        EmployeeUser.email == email,
-        EmployeeUser.deleted_at.is_(None)
-    ).first()
-
-def get_all_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
-    """Get all B2B/B2C users for display"""
-    return db.query(User).filter(
-        User.deleted_at.is_(None)
-    ).offset(skip).limit(limit).all()
-
-def get_all_employees(db: Session) -> List[EmployeeUser]:
-    """Get all admin/staff users"""
-    return db.query(EmployeeUser).filter(
-        EmployeeUser.deleted_at.is_(None)
-    ).all()
-
-def create_employee(db: Session, employee_data: dict) -> EmployeeUser:
-    """Create a new employee (admin/staff)"""
-    # Hash the password
-    hashed_password = get_password_hash(employee_data['password'])
-    
-    # Create employee object
-    new_employee = EmployeeUser(
-        name=employee_data['name'],
-        email=employee_data['email'],
-        password=hashed_password,
-        role=employee_data.get('role', 'staff'),
-        status=employee_data.get('status', 'active'),
-        address=employee_data.get('address'),
-        city=employee_data.get('city'),
-        state=employee_data.get('state'),
-        pincode=employee_data.get('pincode'),
-        permissions=employee_data.get('permissions')
-    )
-    
-    db.add(new_employee)
-    db.commit()
-    db.refresh(new_employee)
-    
-    return new_employee
->>>>>>> 1e65977e (connnect)
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get a B2B/B2C user by email"""
@@ -236,7 +152,6 @@ def create_user(db: Session, user_data: dict) -> User:
     
     return new_user
 
-<<<<<<< HEAD
 # ========== OTP PASSWORD RESET (SENDGRID) ==========
 
 from app.modules.auth.sendgrid_utils import sendgrid_service
@@ -296,5 +211,3 @@ def reset_password_with_otp(db: Session, email: str, otp: str, new_password: str
     db.commit()
     return True
 
-=======
->>>>>>> 1e65977e (connnect)

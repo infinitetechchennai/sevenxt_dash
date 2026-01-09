@@ -8,7 +8,6 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # Razorpay IDs
-  # Change these lines in your models.py
     razorpay_order_id = Column(String(100), unique=True, index=True, nullable=True)
     razorpay_payment_id = Column(String(100), unique=True, index=True, nullable=True)
     razorpay_signature = Column(String(255), nullable=True)
@@ -20,12 +19,17 @@ class Transaction(Base):
     
     # Financials
     amount = Column(Numeric(10, 2), nullable=False)
+    
+    # --- NEW TAX COLUMNS (DO NOT DELETE) ---
+    fee = Column(Numeric(10, 2), default=0.0) # Razorpay Platform Fee
+    tax = Column(Numeric(10, 2), default=0.0) # GST on Fee (Tax data)
+    
     currency = Column(String(10), default="INR")
     method = Column(String(50), nullable=True) # card, upi, etc.
     gateway = Column(String(50), default="Razorpay")
     
     # Status
-    status = Column(String(50), default="PENDING") # SUCCESS, FAILED, PENDING
+    status = Column(String(50), default="PENDING") # SUCCESS, FAILED, PENDING, REFUNDED
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

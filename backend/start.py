@@ -2,7 +2,6 @@
 Startup script for the backend server
 """
 import uvicorn
-<<<<<<< HEAD
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -23,14 +22,3 @@ if __name__ == "__main__":
         # Increase request body size to 100MB for bulk imports (5000+ products)
         h11_max_incomplete_event_size=100 * 1024 * 1024  # 100MB
     )
-=======
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True  # Enable auto-reload for development
-    )
-
->>>>>>> 1e65977e (connnect)

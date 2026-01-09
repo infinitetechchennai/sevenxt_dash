@@ -110,6 +110,50 @@ def approve_exchange(db: Session, exchange_id: int) -> Optional[models.Exchange]
     return exchange
 
 
+def reject_exchange(db: Session, exchange_id: int, rejection_reason: str) -> Optional[models.Exchange]:
+    """Admin rejects exchange and sends rejection email to customer"""
+    exchange = get_exchange_by_id(db, exchange_id)
+    if not exchange:
+        return None
+    
+    # Update exchange status to Rejected
+    exchange.status = 'Rejected'
+    exchange.admin_notes = f"Rejection Reason: {rejection_reason}"
+    exchange.updated_at = datetime.utcnow()
+    
+    # Update Order Status
+    if exchange.order:
+        exchange.order.status = 'Exchange Rejected'
+    
+    db.commit()
+    db.refresh(exchange)
+    
+    # Send rejection email to customer
+    try:
+        from app.modules.auth.sendgrid_utils import sendgrid_service
+        
+        customer_email = exchange.order.email if exchange.order else None
+        customer_name = exchange.order.customer_name if exchange.order else "Customer"
+        
+        if customer_email:
+            sendgrid_service.send_exchange_rejection_email(
+                to_email=customer_email,
+                customer_name=customer_name,
+                order_id=exchange.order_id,
+                product_name=exchange.product_name,
+                rejection_reason=rejection_reason
+            )
+            logger.info(f"Rejection email sent to {customer_email} for exchange {exchange_id}")
+        else:
+            logger.warning(f"No email found for exchange {exchange_id}, skipping email notification")
+    except Exception as e:
+        logger.error(f"Failed to send rejection email for exchange {exchange_id}: {e}")
+    
+    logger.info(f"Exchange {exchange_id} rejected. Reason: {rejection_reason}")
+    return exchange
+
+
+
 def process_exchange_replacement(db: Session, exchange_id: int) -> Optional[models.Exchange]:
     """Process exchange replacement: Generate new AWB and overwrite order AWB"""
     exchange = get_exchange_by_id(db, exchange_id)
@@ -188,11 +232,18 @@ def refund_exchange(db: Session, exchange_id: int) -> Optional[models.Exchange]:
     exchange.completed_at = datetime.utcnow()
     exchange.updated_at = datetime.utcnow()
     
+    # Update parent order status
+    if exchange.order:
+        exchange.order.status = 'Refunded'
+        exchange.order.updated_at = datetime.utcnow()
+        logger.info(f"Order {exchange.order.order_id} status updated to 'Refunded'")
+    
     db.commit()
     db.refresh(exchange)
     
     logger.info(f"Exchange {exchange_id} marked as Refunded")
     return exchange
+
 
 
 def update_return_delivery_status(db: Session, exchange_id: int, delivery_status: str) -> Optional[models.Exchange]:

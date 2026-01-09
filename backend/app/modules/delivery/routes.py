@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.orders.models import Delivery, Order
 from app.modules.exchanges.models import Exchange
+from app.modules.refunds.models import Refund
 from datetime import datetime
 import logging
 
@@ -42,16 +43,36 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
         return {"ok": True}
 
     # -------------------------
-    # 2️⃣ Normalize Status
+    # 2️⃣ Normalize Status - COMPLETE DELHIVERY STATUS MAPPING
     # -------------------------
     STATUS_MAP = {
-        "PICKED UP": "PICKED_UP",
-        "IN TRANSIT": "IN_TRANSIT",
-        "OUT FOR DELIVERY": "OUT_FOR_DELIVERY",
-        "DELIVERED": "DELIVERED",
-        "RTO INITIATED": "RTO",
-        "DELIVERY FAILED": "FAILED",
+        # Forward Shipment Statuses
+        "MANIFESTED": "PICKED_UP",              # Shipment created and manifested
+        "PICKED UP": "PICKED_UP",               # Picked from warehouse
+        "DISPATCHED": "IN_TRANSIT",             # Dispatched from warehouse
+        "IN TRANSIT": "IN_TRANSIT",             # In transit to destination
+        "REACHED AT DESTINATION HUB": "IN_TRANSIT",  # Reached destination city
+        "OUT FOR DELIVERY": "OUT_FOR_DELIVERY", # Out for delivery to customer
+        "DELIVERED": "DELIVERED",               # Successfully delivered
+        
+        # Pickup Statuses
+        "OUT FOR PICKUP": "PICKUP_REQUESTED",   # Out to pickup from seller
+        "PENDING": "PENDING",                   # Shipment pending
+        
+        # RTO (Return to Origin) Statuses
+        "RTO INITIATED": "RTO",                 # Return initiated
+        "RTO IN TRANSIT": "RTO",                # Return in transit
+        "RTO OUT FOR DELIVERY": "RTO",          # RTO out for delivery to warehouse
+        "RTO DELIVERED": "RTO_DELIVERED",       # Successfully returned to warehouse
+        
+        # Exception/Failure Statuses
+        "DELIVERY FAILED": "FAILED",            # Delivery attempt failed (NDR)
+        "UNDELIVERED": "FAILED",                # Could not deliver
+        "CANCELLED": "CANCELLED",               # Shipment cancelled
+        "LOST": "LOST",                         # Package lost in transit
+        "DAMAGED": "DAMAGED",                   # Package damaged
     }
+
 
     normalized = raw_status.strip().upper().replace("-", " ")
     internal_status = STATUS_MAP.get(normalized)
@@ -59,6 +80,50 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
     if not internal_status:
         logger.info(f"[WEBHOOK] Unhandled status '{raw_status}', ignored")
         return {"ok": True}
+
+    # -------------------------
+    # 2.5️⃣ Status Mapping for Refunds & Exchanges
+    # -------------------------
+    # Map delivery statuses to refund statuses
+    REFUND_STATUS_MAP = {
+        'DELIVERED': 'Return Received',
+        'FAILED': 'Pickup Failed',
+        'RTO_DELIVERED': 'Return Failed - RTO',
+        'CANCELLED': 'Cancelled',
+        'LOST': 'Lost in Transit',
+        'DAMAGED': 'Damaged',
+        'PICKED_UP': 'Return In Transit',
+        'IN_TRANSIT': 'Return In Transit',
+        'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
+    }
+    
+    # Map delivery statuses to exchange return statuses
+    EXCHANGE_RETURN_STATUS_MAP = {
+        'DELIVERED': 'Return Received',
+        'FAILED': 'Pickup Failed',
+        'RTO_DELIVERED': 'Return Failed - RTO',
+        'CANCELLED': 'Cancelled',
+        'LOST': 'Lost in Transit',
+        'DAMAGED': 'Damaged',
+        'PICKED_UP': 'Return In Transit',
+        'IN_TRANSIT': 'Return In Transit',
+        'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
+    }
+    
+    # Map delivery statuses to exchange new shipment statuses
+    EXCHANGE_NEW_STATUS_MAP = {
+        'DELIVERED': 'Completed',
+        'FAILED': 'Delivery Failed',
+        'RTO': 'RTO In Progress',
+        'RTO_DELIVERED': 'RTO Completed',
+        'CANCELLED': 'Cancelled',
+        'LOST': 'Lost in Transit',
+        'DAMAGED': 'Damaged',
+        'PICKED_UP': 'Out for Delivery',
+        'IN_TRANSIT': 'In Transit',
+        'OUT_FOR_DELIVERY': 'Out for Delivery',
+    }
+
 
     # -------------------------
     # 3️⃣ Find Delivery
@@ -72,9 +137,14 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
         # Continue to check Exchanges, as it might be a return shipment not in Delivery table
     else:
         # -------------------------
-        # 4️⃣ Prevent Backward Updates (Only for Delivery table)
+        # 4️⃣ Smart Status Progression Validation
         # -------------------------
-        STATUS_ORDER = [
+        # Define status categories
+        TERMINAL_STATUSES = ["DELIVERED", "RTO_DELIVERED", "CANCELLED", "LOST"]
+        EXCEPTION_STATUSES = ["FAILED", "DAMAGED", "UNDELIVERED"]
+        
+        # Forward shipment progression
+        FORWARD_STATUS_ORDER = [
             "AWB_GENERATED",
             "PICKUP_REQUESTED",
             "PICKED_UP",
@@ -82,17 +152,66 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
             "OUT_FOR_DELIVERY",
             "DELIVERED",
         ]
-
-        try:
-            current_index = STATUS_ORDER.index(delivery.delivery_status)
-            new_index = STATUS_ORDER.index(internal_status)
-        except ValueError:
-            current_index = -1
-            new_index = -1
-
-        if new_index < current_index:
+        
+        # RTO progression
+        RTO_STATUS_ORDER = [
+            "RTO",
+            "RTO_DELIVERED",
+        ]
+        
+        def should_update_status(current_status: str, new_status: str) -> bool:
+            """
+            Determine if status update should be allowed based on smart category validation
+            """
+            # Always allow terminal and exception statuses (can happen at any time)
+            if new_status in TERMINAL_STATUSES or new_status in EXCEPTION_STATUSES:
+                logger.info(f"[WEBHOOK] Allowing terminal/exception status: {new_status}")
+                return True
+            
+            # Don't update if already in terminal state (final states are permanent)
+            if current_status in TERMINAL_STATUSES:
+                logger.info(f"[WEBHOOK] Blocked update - already in terminal status: {current_status}")
+                return False
+            
+            # Allow transition from forward to RTO (delivery failed, returning to origin)
+            if current_status in FORWARD_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
+                logger.info(f"[WEBHOOK] Allowing forward → RTO transition: {current_status} → {new_status}")
+                return True
+            
+            # Check forward progression (only allow moving forward, not backward)
+            if current_status in FORWARD_STATUS_ORDER and new_status in FORWARD_STATUS_ORDER:
+                try:
+                    current_index = FORWARD_STATUS_ORDER.index(current_status)
+                    new_index = FORWARD_STATUS_ORDER.index(new_status)
+                    if new_index >= current_index:
+                        return True
+                    else:
+                        logger.info(f"[WEBHOOK] Blocked backward forward progression: {current_status} → {new_status}")
+                        return False
+                except ValueError:
+                    return True
+            
+            # Check RTO progression (only allow moving forward in RTO flow)
+            if current_status in RTO_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
+                try:
+                    current_index = RTO_STATUS_ORDER.index(current_status)
+                    new_index = RTO_STATUS_ORDER.index(new_status)
+                    if new_index >= current_index:
+                        return True
+                    else:
+                        logger.info(f"[WEBHOOK] Blocked backward RTO progression: {current_status} → {new_status}")
+                        return False
+                except ValueError:
+                    return True
+            
+            # Default: allow update for any other case
+            logger.info(f"[WEBHOOK] Allowing status update (default): {current_status} → {new_status}")
+            return True
+        
+        # Validate status transition
+        if not should_update_status(delivery.delivery_status, internal_status):
             logger.info(
-                f"[WEBHOOK] Ignored backward status {internal_status} for AWB {awb}"
+                f"[WEBHOOK] Ignored invalid status transition {delivery.delivery_status} → {internal_status} for AWB {awb}"
             )
         else:
             # -------------------------
@@ -113,8 +232,18 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
     exchange_return = db.query(Exchange).filter(Exchange.return_awb_number == awb).first()
     if exchange_return:
         exchange_return.return_delivery_status = internal_status
-        if internal_status == 'DELIVERED':
-             exchange_return.status = 'Return Received'
+        
+        # Update exchange return status based on delivery status using dictionary mapping
+        if internal_status in EXCHANGE_RETURN_STATUS_MAP:
+            exchange_return.status = EXCHANGE_RETURN_STATUS_MAP[internal_status]
+            logger.info(f"[WEBHOOK] Updated exchange {exchange_return.id} return status to '{exchange_return.status}'")
+            
+            # Special handling for critical statuses
+            if internal_status == 'DELIVERED':
+                logger.info(f"[WEBHOOK] Exchange return delivered to warehouse for exchange {exchange_return.id}")
+            elif internal_status in ['FAILED', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
+                logger.warning(f"[WEBHOOK] ⚠️ Exchange {exchange_return.id} return has exception status: {exchange_return.status}")
+        
         db.commit()
         logger.info(f"[WEBHOOK] Updated Exchange Return AWB {awb} -> {internal_status}")
 
@@ -128,10 +257,43 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
              exchange_new.order.status = internal_status
              logger.info(f"[WEBHOOK] Synced Order {exchange_new.order_id} status to {internal_status}")
 
-        if internal_status == 'DELIVERED':
-             exchange_new.status = 'Completed'
-             exchange_new.completed_at = datetime.utcnow()
+        # Update exchange new status based on delivery status using dictionary mapping
+        if internal_status in EXCHANGE_NEW_STATUS_MAP:
+            exchange_new.status = EXCHANGE_NEW_STATUS_MAP[internal_status]
+            logger.info(f"[WEBHOOK] Updated exchange {exchange_new.id} new shipment status to '{exchange_new.status}'")
+            
+            # Special handling for completion and critical statuses
+            if internal_status == 'DELIVERED':
+                exchange_new.completed_at = datetime.utcnow()
+                logger.info(f"[WEBHOOK] Exchange {exchange_new.id} completed successfully")
+            elif internal_status in ['FAILED', 'RTO', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
+                logger.warning(f"[WEBHOOK] ⚠️ Exchange {exchange_new.id} new shipment has exception status: {exchange_new.status}")
+        
         db.commit()
         logger.info(f"[WEBHOOK] Updated Exchange New AWB {awb} -> {internal_status}")
 
+    # -------------------------
+    # 7️⃣ Update Refund (if applicable)
+    # -------------------------
+    # Check for Refund Return Shipment
+    refund = db.query(Refund).filter(Refund.return_awb_number == awb).first()
+    if refund:
+        refund.return_delivery_status = internal_status
+        
+        # Update refund status based on delivery status using dictionary mapping
+        if internal_status in REFUND_STATUS_MAP:
+            refund.status = REFUND_STATUS_MAP[internal_status]
+            logger.info(f"[WEBHOOK] Updated refund {refund.id} status to '{refund.status}'")
+            
+            # Special handling for critical statuses
+            if internal_status == 'DELIVERED':
+                logger.info(f"[WEBHOOK] Refund return delivered to warehouse for refund {refund.id}")
+            elif internal_status in ['FAILED', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
+                logger.warning(f"[WEBHOOK] ⚠️ Refund {refund.id} has exception status: {refund.status}")
+        
+        db.commit()
+        logger.info(f"[WEBHOOK] Updated Refund Return AWB {awb} -> {internal_status}")
+
+
     return {"ok": True}
+

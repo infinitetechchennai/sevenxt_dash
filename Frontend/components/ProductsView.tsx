@@ -1,23 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar } from 'lucide-react';
-<<<<<<< HEAD
+import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar, Check } from 'lucide-react';
 import { Product, ProductAttribute, ProductVariant } from '../types';
 import { generateProductDescription } from '../services/geminiService';
-import { fetchProducts, createProduct, updateProduct, deleteProduct, importProducts } from '../services/api';
+import { fetchProducts, createProduct, updateProduct, deleteProduct, importProducts, fetchReviews, createReview } from '../services/api';
 import { DashboardView } from './DashboardView';
-=======
-import { MOCK_PRODUCTS, MOCK_BRANDS } from '../constants'; // Fallback
-import { Product, ProductAttribute, ProductVariant } from '../types';
-import { generateProductDescription } from '../services/geminiService';
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from '../services/api';
->>>>>>> 1e65977e (connnect)
 
 interface Review {
-  id: number;
-  user: string;
+  id: string;
+  user_id: string;
   rating: number;
   comment: string;
-  date: string;
+  created_at: string;
 }
 
 interface ProductsViewProps {
@@ -45,6 +38,117 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const [showReviewsModal, setShowReviewsModal] = useState(false);
   const [selectedProductReviews, setSelectedProductReviews] = useState<Review[]>([]);
   const [selectedProductName, setSelectedProductName] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  // New Review State
+  const [newReviewRating, setNewReviewRating] = useState(0);
+  const [newReviewComment, setNewReviewComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // --- Category Management ---
+  const DEFAULT_CATEGORIES = [
+    { value: "Computers", label: "Computers & Laptops" },
+    { value: "Mobile", label: "Smartphones & Accessories" },
+    { value: "Audio", label: "Audio & Sound" },
+    { value: "Home Appliances", label: "Home Appliances" },
+    { value: "Smart Home", label: "Smart Home & IoT" },
+    { value: "Cameras", label: "Cameras & Photography" },
+    { value: "Wearables", label: "Wearable Technology" }
+  ];
+
+  const [availableCategories, setAvailableCategories] = useState<{ value: string, label: string }[]>(DEFAULT_CATEGORIES);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  // Load from LocalStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('custom_categories');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setAvailableCategories(prev => {
+            const existing = new Set(prev.map(c => c.value));
+            const uniqueSaved = parsed.filter((c: any) => !existing.has(c.value));
+            return [...prev, ...uniqueSaved];
+          });
+        }
+      } catch (e) {
+        console.error("Failed to parse custom categories", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      setAvailableCategories(prev => {
+        const existingValues = new Set(prev.map(c => c.value));
+        const newCats: { value: string, label: string }[] = [];
+        products.forEach(p => {
+          if (p.category && !existingValues.has(p.category)) {
+            existingValues.add(p.category);
+            newCats.push({ value: p.category, label: p.category });
+          }
+        });
+        return [...prev, ...newCats];
+      });
+    }
+  }, [products]);
+
+  const handleAddCategory = () => {
+    if (newCategoryName.trim()) {
+      const cat = newCategoryName.trim();
+      const newEntry = { value: cat, label: cat };
+
+      setAvailableCategories(prev => {
+        if (prev.some(c => c.value === cat)) return prev;
+
+        // Save to local storage
+        try {
+          const currentSaved = JSON.parse(localStorage.getItem('custom_categories') || '[]');
+          if (!currentSaved.some((c: any) => c.value === cat)) {
+            const newSaved = [...currentSaved, newEntry];
+            localStorage.setItem('custom_categories', JSON.stringify(newSaved));
+          }
+        } catch (e) {
+          console.error("Failed to save category", e);
+        }
+
+        return [...prev, newEntry];
+      });
+
+      setFormData(prev => ({ ...prev, category: cat }));
+      setNewCategoryName("");
+      setIsAddingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = () => {
+    const currentCat = formData.category;
+    if (!currentCat) return;
+
+    const isDefault = DEFAULT_CATEGORIES.some(c => c.value === currentCat);
+
+    if (isDefault) {
+      alert("Cannot delete default categories.");
+      return;
+    }
+
+    if (window.confirm(`Delete category "${currentCat}"?`)) {
+      setAvailableCategories(prev => prev.filter(c => c.value !== currentCat));
+
+      try {
+        const saved = JSON.parse(localStorage.getItem('custom_categories') || '[]');
+        const newSaved = saved.filter((c: any) => c.value !== currentCat);
+        localStorage.setItem('custom_categories', JSON.stringify(newSaved));
+      } catch (e) { console.error(e); }
+
+      setFormData(prev => ({ ...prev, category: 'Computers' }));
+    }
+  };
+
+
 
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -55,6 +159,38 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productImageInputRef = useRef<HTMLInputElement>(null);
 
+
+
+  const handleSubmitReview = async () => {
+    if (!selectedProductId || newReviewRating === 0) return;
+
+    setIsSubmittingReview(true);
+    try {
+      await createReview({
+        product_id: selectedProductId,
+        user_id: "Guest User", // TODO: Replace with actual logged in user
+        rating: newReviewRating,
+        comment: newReviewComment
+      });
+
+      // Refresh reviews
+      const dbReviews = await fetchReviews(selectedProductId);
+      setSelectedProductReviews(dbReviews);
+
+      // Reset form
+      setNewReviewRating(0);
+      setNewReviewComment('');
+
+      // Refresh products to update rating count in table
+      loadProducts();
+    } catch (error) {
+      console.error("Failed to submit review:", error);
+      alert("Failed to submit review. Please try again.");
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -63,10 +199,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     id: undefined,
     name: '',
     category: 'Computers',
-<<<<<<< HEAD
-=======
-    brand: '',
->>>>>>> 1e65977e (connnect)
     b2cPrice: 0,
     compareAtPrice: 0,
     b2bPrice: 0,
@@ -75,7 +207,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     image: '',
     attributes: [],
     variants: [],
-<<<<<<< HEAD
     // Regular discounts (permanent)
     b2cDiscount: 0,
     b2bDiscount: 0,
@@ -98,20 +229,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     weight: 0,
     breadth: 0,
     length: 0
-=======
-    b2cOfferPercentage: 0,
-    b2cOfferStartDate: '',
-    b2cOfferEndDate: '',
-    b2bOfferPercentage: 0,
-    b2bOfferStartDate: '',
-    b2bOfferEndDate: ''
->>>>>>> 1e65977e (connnect)
   });
 
   const [newAttribute, setNewAttribute] = useState({ name: '', value: '' });
   const [newVariant, setNewVariant] = useState<ProductVariant>({ color: '', colorCode: '#000000', stock: 0 });
 
-<<<<<<< HEAD
   // Color name to hex converter
   const getColorHex = (colorName: string): string => {
     const colors: { [key: string]: string } = {
@@ -140,15 +262,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   // Load products on mount
   useEffect(() => {
     loadProducts();
-
-    // Auto-refresh every 60 seconds to check for expired offers
-    const intervalId = setInterval(() => {
-      console.log('Auto-refreshing products to check for expired offers...');
-      loadProducts();
-    }, 60000); // 60 seconds
-
-    // Cleanup interval on unmount
-    return () => clearInterval(intervalId);
   }, []);
 
   const [error, setError] = useState<string | null>(null);
@@ -163,21 +276,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       console.error("Failed to load products from backend:", e);
       setError(e.message || "Failed to load products. Please check if the backend is running.");
       setProducts([]);
-=======
-  // Load Data from API
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchProducts();
-      setProducts(data);
-    } catch (e) {
-      console.warn("Backend not available, using MOCK data.");
-      setProducts(MOCK_PRODUCTS);
->>>>>>> 1e65977e (connnect)
     } finally {
       setLoading(false);
     }
@@ -208,12 +306,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   // Filtering and Pagination logic
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-<<<<<<< HEAD
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
-=======
-    p.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.brand && p.brand.toLowerCase().includes(searchTerm.toLowerCase()))
->>>>>>> 1e65977e (connnect)
   );
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -270,10 +363,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       id: undefined,
       name: '',
       category: 'Computers',
-<<<<<<< HEAD
-=======
-      brand: '',
->>>>>>> 1e65977e (connnect)
       b2cPrice: 0,
       compareAtPrice: 0,
       b2bPrice: 0,
@@ -282,7 +371,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       image: '',
       attributes: [],
       variants: [],
-<<<<<<< HEAD
       // Regular discounts (permanent)
       b2cDiscount: 0,
       b2bDiscount: 0,
@@ -305,14 +393,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       weight: 0,
       breadth: 0,
       length: 0
-=======
-      b2cOfferPercentage: 0,
-      b2cOfferStartDate: '',
-      b2cOfferEndDate: '',
-      b2bOfferPercentage: 0,
-      b2bOfferStartDate: '',
-      b2bOfferEndDate: ''
->>>>>>> 1e65977e (connnect)
     });
     setNewAttribute({ name: '', value: '' });
     setNewVariant({ color: '', colorCode: '#000000', stock: 0 });
@@ -321,7 +401,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const handleEditProduct = (product: Product) => {
     setFormData({
       ...product,
-<<<<<<< HEAD
       description: product.description || '',
       compareAtPrice: product.compareAtPrice || 0,
       attributes: product.attributes || [],
@@ -348,17 +427,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       weight: product.weight || 0,
       breadth: product.breadth || 0,
       length: product.length || 0
-=======
-      compareAtPrice: product.compareAtPrice || 0,
-      attributes: product.attributes || [],
-      variants: product.variants || [],
-      b2cOfferPercentage: product.b2cOfferPercentage || 0,
-      b2cOfferStartDate: product.b2cOfferStartDate || '',
-      b2cOfferEndDate: product.b2cOfferEndDate || '',
-      b2bOfferPercentage: product.b2bOfferPercentage || 0,
-      b2bOfferStartDate: product.b2bOfferStartDate || '',
-      b2bOfferEndDate: product.b2bOfferEndDate || ''
->>>>>>> 1e65977e (connnect)
     });
     setShowModal(true);
     setOpenActionMenuId(null);
@@ -376,25 +444,13 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       await createProduct(newProduct);
       loadProducts(); // Refresh
     } catch (e) {
-<<<<<<< HEAD
       console.error("Backend unavailable:", e);
       alert("Failed to duplicate product. Please check your connection.");
-=======
-      console.warn("Backend unavailable, duplicating in local state");
-      const newProduct = {
-        ...product,
-        id: `prod_${Date.now()}`,
-        name: `${product.name} (Copy)`,
-        status: 'Draft' as const
-      };
-      setProducts(prev => [newProduct, ...prev]);
->>>>>>> 1e65977e (connnect)
     } finally {
       setOpenActionMenuId(null);
     }
   };
 
-<<<<<<< HEAD
   const handleToggleStatus = async (e: React.MouseEvent, product: Product) => {
     e.stopPropagation();
     const newStatus = product.status === 'Archived' ? 'Active' : 'Archived';
@@ -411,14 +467,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       // Revert
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: product.status } : p));
     }
-=======
-  const handleToggleStatus = (e: React.MouseEvent, product: Product) => {
-    e.stopPropagation();
-    // Optimistic Update
-    const newStatus = product.status === 'Archived' ? 'Active' : 'Archived';
-    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, status: newStatus } : p));
-    setOpenActionMenuId(null);
->>>>>>> 1e65977e (connnect)
   };
 
   // Trigger Delete Modal
@@ -433,7 +481,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   // Execute Deletion
   const executeDelete = async () => {
     if (isBulkDelete) {
-<<<<<<< HEAD
       try {
         // Delete all selected products
         await Promise.all(selectedProductIds.map(id => deleteProduct(id)));
@@ -442,11 +489,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         console.error("Error deleting products:", e);
         alert("Failed to delete products. Please check your connection.");
       }
-=======
-      // Bulk delete logic would go here
-      // For fallback, we filter locally
-      setProducts(prev => prev.filter(p => !selectedProductIds.includes(p.id)));
->>>>>>> 1e65977e (connnect)
       setSelectedProductIds([]);
       setIsBulkDelete(false);
     } else if (productToDelete) {
@@ -454,14 +496,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         await deleteProduct(productToDelete);
         loadProducts(); // Refresh
       } catch (e) {
-<<<<<<< HEAD
         console.error("Backend unavailable:", e);
         alert("Failed to delete product. Please check your connection.");
-=======
-        console.warn("Backend unavailable, deleting from local state");
-        // Fallback for mock environment
-        setProducts(prev => prev.filter(p => p.id !== productToDelete));
->>>>>>> 1e65977e (connnect)
       }
       setProductToDelete(null);
     }
@@ -469,7 +505,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   };
 
   const handleSaveProduct = async () => {
-<<<<<<< HEAD
     // Validation
     if (!formData.name || formData.name.trim() === '') {
       alert("Please enter a product name.");
@@ -481,14 +516,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       return;
     }
 
-=======
->>>>>>> 1e65977e (connnect)
     let finalStock = formData.stock || 0;
     if (formData.variants && formData.variants.length > 0) {
       finalStock = formData.variants.reduce((sum, v) => sum + v.stock, 0);
     }
 
-<<<<<<< HEAD
     let b2cOfferPrice = formData.b2cOfferPrice || 0;
     let b2bOfferPrice = formData.b2bOfferPrice || 0;
 
@@ -533,12 +565,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       b2cOfferEndDate: formData.b2cOfferEndDate || null,
       b2bOfferStartDate: formData.b2bOfferStartDate || null,
       b2bOfferEndDate: formData.b2bOfferEndDate || null
-=======
-    const productData = {
-      ...formData,
-      stock: finalStock,
-      image: formData.image || `https://picsum.photos/200/200?random=${Date.now()}`
->>>>>>> 1e65977e (connnect)
     };
 
     try {
@@ -549,25 +575,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       }
       loadProducts(); // Refresh from server
     } catch (e) {
-<<<<<<< HEAD
       console.error("Backend unavailable:", e);
       alert("Failed to save product. Please check your connection.");
-=======
-      console.warn("Backend unavailable, saving to local state");
-      if (formData.id) {
-        // Update existing
-        setProducts(prev => prev.map(p => p.id === formData.id ? { ...p, ...productData } as Product : p));
-      } else {
-        // Create new
-        const newProduct = {
-          ...productData,
-          id: `prod_${Date.now()}`,
-          rating: 0,
-          reviews: 0
-        } as Product;
-        setProducts(prev => [newProduct, ...prev]);
-      }
->>>>>>> 1e65977e (connnect)
     }
     setShowModal(false);
     resetForm();
@@ -613,33 +622,28 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     setShowModal(true);
   };
 
-  const handleViewReviews = (product: Product) => {
-    const count = product.reviews || 0;
-    const baseRating = product.rating || 4.0;
-
-    const mockReviews: Review[] = Array.from({ length: Math.min(count, 8) }).map((_, i) => ({
-      id: i,
-      user: `Customer ${Math.floor(Math.random() * 10000)}`,
-      rating: Math.min(5, Math.max(1, baseRating + (Math.random() * 2 - 1))),
-      comment: [
-        "Great product, really happy with the quality!",
-        "Delivery was fast, but the packaging could be better.",
-        "Excellent value for money.",
-        "Works exactly as described.",
-        "Customer service was helpful.",
-        "A bit expensive, but worth it.",
-        "Solid build quality.",
-        "Would recommend to a friend."
-      ][Math.floor(Math.random() * 8)],
-      date: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toLocaleDateString()
-    }));
-
-    setSelectedProductReviews(mockReviews);
+  const handleViewReviews = async (product: Product) => {
     setSelectedProductName(product.name);
+    setSelectedProductId(product.id);
     setShowReviewsModal(true);
+    setReviewsLoading(true);
+    setNewReviewRating(0);
+    setNewReviewComment('');
+
+
+    try {
+      const dbReviews = await fetchReviews(product.id);
+      console.log("Fetched reviews:", dbReviews);
+      setSelectedProductReviews(dbReviews);
+    } catch (error) {
+      console.error("Failed to fetch reviews:", error);
+      // Fallback to empty if fetch fails
+      setSelectedProductReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
   };
 
-<<<<<<< HEAD
   // Helper function to format date with time for Excel export
   const formatDateTime = (dateValue: string | null | undefined): string => {
     if (!dateValue) return '';
@@ -684,7 +688,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         'SGST %': p.sgst || 0,
         'CGST %': p.cgst || 0,
         'HSN Code': p.hsn || '',
-        'Return Policy': p.returnPolicy || '',
         'Height (cm)': p.height || 0,
         'Weight (kg)': p.weight || 0,
         'Breadth (cm)': p.breadth || 0,
@@ -754,43 +757,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       alert('Failed to export products. Installing xlsx library...');
       // Fallback to CSV if xlsx is not available
       window.open('https://www.npmjs.com/package/xlsx', '_blank');
-=======
-  // --- Export/Import Logic ---
-  const handleExport = () => {
-    const headers = [
-      'ID', 'Name', 'Category', 'Brand', 'B2C Selling Price', 'MRP', 'B2C Offer %', 'B2B Selling Price', 'B2B Offer %', 'Stock', 'Status'
-    ];
-
-    const productsToExport = selectedProductIds.length > 0
-      ? products.filter(p => selectedProductIds.includes(p.id))
-      : products;
-
-    const rows = productsToExport.map(p => [
-      p.id,
-      `"${p.name.replace(/"/g, '""')}"`,
-      p.category,
-      p.brand || '',
-      p.b2cPrice,
-      p.compareAtPrice || 0,
-      `${p.b2cOfferPercentage || 0}%`,
-      p.b2bPrice,
-      `${p.b2bOfferPercentage || 0}%`,
-      p.stock,
-      p.status
-    ].join(','));
-
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', selectedProductIds.length > 0 ? 'selected_products.csv' : 'all_products.csv');
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
->>>>>>> 1e65977e (connnect)
     }
   };
 
@@ -798,7 +764,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     fileInputRef.current?.click();
   };
 
-<<<<<<< HEAD
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -812,15 +777,21 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
 
     try {
       setLoading(true);
-      const result = await importProducts(file);
+      const result = await importProducts(file) as any;
 
-      let message = `Import Complete!\n\n✅ Successfully imported: ${result.success} products`;
-      if (result.failed > 0) {
-        message += `\n❌ Failed: ${result.failed} products`;
-        if (result.errors && result.errors.length > 0) {
-          message += `\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}`;
-          if (result.errors.length > 5) {
-            message += `\n... and ${result.errors.length - 5} more errors`;
+      // Access the nested details object
+      const details = result.details || result;
+
+      let message = `Import Complete!\n\n✅ Successfully imported: ${details.success || 0} products`;
+      if (details.created) message += `\n   - Created: ${details.created}`;
+      if (details.updated) message += `\n   - Updated: ${details.updated}`;
+
+      if (details.failed && details.failed > 0) {
+        message += `\n❌ Failed: ${details.failed} products`;
+        if (details.errors && details.errors.length > 0) {
+          message += `\n\nErrors:\n${details.errors.slice(0, 5).join('\n')}`;
+          if (details.errors.length > 5) {
+            message += `\n... and ${details.errors.length - 5} more errors`;
           }
         }
       }
@@ -838,18 +809,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-=======
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      // Mock Import Logic - Simplified
-      alert("Import functionality mocked for demo.");
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-    reader.readAsText(file);
->>>>>>> 1e65977e (connnect)
   };
 
   const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -874,7 +833,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const renderStars = (rating: number) => {
     return (
       <div className="flex items-center">
-<<<<<<< HEAD
         {[...Array(5)].map((_, i) => {
           const fillPercentage = Math.max(0, Math.min(1, rating - i));
           return (
@@ -900,19 +858,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       </div>
     );
   };
-=======
-        {[...Array(5)].map((_, i) => (
-          <Star
-            key={i}
-            size={12}
-            className={`${i < Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-          />
-        ))}
-      </div>
-    );
-  };
-
->>>>>>> 1e65977e (connnect)
   const calculateDiscount = (original: number, selling: number) => {
     if (!original || original <= selling) return 0;
     return Math.round(((original - selling) / original) * 100);
@@ -935,7 +880,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     );
   }
 
-<<<<<<< HEAD
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-red-500">
@@ -952,8 +896,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     );
   }
 
-=======
->>>>>>> 1e65977e (connnect)
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
       {/* Header Section */}
@@ -978,11 +920,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
           >
             <FileDown className="mr-2 h-4 w-4" /> Export {selectedProductIds.length > 0 ? `(${selectedProductIds.length})` : 'All'}
           </button>
-<<<<<<< HEAD
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls,.csv" className="hidden" />
-=======
-          <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".csv" className="hidden" />
->>>>>>> 1e65977e (connnect)
           <button
             className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors border border-input bg-white shadow-sm hover:bg-gray-100 h-9 px-4 py-2 text-gray-900"
             onClick={handleImportClick}
@@ -1004,11 +942,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
-<<<<<<< HEAD
               placeholder="Search by name or category..."
-=======
-              placeholder="Search by name, brand or category..."
->>>>>>> 1e65977e (connnect)
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -1056,12 +990,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                 </th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px]">Image</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
-<<<<<<< HEAD
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground max-w-[200px]">Description</th>
-=======
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name & Brand</th>
->>>>>>> 1e65977e (connnect)
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rating</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                   <div className="flex items-center gap-1"><ShoppingBag size={14} /> Price (B2C)</div>
@@ -1072,13 +1002,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Active Offer (B2C)</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Active Offer (B2B)</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Stock</th>
-<<<<<<< HEAD
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">SGST %</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">CGST %</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">HSN</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Dimensions</th>
-=======
->>>>>>> 1e65977e (connnect)
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Category</th>
                 <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</th>
               </tr>
@@ -1086,7 +1013,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
             <tbody className="[&_tr:last-child]:border-0">
               {currentProducts.map((product) => {
                 const retailDiscount = calculateDiscount(product.compareAtPrice || 0, product.b2cPrice);
-<<<<<<< HEAD
 
                 // Backend only sets offerPrice > 0 for ACTIVE offers
                 // If offerPrice is 0 or null, there's no active offer
@@ -1096,20 +1022,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                 // Use offer price if available, otherwise use base price
                 const displayB2CPrice = hasActiveB2COffer ? product.b2cOfferPrice : product.b2cPrice;
                 const displayB2BPrice = hasActiveB2BOffer ? product.b2bOfferPrice : product.b2bPrice;
-=======
-                const isB2COfferActive = checkOfferStatus(product.b2cOfferPercentage, product.b2cOfferStartDate, product.b2cOfferEndDate);
-                const isB2BOfferActive = checkOfferStatus(product.b2bOfferPercentage, product.b2bOfferStartDate, product.b2bOfferEndDate);
-
-                const offerB2CPrice = isB2COfferActive ? product.b2cPrice * (1 - (product.b2cOfferPercentage || 0) / 100) : product.b2cPrice;
-                const offerB2BPrice = isB2BOfferActive ? product.b2bPrice * (1 - (product.b2bOfferPercentage || 0) / 100) : product.b2bPrice;
->>>>>>> 1e65977e (connnect)
 
                 return (
                   <tr key={product.id} className={`border-b border-border transition-colors hover:bg-gray-50 relative ${selectedProductIds.includes(product.id) ? 'bg-indigo-50/50 hover:bg-indigo-50' : ''}`}>
                     <td className="p-4 align-middle">
                       <input
                         type="checkbox"
-<<<<<<< HEAD
                         checked={selectedProductIds.includes(product.id)}
                         onChange={() => toggleSelectProduct(product.id)}
                         className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -1129,15 +1047,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                           <span className="text-xs text-gray-500">ID: {product.id}</span>
                         </div>
                       </div>
-=======
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        checked={selectedProductIds.includes(product.id)}
-                        onChange={(e) => { e.stopPropagation(); toggleSelectProduct(product.id); }}
-                      />
-                    </td>
-                    <td className="p-4 align-middle">
-                      <img src={product.image} alt={product.name} className="aspect-square rounded-md object-cover h-10 w-10 border border-gray-200" />
->>>>>>> 1e65977e (connnect)
                     </td>
                     <td className="p-4 align-middle">
                       <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${product.status === 'Active' ? 'border-transparent bg-green-100 text-green-800' : 'border-transparent bg-gray-100 text-gray-800'
@@ -1147,20 +1056,36 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     </td>
                     <td className="p-4 align-middle">
                       <div className="font-medium text-gray-900">{product.name}</div>
-<<<<<<< HEAD
                     </td>
                     <td className="p-4 align-middle max-w-[200px]">
                       <div className="text-sm text-gray-600 truncate" title={product.description || ''}>
                         {product.description || <span className="text-gray-400 italic">No description</span>}
                       </div>
-=======
-                      <div className="text-xs text-gray-500">{product.brand}</div>
->>>>>>> 1e65977e (connnect)
                     </td>
                     <td className="p-4 align-middle">
-                      <div className="flex flex-col gap-1">
-                        {renderStars(product.rating || 0)}
-                        <span className="text-xs font-medium text-gray-500">{product.rating?.toFixed(1)} ({product.reviews})</span>
+                      <div
+                        className="relative group flex flex-col justify-center items-center cursor-pointer hover:bg-indigo-50/50 p-2 -m-2 rounded-xl transition-all min-w-[120px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewReviews(product);
+                        }}
+                      >
+                        <div className="flex items-center gap-1">
+                          {renderStars(product.rating || 0)}
+                        </div>
+                        <span className="text-[10px] font-bold text-gray-500 mt-1">
+                          {product.rating?.toFixed(1)} {product.reviews}
+                        </span>
+
+                        {/* Hover Tooltip - High Z-Index and positioned above */}
+                        {product.latestReview && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 bg-gray-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[9999]">
+                            <p className="font-semibold text-gray-300 mb-1 border-b border-gray-700 pb-1">Latest Customer Review</p>
+                            <p className="italic leading-relaxed text-gray-100">"{product.latestReview}"</p>
+                            {/* Arrow */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900/95"></div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="p-4 align-middle">
@@ -1169,7 +1094,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                           <span className="text-xs text-gray-400 line-through">₹{product.compareAtPrice.toLocaleString()}</span>
                         )}
                         <div className="flex items-center gap-1">
-<<<<<<< HEAD
                           {hasActiveB2COffer ? (
                             <span className="font-bold text-green-600">₹{displayB2CPrice?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                           ) : (
@@ -1177,18 +1101,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                           )}
                         </div>
                         {!hasActiveB2COffer && retailDiscount > 0 && (
-=======
-                          {isB2COfferActive ? (
-                            <>
-                              <span className="text-xs text-gray-400 line-through">₹{(product.b2cPrice || 0).toLocaleString()}</span>
-                              <span className="font-bold text-green-600">₹{offerB2CPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </>
-                          ) : (
-                            <span className="font-medium text-gray-900">₹{(product.b2cPrice || 0).toLocaleString()}</span>
-                          )}
-                        </div>
-                        {!isB2COfferActive && retailDiscount > 0 && (
->>>>>>> 1e65977e (connnect)
                           <span className="text-[10px] text-green-600 font-medium bg-green-50 px-1 rounded w-fit">
                             {retailDiscount}% off MRP
                           </span>
@@ -1202,7 +1114,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                           <span className="text-xs text-gray-400 line-through">₹{product.compareAtPrice.toLocaleString()}</span>
                         )}
                         <div className="flex items-center gap-1">
-<<<<<<< HEAD
                           {hasActiveB2BOffer ? (
                             <span className="font-bold text-blue-600">₹{displayB2BPrice?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                           ) : (
@@ -1211,19 +1122,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         </div>
                         {/* Discount Badge */}
                         {!hasActiveB2BOffer && (product.compareAtPrice && product.compareAtPrice > (product.b2bPrice || 0)) && (
-=======
-                          {isB2BOfferActive ? (
-                            <>
-                              <span className="text-xs text-gray-400 line-through">₹{(product.b2bPrice || 0).toLocaleString()}</span>
-                              <span className="font-bold text-blue-600">₹{offerB2BPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                            </>
-                          ) : (
-                            <span className="font-medium text-blue-600">₹{(product.b2bPrice || 0).toLocaleString()}</span>
-                          )}
-                        </div>
-                        {/* Discount Badge */}
-                        {!isB2BOfferActive && (product.compareAtPrice && product.compareAtPrice > (product.b2bPrice || 0)) && (
->>>>>>> 1e65977e (connnect)
                           <span className="text-[10px] text-blue-600 font-medium bg-blue-50 px-1 rounded w-fit">
                             {calculateDiscount(product.compareAtPrice, product.b2bPrice || 0)}% off MRP
                           </span>
@@ -1232,7 +1130,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     </td>
                     {/* B2C Offer Column */}
                     <td className="p-4 align-middle">
-<<<<<<< HEAD
                       {hasActiveB2COffer ? (
                         <div className="flex flex-col">
                           <span className="text-xs font-bold px-2 py-0.5 rounded w-fit mb-1 bg-green-100 text-green-700">
@@ -1246,24 +1143,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         </div>
                       ) : (
                         <span className="text-xs text-gray-400">No active offer</span>
-=======
-                      {product.b2cOfferPercentage && product.b2cOfferPercentage > 0 ? (
-                        <div className="flex flex-col">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded w-fit mb-1 ${isB2COfferActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {isB2COfferActive ? 'Active' : 'Scheduled'} {product.b2cOfferPercentage}% Off
-                          </span>
-                          <div className="text-[10px] text-gray-500 flex items-center gap-1">
-                            <Calendar size={10} /> Ends: {new Date(product.b2cOfferEndDate!).toLocaleDateString()}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
->>>>>>> 1e65977e (connnect)
                       )}
                     </td>
                     {/* B2B Offer Column */}
                     <td className="p-4 align-middle">
-<<<<<<< HEAD
                       {hasActiveB2BOffer ? (
                         <div className="flex flex-col">
                           <span className="text-xs font-bold px-2 py-0.5 rounded w-fit mb-1 bg-blue-100 text-blue-700">
@@ -1277,19 +1160,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         </div>
                       ) : (
                         <span className="text-xs text-gray-400">No active offer</span>
-=======
-                      {product.b2bOfferPercentage && product.b2bOfferPercentage > 0 ? (
-                        <div className="flex flex-col">
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded w-fit mb-1 ${isB2BOfferActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {isB2BOfferActive ? 'Active' : 'Scheduled'} {product.b2bOfferPercentage}% Off
-                          </span>
-                          <div className="text-[10px] text-gray-500 flex items-center gap-1">
-                            <Calendar size={10} /> Ends: {new Date(product.b2bOfferEndDate!).toLocaleDateString()}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
->>>>>>> 1e65977e (connnect)
                       )}
                     </td>
                     <td className="p-4 align-middle">
@@ -1298,22 +1168,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         {product.variants && product.variants.length > 0 && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap max-w-[100px]">
                             {product.variants.map((variant, idx) => (
-<<<<<<< HEAD
                               <div
                                 key={idx}
                                 className="w-2 h-2 rounded-full border border-gray-300"
                                 style={{ backgroundColor: variant.colorCode }}
                                 title={`${variant.color}: ${variant.stock} in stock`}
                               />
-=======
-                              <div key={idx} className="w-2 h-2 rounded-full border border-gray-300" style={{ backgroundColor: variant.colorCode }} title={`${variant.color}`} />
->>>>>>> 1e65977e (connnect)
                             ))}
                           </div>
                         )}
                       </div>
                     </td>
-<<<<<<< HEAD
                     {/* SGST Column */}
                     <td className="p-4 align-middle">
                       <span className="text-sm text-gray-700">{product.sgst ? `${product.sgst}%` : '-'}</span>
@@ -1349,8 +1214,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         )}
                       </div>
                     </td>
-=======
->>>>>>> 1e65977e (connnect)
                     <td className="p-4 align-middle text-gray-700">{product.category}</td>
                     <td className="p-4 align-middle text-right">
                       <div className="flex items-center justify-end gap-2 relative">
@@ -1376,6 +1239,16 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                             className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50 animate-in fade-in zoom-in-95 duration-100 origin-top-right"
                           >
                             <div className="py-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenActionMenuId(null);
+                                  handleViewReviews(product);
+                                }}
+                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <MessageSquare size={14} /> View Reviews
+                              </button>
                               <button
                                 onClick={(e) => handleDuplicateProduct(e, product)}
                                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
@@ -1415,7 +1288,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
           </div>
           <div className="flex items-center space-x-2">
             <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50"><ChevronLeft size={16} /></button>
-<<<<<<< HEAD
             {(() => {
               const pages = [];
               const maxPagesToShow = 5;
@@ -1440,19 +1312,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               }
               return pages;
             })()}
-=======
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              let pageNum = i + 1;
-              if (totalPages > 5 && currentPage > 3) {
-                pageNum = currentPage - 2 + i;
-                if (pageNum > totalPages) pageNum = pageNum - (pageNum - totalPages);
-              }
-              if (pageNum > totalPages || pageNum < 1) return null;
-              return (
-                <button key={pageNum} onClick={() => handlePageChange(pageNum)} className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium border ${currentPage === pageNum ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>{pageNum}</button>
-              );
-            })}
->>>>>>> 1e65977e (connnect)
             <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50"><ChevronRight size={16} /></button>
           </div>
         </div>
@@ -1472,10 +1331,16 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               <div className="flex flex-col items-center justify-center gap-4 mb-2 p-4 border border-dashed border-gray-200 rounded-lg bg-gray-50/50">
                 <div className="w-40 h-40 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden relative group">
                   <img
-                    src={formData.image || 'https://via.placeholder.com/150?text=No+Image'}
+                    src={formData.image || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23f3f4f6" width="150" height="150"/%3E%3Ctext fill="%239ca3af" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3ENo Image%3C/text%3E%3C/svg%3E'}
                     alt="Product"
                     className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Error'; }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (!img.dataset.errorHandled) {
+                        img.dataset.errorHandled = 'true';
+                        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150"%3E%3Crect fill="%23fee2e2" width="150" height="150"/%3E%3Ctext fill="%23dc2626" font-family="sans-serif" font-size="14" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle"%3EImage Error%3C/text%3E%3C/svg%3E';
+                      }
+                    }}
                   />
                   {!formData.image && (
                     <div className="absolute inset-0 flex items-center justify-center text-gray-300">
@@ -1509,18 +1374,72 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium text-gray-700">Category</label>
-                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900">
-                    <option value="Computers">Computers & Laptops</option>
-                    <option value="Mobile">Smartphones & Accessories</option>
-                    <option value="Audio">Audio & Sound</option>
-                    <option value="Home Appliances">Home Appliances</option>
-                    <option value="Smart Home">Smart Home & IoT</option>
-                    <option value="Cameras">Cameras & Photography</option>
-                    <option value="Wearables">Wearable Technology</option>
-                  </select>
-                </div>
-<<<<<<< HEAD
+                  <div className="flex gap-2 relative">
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900"
+                    >
+                      {availableCategories.map((cat) => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
 
+                    <div className="flex gap-1 items-center">
+                      <button
+                        onClick={() => setIsAddingCategory(!isAddingCategory)}
+                        className={`h-9 px-3 border rounded-md flex items-center justify-center gap-1 transition-all ${isAddingCategory ? 'bg-blue-50 border-blue-300 text-blue-600 ring-2 ring-blue-100' : 'bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                        title="Add New Category"
+                      >
+                        <Plus size={16} className={isAddingCategory ? 'rotate-45 transition-transform' : 'transition-transform'} />
+                      </button>
+
+                      <button
+                        onClick={handleDeleteCategory}
+                        className="h-9 px-3 border rounded-md flex items-center justify-center bg-gray-50 border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-50 disabled:hover:text-gray-400 disabled:hover:border-gray-300"
+                        title="Delete Selected Category"
+                        disabled={!formData.category || DEFAULT_CATEGORIES.some(c => c.value === formData.category)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    {/* Popover Box for Adding Category */}
+                    {isAddingCategory && (
+                      <div className="absolute top-0 right-0 translate-x-[105%] w-80 p-4 bg-white border border-gray-100 shadow-2xl rounded-xl z-50 animate-in fade-in zoom-in-95 slide-in-from-left-2 ring-1 ring-black/5">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Add New Category</span>
+                          <button onClick={() => setIsAddingCategory(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            className="flex-1 h-9 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-900 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all outline-none"
+                            placeholder="Category Name"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                          />
+                          <button
+                            onClick={handleAddCategory}
+                            className="h-9 px-4 bg-gray-900 text-white rounded-md hover:bg-black text-xs font-medium shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="text-[10px] text-gray-400 mt-2 text-center bg-gray-50 py-1 rounded">
+                          Press <span className="font-mono font-bold text-gray-500">Enter</span> to save
+                        </div>
+
+                        {/* Little arrow pointing to the button */}
+                        <div className="absolute top-3 -left-2 w-4 h-4 bg-white border-l border-b border-gray-100 transform rotate-45"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Regular Pricing Section */}
@@ -1528,57 +1447,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                 <h4 className="text-sm font-semibold text-gray-900">Regular Pricing</h4>
 
                 {/* MRP */}
-=======
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-gray-700">Brand</label>
-                  <select value={formData.brand} onChange={(e) => setFormData({ ...formData, brand: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900">
-                    <option value="">Select Brand</option>
-                    {MOCK_BRANDS.map(brand => <option key={brand.id} value={brand.name}>{brand.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Retail Pricing */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-gray-700">B2C Price (Selling)</label>
-                  <input
-                    type="number"
-                    value={formData.b2cPrice}
-                    onChange={(e) => {
-                      const newPrice = parseFloat(e.target.value) || 0;
-                      setFormData({ ...formData, b2cPrice: newPrice });
-                    }}
-                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-gray-700">Discount (%)</label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={formData.compareAtPrice && formData.compareAtPrice > 0
-                      ? ((formData.compareAtPrice - (formData.b2cPrice || 0)) / formData.compareAtPrice * 100).toFixed(1)
-                      : ''}
-                    onChange={(e) => {
-                      const discount = parseFloat(e.target.value) || 0;
-                      const original = formData.compareAtPrice || 0;
-                      if (original > 0) {
-                        const newPrice = original - (original * (discount / 100));
-                        setFormData({ ...formData, b2cPrice: Math.round(newPrice) });
-                      }
-                    }}
-                    disabled={!formData.compareAtPrice || formData.compareAtPrice <= 0}
-                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
-                  />
-                </div>
->>>>>>> 1e65977e (connnect)
                 <div className="grid gap-2">
                   <label className="text-sm font-medium text-gray-500">MRP (Actual Price)</label>
                   <input
                     type="number"
                     value={formData.compareAtPrice}
-<<<<<<< HEAD
                     onChange={(e) => {
                       const newMRP = parseFloat(e.target.value) || 0;
                       const b2cPrice = formData.b2cPrice || 0;
@@ -1603,14 +1476,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         b2bDiscount: b2bDiscount
                       });
                     }}
-=======
-                    onChange={(e) => setFormData({ ...formData, compareAtPrice: parseFloat(e.target.value) })}
->>>>>>> 1e65977e (connnect)
                     className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900"
                     placeholder="Unified MRP"
                   />
                 </div>
-<<<<<<< HEAD
 
                 {/* Retail Pricing */}
                 <div className="grid grid-cols-2 gap-4">
@@ -1793,139 +1662,18 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                           onChange={(e) => setFormData({ ...formData, b2bOfferEndDate: e.target.value })}
                         />
                       </div>
-=======
-              </div>
-
-              {/* Limited Time Offers Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* B2C Retail Offer */}
-                <div className="border border-green-200 rounded-lg p-3 bg-green-50/30">
-                  <h4 className="text-sm font-bold text-green-800 flex items-center gap-2 mb-3">
-                    <Percent size={14} /> Retail (B2C) Offer
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Discount %</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 10"
-                        className="w-full h-8 px-2 border border-green-200 rounded text-sm text-gray-900 focus:ring-green-500 focus:border-green-500"
-                        value={formData.b2cOfferPercentage || ''}
-                        onChange={(e) => setFormData({ ...formData, b2cOfferPercentage: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="datetime-local"
-                        className="w-full h-8 px-2 border border-green-200 rounded text-sm text-gray-900"
-                        value={formData.b2cOfferStartDate || ''}
-                        onChange={(e) => setFormData({ ...formData, b2cOfferStartDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="datetime-local"
-                        className="w-full h-8 px-2 border border-green-200 rounded text-sm text-gray-900"
-                        value={formData.b2cOfferEndDate || ''}
-                        onChange={(e) => setFormData({ ...formData, b2cOfferEndDate: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* B2B Bulk Offer */}
-                <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/30">
-                  <h4 className="text-sm font-bold text-blue-800 flex items-center gap-2 mb-3">
-                    <Percent size={14} /> Bulk (B2B) Offer
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Discount %</label>
-                      <input
-                        type="number"
-                        placeholder="e.g. 5"
-                        className="w-full h-8 px-2 border border-blue-200 rounded text-sm text-gray-900 focus:ring-blue-500 focus:border-blue-500"
-                        value={formData.b2bOfferPercentage || ''}
-                        onChange={(e) => setFormData({ ...formData, b2bOfferPercentage: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="datetime-local"
-                        className="w-full h-8 px-2 border border-blue-200 rounded text-sm text-gray-900"
-                        value={formData.b2bOfferStartDate || ''}
-                        onChange={(e) => setFormData({ ...formData, b2bOfferStartDate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="datetime-local"
-                        className="w-full h-8 px-2 border border-blue-200 rounded text-sm text-gray-900"
-                        value={formData.b2bOfferEndDate || ''}
-                        onChange={(e) => setFormData({ ...formData, b2bOfferEndDate: e.target.value })}
-                      />
->>>>>>> 1e65977e (connnect)
                     </div>
                   </div>
                 </div>
               </div>
 
-<<<<<<< HEAD
-=======
-              {/* Bulk Pricing */}
-              <div className="grid grid-cols-3 gap-4 border-t border-gray-100 pt-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-blue-600">B2B Price (Bulk)</label>
-                  <input
-                    type="number"
-                    value={formData.b2bPrice}
-                    onChange={(e) => {
-                      const newPrice = parseFloat(e.target.value) || 0;
-                      setFormData({ ...formData, b2bPrice: newPrice });
-                    }}
-                    className="flex h-9 w-full rounded-md border border-blue-200 bg-white px-3 text-sm text-gray-900"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-gray-700">Bulk Discount (%)</label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={formData.compareAtPrice && formData.compareAtPrice > 0
-                      ? ((formData.compareAtPrice - (formData.b2bPrice || 0)) / formData.compareAtPrice * 100).toFixed(1)
-                      : ''}
-                    onChange={(e) => {
-                      const discount = parseFloat(e.target.value) || 0;
-                      const original = formData.compareAtPrice || 0; // Uses Unified MRP
-                      if (original > 0) {
-                        const newPrice = original - (original * (discount / 100));
-                        setFormData({ ...formData, b2bPrice: Math.round(newPrice) });
-                      }
-                    }}
-                    disabled={!formData.compareAtPrice || formData.compareAtPrice <= 0}
-                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
-                  />
-                </div>
-                <div className="grid gap-2 pt-6">
-                  <p className="text-xs text-gray-400 italic">
-                    B2B discount is calculated on the same MRP as B2C.
-                  </p>
-                </div>
-              </div>
-
->>>>>>> 1e65977e (connnect)
               <div className="grid gap-2 mt-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700">Description</label>
-                  <button onClick={handleGenerateDescription} disabled={isGenerating || !formData.name} className="text-xs flex items-center gap-1 text-blue-600 hover:underline disabled:opacity-50 font-medium">
+                  {/* <button onClick={handleGenerateDescription} disabled={isGenerating || !formData.name} className="text-xs flex items-center gap-1 text-blue-600 hover:underline disabled:opacity-50 font-medium">
                     <Sparkles size={12} /> {isGenerating ? 'Generating...' : 'Auto-generate AI'}
-                  </button>
+                  </button> */}
                 </div>
-<<<<<<< HEAD
                 <textarea value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="flex min-h-[80px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900" />
               </div>
 
@@ -1982,7 +1730,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
+                {/* <div className="grid gap-2">
                   <label className="text-sm font-medium text-gray-700">Return Policy</label>
                   <textarea
                     value={formData.returnPolicy || ''}
@@ -1990,7 +1738,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     className="flex min-h-[60px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900"
                     placeholder="e.g. 7 days return policy. Product must be unused and in original packaging."
                   />
-                </div>
+                </div> */}
               </div>
 
               {/* Dimensions Section */}
@@ -2042,9 +1790,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     />
                   </div>
                 </div>
-=======
-                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="flex min-h-[80px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900" />
->>>>>>> 1e65977e (connnect)
               </div>
 
               {/* Variants UI */}
@@ -2064,7 +1809,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                     </div>
                   ) : <p className="text-xs text-gray-400 text-center py-2">No variants added.</p>}
                   <div className="flex gap-2 pt-2 border-t border-gray-200 items-end">
-<<<<<<< HEAD
                     <input
                       placeholder="Color (e.g., Red, Blue)"
                       className="flex-1 h-8 text-xs border rounded px-2 text-gray-900"
@@ -2082,10 +1826,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                       onChange={(e) => setNewVariant({ ...newVariant, colorCode: e.target.value })}
                       title="Click to pick custom color"
                     />
-=======
-                    <input placeholder="Color" className="flex-1 h-8 text-xs border rounded px-2 text-gray-900" value={newVariant.color} onChange={(e) => setNewVariant({ ...newVariant, color: e.target.value })} />
-                    <input type="color" className="w-8 h-8 p-0 border rounded cursor-pointer" value={newVariant.colorCode} onChange={(e) => setNewVariant({ ...newVariant, colorCode: e.target.value })} />
->>>>>>> 1e65977e (connnect)
                     <input type="number" placeholder="Qty" className="w-20 h-8 text-xs border rounded px-2 text-gray-900" value={newVariant.stock} onChange={(e) => setNewVariant({ ...newVariant, stock: parseInt(e.target.value) || 0 })} />
                     <button onClick={handleAddVariant} className="bg-gray-900 text-white h-8 px-3 rounded text-xs font-medium" disabled={!newVariant.color}>Add</button>
                   </div>
@@ -2110,22 +1850,68 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               <button onClick={() => setShowReviewsModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"><X size={20} /></button>
             </div>
             <div className="overflow-y-auto p-6 space-y-4 flex-1">
-              {selectedProductReviews.length === 0 ? <p className="text-center text-gray-500">No reviews yet.</p> :
+              {reviewsLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <RefreshCw className="animate-spin text-gray-400" size={24} />
+                </div>
+              ) : selectedProductReviews.length === 0 ? (
+                <p className="text-center text-gray-500">No reviews yet.</p>
+              ) : (
                 selectedProductReviews.map((review) => (
                   <div key={review.id} className="border-b border-gray-100 pb-4">
                     <div className="flex justify-between items-start mb-1">
-                      <span className="text-sm font-semibold text-gray-900">{review.user}</span>
-                      <span className="text-xs text-gray-400">{review.date}</span>
+                      <span className="text-sm font-semibold text-gray-900">{review.user_id || 'Anonymous'}</span>
+                      <span className="text-xs text-gray-400">
+                        {review.created_at ? new Date(review.created_at).toLocaleDateString() : '-'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1 mb-2">{renderStars(review.rating)}</div>
-                    <p className="text-sm text-gray-600">"{review.comment}"</p>
+                    <p className="text-sm text-gray-600">
+                      {review.comment ? `"${review.comment}"` : <span className="italic text-gray-400">No comment provided</span>}
+                    </p>
                   </div>
                 ))
-              }
+              )}
             </div>
-            <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
-              <button onClick={() => setShowReviewsModal(false)} className="text-sm font-medium text-gray-600 hover:text-gray-900">Close</button>
-            </div>
+            {/* <div className="p-4 bg-gray-50 border-t border-gray-100">
+              <div className="mb-4">
+                {/* <h4 className="text-sm font-semibold mb-2">Write a Review</h4> */}
+            {/* <div className="space-y-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setNewReviewRating(star)}
+                        className="focus:outline-none"
+                      > */}
+            {/* <Star
+                          size={20}
+                          className={star <= newReviewRating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}
+                        /> */}
+            {/* </button>
+                    ))}
+                  </div> */}
+            {/* <textarea
+                    placeholder="Share your thoughts..."
+                    className="w-full text-sm border rounded-md p-2 h-20"
+                    value={newReviewComment}
+                    onChange={(e) => setNewReviewComment(e.target.value)}
+                  /> */}
+            {/* <div className="flex justify-end gap-2"> */}
+            {/* <button
+                      onClick={handleSubmitReview}
+                      disabled={isSubmittingReview || newReviewRating === 0}
+                      className="bg-indigo-600 text-white text-xs px-3 py-1.5 rounded disabled:opacity-50"
+                    >
+                      {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                    </button> */}
+            {/* </div> */}
+            {/* </div>
+              </div>
+
+              <button onClick={() => setShowReviewsModal(false)} className="text-sm font-medium text-gray-600 hover:text-gray-900 w-full pt-2 border-t border-gray-200">Close</button>
+            // </div> */}
           </div>
         </div>
       )}
@@ -2167,10 +1953,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       )}
     </div>
   );
-<<<<<<< HEAD
 };
 
 
-=======
-};
->>>>>>> 1e65977e (connnect)

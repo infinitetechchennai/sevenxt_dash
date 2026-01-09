@@ -1,11 +1,10 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import io
 
-<<<<<<< HEAD
 def ensure_datetime(date_val):
     if isinstance(date_val, str):
         try:
@@ -16,7 +15,8 @@ def ensure_datetime(date_val):
 
 def calculate_offer_prices(product: models.Product):
     """Calculates and updates offer prices - NO PRINT STATEMENTS for speed"""
-    now = datetime.now()
+    # Fix Timezone: Use UTC + 5:30 (IST) to match user input
+    now = datetime.utcnow() + timedelta(hours=5, minutes=30)
     
     # B2C Offer Logic
     discount_pct = 0.0
@@ -32,15 +32,22 @@ def calculate_offer_prices(product: models.Product):
         end_date = ensure_datetime(product.b2c_offer_end_date)
         
         if start_date and end_date:
-            if start_date <= now <= end_date:
-                is_b2c_offer_active = True
-            else:
+            # Check if offer has expired (past end date)
+            if now > end_date:
+                # Offer expired - clear it
                 product.b2c_active_offer = 0.0
                 product.b2c_offer_price = 0.0
                 product.b2c_offer_start_date = None
                 product.b2c_offer_end_date = None
                 is_b2c_offer_active = False
+            # Check if offer is currently active
+            elif start_date <= now <= end_date:
+                is_b2c_offer_active = True
+            # Otherwise offer is scheduled for future - keep the data but don't activate yet
+            else:
+                is_b2c_offer_active = False
         else:
+            # No dates specified - offer is always active
             is_b2c_offer_active = True
     
     if is_b2c_offer_active and discount_pct > 0:
@@ -62,15 +69,22 @@ def calculate_offer_prices(product: models.Product):
         end_date_b2b = ensure_datetime(product.b2b_offer_end_date)
         
         if start_date_b2b and end_date_b2b:
-            if start_date_b2b <= now <= end_date_b2b:
-                is_b2b_offer_active = True
-            else:
+            # Check if offer has expired (past end date)
+            if now > end_date_b2b:
+                # Offer expired - clear it
                 product.b2b_active_offer = 0.0
                 product.b2b_offer_price = 0.0
                 product.b2b_offer_start_date = None
                 product.b2b_offer_end_date = None
                 is_b2b_offer_active = False
+            # Check if offer is currently active
+            elif start_date_b2b <= now <= end_date_b2b:
+                is_b2b_offer_active = True
+            # Otherwise offer is scheduled for future - keep the data but don't activate yet
+            else:
+                is_b2b_offer_active = False
         else:
+            # No dates specified - offer is always active
             is_b2b_offer_active = True
     
     if is_b2b_offer_active and discount_pct_b2b > 0:
@@ -83,18 +97,35 @@ def get_products(db: Session, skip: int = 0, limit: int = 6000):
     try:
         products = db.query(models.Product).offset(skip).limit(limit).all()
         
+        products_to_update = []
         for product in products:
             try:
+                # Store original offer prices to detect changes
+                original_b2c_offer_price = product.b2c_offer_price
+                original_b2b_offer_price = product.b2b_offer_price
+                
                 calculate_offer_prices(product)
+                
+                # Check if offer prices changed (offer activated or deactivated)
+                b2c_price_changed = original_b2c_offer_price != product.b2c_offer_price
+                b2b_price_changed = original_b2b_offer_price != product.b2b_offer_price
+                
                 b2c_end = ensure_datetime(product.b2c_offer_end_date)
                 b2b_end = ensure_datetime(product.b2b_offer_end_date)
                 
+                # Commit if: offer expired OR offer prices changed (activated/deactivated)
                 if (b2c_end and b2c_end < datetime.now()) or \
-                   (b2b_end and b2b_end < datetime.now()):
-                    db.add(product)
-                    db.commit()
+                   (b2b_end and b2b_end < datetime.now()) or \
+                   b2c_price_changed or b2b_price_changed:
+                    products_to_update.append(product)
             except Exception:
                 continue
+        
+        # Bulk commit all changes
+        if products_to_update:
+            for product in products_to_update:
+                db.add(product)
+            db.commit()
                 
         return products
     except Exception as e:
@@ -103,9 +134,20 @@ def get_products(db: Session, skip: int = 0, limit: int = 6000):
 def get_product(db: Session, product_id: str):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if product:
+        # Store original offer prices to detect changes
+        original_b2c_offer_price = product.b2c_offer_price
+        original_b2b_offer_price = product.b2b_offer_price
+        
         calculate_offer_prices(product)
+        
+        # Check if offer prices changed (offer activated or deactivated)
+        b2c_price_changed = original_b2c_offer_price != product.b2c_offer_price
+        b2b_price_changed = original_b2b_offer_price != product.b2b_offer_price
+        
+        # Commit if: offer expired OR offer prices changed
         if (product.b2c_offer_end_date and product.b2c_offer_end_date < datetime.now()) or \
-           (product.b2b_offer_end_date and product.b2b_offer_end_date < datetime.now()):
+           (product.b2b_offer_end_date and product.b2b_offer_end_date < datetime.now()) or \
+           b2c_price_changed or b2b_price_changed:
             db.add(product)
             db.commit()
     return product
@@ -128,95 +170,10 @@ def create_product(db: Session, product: schemas.ProductCreate):
     
     calculate_offer_prices(db_product)
     
-=======
-# ... existing functions ...
-
-def get_products(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Product).offset(skip).limit(limit).all()
-
-def process_bulk_import(db: Session, file_contents: bytes):
-    try:
-        df = pd.read_excel(io.BytesIO(file_contents))
-        
-        # Normalize column names
-        df.columns = [c.lower().replace(' ', '_') for c in df.columns]
-        
-        results = {"success": 0, "failed": 0, "errors": []}
-        
-        for index, row in df.iterrows():
-            try:
-                # Basic validation
-                if pd.isna(row.get('name')):
-                    continue
-                    
-                # Prepare product data
-                product_data = schemas.ProductCreate(
-                    name=str(row['name']),
-                    category=str(row.get('category', 'Uncategorized')),
-                    brand=str(row.get('brand', '')) if not pd.isna(row.get('brand')) else None,
-                    b2cPrice=float(row.get('b2c_price', 0)),
-                    compareAtPrice=float(row.get('mrp', 0)),
-                    b2bPrice=float(row.get('b2b_price', 0)),
-                    stock=int(row.get('stock', 0)),
-                    description=str(row.get('description', '')) if not pd.isna(row.get('description')) else None,
-                    status=str(row.get('status', 'Draft')),
-                    image=str(row.get('image_url', '')) if not pd.isna(row.get('image_url')) else None,
-                    
-                    # Offers
-                    b2cOfferPercentage=float(row.get('b2c_offer_%', 0)),
-                    b2bOfferPercentage=float(row.get('b2b_offer_%', 0))
-                )
-                
-                # Create product
-                create_product(db, product_data)
-                results["success"] += 1
-                
-            except Exception as e:
-                results["failed"] += 1
-                results["errors"].append(f"Row {index + 2}: {str(e)}")
-                
-        return results
-        
-    except Exception as e:
-        raise Exception(f"Failed to process Excel file: {str(e)}")
-
-def get_product(db: Session, product_id: str):
-    return db.query(models.Product).filter(models.Product.id == product_id).first()
-
-def create_product(db: Session, product: schemas.ProductCreate):
-    # Generate ID if not provided
-    product_id = product.id if product.id else f"prod_{uuid.uuid4().hex[:8]}"
-    
-    db_product = models.Product(
-        id=product_id,
-        name=product.name,
-        category=product.category,
-        brand=product.brand,
-        b2c_price=product.b2cPrice,
-        compare_at_price=product.compareAtPrice,
-        b2b_price=product.b2bPrice,
-        b2c_offer_percentage=product.b2cOfferPercentage,
-        b2c_offer_start_date=product.b2cOfferStartDate,
-        b2c_offer_end_date=product.b2cOfferEndDate,
-        b2b_offer_percentage=product.b2bOfferPercentage,
-        b2b_offer_start_date=product.b2bOfferStartDate,
-        b2b_offer_end_date=product.b2bOfferEndDate,
-        description=product.description,
-        status=product.status,
-        stock=product.stock,
-        image=product.image,
-        rating=product.rating,
-        reviews=product.reviews
-    )
->>>>>>> 1e65977e (connnect)
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
     
-<<<<<<< HEAD
-=======
-    # Add Attributes
->>>>>>> 1e65977e (connnect)
     for attr in product.attributes:
         db_attr = models.ProductAttribute(
             product_id=product_id,
@@ -225,19 +182,11 @@ def create_product(db: Session, product: schemas.ProductCreate):
         )
         db.add(db_attr)
     
-<<<<<<< HEAD
-=======
-    # Add Variants
->>>>>>> 1e65977e (connnect)
     for variant in product.variants:
         db_variant = models.ProductVariant(
             product_id=product_id,
             color=variant.color,
-<<<<<<< HEAD
             color_code=variant.color_code,
-=======
-            color_code=variant.colorCode,
->>>>>>> 1e65977e (connnect)
             stock=variant.stock
         )
         db.add(db_variant)
@@ -251,7 +200,6 @@ def update_product(db: Session, product_id: str, product: schemas.ProductUpdate)
     if not db_product:
         return None
     
-<<<<<<< HEAD
     update_data = product.model_dump(exclude={'attributes', 'variants', 'id'}, exclude_unset=True, by_alias=False)
     
     for key, value in update_data.items():
@@ -260,34 +208,6 @@ def update_product(db: Session, product_id: str, product: schemas.ProductUpdate)
             
     calculate_offer_prices(db_product)
     
-=======
-    # Update fields
-    update_data = product.model_dump(exclude={'attributes', 'variants', 'id'}, exclude_unset=True)
-    
-    # Map alias keys back to model keys if needed (pydantic model_dump with by_alias=False gives field names)
-    # But we defined aliases in schema. Let's handle manually to be safe or use populate_by_name
-    
-    db_product.name = product.name
-    db_product.category = product.category
-    db_product.brand = product.brand
-    db_product.b2c_price = product.b2cPrice
-    db_product.compare_at_price = product.compareAtPrice
-    db_product.b2b_price = product.b2bPrice
-    db_product.b2c_offer_percentage = product.b2cOfferPercentage
-    db_product.b2c_offer_start_date = product.b2cOfferStartDate
-    db_product.b2c_offer_end_date = product.b2cOfferEndDate
-    db_product.b2b_offer_percentage = product.b2bOfferPercentage
-    db_product.b2b_offer_start_date = product.b2bOfferStartDate
-    db_product.b2b_offer_end_date = product.b2bOfferEndDate
-    db_product.description = product.description
-    db_product.status = product.status
-    db_product.stock = product.stock
-    db_product.image = product.image
-    db_product.rating = product.rating
-    db_product.reviews = product.reviews
-    
-    # Update Attributes (Delete all and recreate)
->>>>>>> 1e65977e (connnect)
     if product.attributes is not None:
         db.query(models.ProductAttribute).filter(models.ProductAttribute.product_id == product_id).delete()
         for attr in product.attributes:
@@ -298,21 +218,13 @@ def update_product(db: Session, product_id: str, product: schemas.ProductUpdate)
             )
             db.add(db_attr)
             
-<<<<<<< HEAD
-=======
-    # Update Variants (Delete all and recreate)
->>>>>>> 1e65977e (connnect)
     if product.variants is not None:
         db.query(models.ProductVariant).filter(models.ProductVariant.product_id == product_id).delete()
         for variant in product.variants:
             db_variant = models.ProductVariant(
                 product_id=product_id,
                 color=variant.color,
-<<<<<<< HEAD
                 color_code=variant.color_code,
-=======
-                color_code=variant.colorCode,
->>>>>>> 1e65977e (connnect)
                 stock=variant.stock
             )
             db.add(db_variant)
@@ -322,17 +234,12 @@ def update_product(db: Session, product_id: str, product: schemas.ProductUpdate)
     return db_product
 
 def delete_product(db: Session, product_id: str):
-<<<<<<< HEAD
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
-=======
-    db_product = get_product(db, product_id)
->>>>>>> 1e65977e (connnect)
     if db_product:
         db.delete(db_product)
         db.commit()
         return True
     return False
-<<<<<<< HEAD
 
 def process_bulk_import(db: Session, file_contents: bytes, verbose: bool = False):
     """OPTIMIZED bulk import - NO PRINT STATEMENTS for maximum speed"""
@@ -504,13 +411,13 @@ def process_bulk_import(db: Session, file_contents: bytes, verbose: bool = False
                 status = safe_str(get_value(row, ['status', 'product_status'], 'Draft'))
                 image = safe_str(get_value(row, ['image', 'image_url', 'img', 'picture', 'photo']))
                 rating = safe_float(get_value(row, ['rating', 'product_rating', 'stars']))
-                reviews = safe_int(get_value(row, ['reviews', 'review_count', 'num_reviews']))
+                # reviews = safe_int(get_value(row, ['reviews', 'review_count', 'num_reviews']))
                 product_id = safe_str(get_value(row, ['product_id', 'id', 'sku', 'product_code']))
                 
                 sgst = safe_float(get_value(row, ['sgst', 'sgst_%', 'sgst_percentage', 'state_gst']))
                 cgst = safe_float(get_value(row, ['cgst', 'cgst_%', 'cgst_percentage', 'central_gst']))
                 hsn = safe_str(get_value(row, ['hsn', 'hsn_code', 'hsn_number']))
-                return_policy = safe_str(get_value(row, ['return_policy', 'returns', 'return', 'policy']))
+                # return_policy = safe_str(get_value(row, ['return_policy', 'returns', 'return', 'policy']))
                 
                 height = safe_float(get_value(row, ['height', 'height_(cm)', 'height_cm']))
                 weight = safe_float(get_value(row, ['weight', 'weight_(kg)', 'weight_kg']))
@@ -571,7 +478,7 @@ def process_bulk_import(db: Session, file_contents: bytes, verbose: bool = False
                     'status': status if status in ['Active', 'Draft', 'Archived'] else 'Draft',
                     'image': image or None,
                     'rating': rating,
-                    'reviews': reviews,
+                    # 'reviews': reviews,  # Commented out - field removed from model
                     'b2c_active_offer': b2c_offer,
                     'b2b_active_offer': b2b_offer,
                     'b2c_offer_price': b2c_offer_price,
@@ -583,7 +490,7 @@ def process_bulk_import(db: Session, file_contents: bytes, verbose: bool = False
                     'sgst': sgst,
                     'cgst': cgst,
                     'hsn': hsn or None,
-                    'return_policy': return_policy or None,
+                    # 'return_policy': return_policy or None,  # Commented out - field removed from model
                     'height': height,
                     'weight': weight,
                     'breadth': breadth,
@@ -642,5 +549,3 @@ def process_bulk_import(db: Session, file_contents: bytes, verbose: bool = False
     except Exception as e:
         print(f"❌ Import failed: {str(e)}")
         raise Exception(f"Import failed: {str(e)}")
-=======
->>>>>>> 1e65977e (connnect)

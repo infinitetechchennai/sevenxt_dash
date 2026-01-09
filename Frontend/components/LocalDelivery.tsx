@@ -9,10 +9,11 @@ import {
 } from 'recharts';
 
 import { PorterRateRule, PorterZone } from '../types';
+import { API_BASE_URL } from '../services/api';
 
 export const PorterView: React.FC = () => {
-    // Tabs focused on Local Operations
-    const [activeTab, setActiveTab] = useState<'Live Ops' | 'Book Rider' | 'History' | 'Settings'>('Live Ops');
+    // Tabs focused on Local Operations - only Live Ops now
+    const [activeTab, setActiveTab] = useState<'Live Ops'>('Live Ops');
     const [searchTerm, setSearchTerm] = useState('');
 
     // Local state for Rules and Zones
@@ -42,7 +43,7 @@ export const PorterView: React.FC = () => {
         // Fetch local deliveries from backend (city=Chennai filter applied on backend)
         const fetchLocalDeliveries = async () => {
             try {
-                const base = (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8001';
+                const base = API_BASE_URL;
                 const token = localStorage.getItem('auth_token');
                 const res = await fetch(`${base}/api/v1/orders/deliveries?city=Chennai`, {
                     headers: {
@@ -126,177 +127,60 @@ export const PorterView: React.FC = () => {
                         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <MapPin className="text-indigo-600" /> Delivery (Local)
                         </h2>
-                        <p className="text-gray-500 mt-1">Manage intra-city logistics for B2B & B2C orders via Porter.</p>
+                        <p className="text-gray-500 mt-1">Manage intra-city logistics for B2B & B2C orders via Delivery.</p>
                     </div>
 
                 </div>
 
-                {/* Navigation Tabs */}
+                {/* Navigation Tabs - Only Live Operations */}
                 <div className="bg-white px-6 rounded-xl border border-gray-200 shadow-sm">
                     <nav className="-mb-px flex space-x-8 overflow-x-auto no-scrollbar">
                         <button
-                            onClick={() => setActiveTab('Live Ops')}
-                            className={`whitespace-nowrap py-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'Live Ops' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
+                            className="whitespace-nowrap py-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 border-indigo-600 text-indigo-600"
                         >
                             <Activity size={18} /> Live Operations
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('History')}
-                            className={`whitespace-nowrap py-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'History' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <FileClock size={18} /> Trip History
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('Settings')}
-                            className={`whitespace-nowrap py-4 border-b-2 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === 'Settings' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <Key size={18} /> Configuration
                         </button>
                     </nav>
                 </div>
             </div>
 
             {/* --- LIVE OPS TAB --- */}
-            {activeTab === 'Live Ops' && (
-                <div className="space-y-6 animate-in fade-in">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Local Deliveries */}
-                        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                                <h3 className="font-bold text-gray-900">Local Deliveries (Chennai)</h3>
-                                <p className="text-sm text-gray-500 mt-1">Showing all Chennai deliveries</p>
-                            </div>
-                            <div className="divide-y divide-gray-100">
-                                {outstationDeliveries.length === 0 ? (
-                                    <div className="p-6 text-center text-sm text-gray-500">No local deliveries found.</div>
-                                ) : (
-                                    outstationDeliveries.map((d) => (
-                                        <div key={d.id || d.awb_number || d.order_id} className="p-4 hover:bg-gray-50 flex items-center justify-between">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="font-bold text-gray-900">{d.order_number || d.order_id || d.awb_number}</span>
-                                                    <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded uppercase">Local</span>
-                                                </div>
-                                                <div className="text-sm text-gray-500 flex items-center gap-2">
-                                                    <MapPin size={14} /> {d.full_address || d.customer_name || 'Address not available'}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="font-bold text-gray-900">{d.customer_name || d.phone || '-'}</div>
-                                                <div className="text-xs text-blue-600 font-medium">{(d.delivery_status || '').replace(/_/g, ' ')}</div>
-                                            </div>
+            <div className="space-y-6 animate-in fade-in">
+                {/* Local Deliveries */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                        <h3 className="font-bold text-gray-900">Local Deliveries (Chennai)</h3>
+                        <p className="text-sm text-gray-500 mt-1">Showing all Chennai deliveries</p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                        {outstationDeliveries.length === 0 ? (
+                            <div className="p-6 text-center text-sm text-gray-500">No local deliveries found.</div>
+                        ) : (
+                            outstationDeliveries.map((d) => (
+                                <div key={d.id || d.awb_number || d.order_id} className="p-4 hover:bg-gray-50 flex items-center justify-between">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-bold text-gray-900">{d.order_number || d.order_id || d.awb_number}</span>
+                                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded uppercase">Local</span>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Performance Chart */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="font-bold text-gray-900 mb-6 text-center">Delivery Success Rate</h3>
-                            <div className="h-[250px] w-full relative flex items-center justify-center">
-                                <p className="text-gray-500 text-center">No performance data available</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- TRIP HISTORY TAB --- */}
-            {activeTab === 'History' && (
-                <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden animate-in fade-in">
-                    <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-                        <h3 className="text-lg font-semibold text-gray-900">Local Delivery Logs</h3>
-                        <div className="relative w-64">
-                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
-                            />
-                        </div>
-                    </div>
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
-                            <tr>
-                                <th className="px-6 py-3 text-left">Order</th>
-                                <th className="px-6 py-3 text-left">Customer</th>
-                                <th className="px-6 py-3 text-left">Address</th>
-                                <th className="px-6 py-3 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
-                            {filteredLogs.map((log) => (
-                                <tr key={log.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4 font-mono font-medium text-indigo-600 text-sm">{log.order_number || log.order_id}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">{log.customer_name}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">{log.full_address}</td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-medium bg-gray-100 text-gray-800 border-gray-200">
-                                            {(log.delivery_status || '').replace(/_/g, ' ')}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* --- SETTINGS TAB --- */}
-            {activeTab === 'Settings' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in">
-                    {/* Rate Rules */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-900">Rate Card (Chennai)</h3>
-                            <button onClick={() => setShowRuleModal(true)} className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800">Add Rule</button>
-                        </div>
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-white text-gray-500 border-b border-gray-100">
-                                <tr>
-                                    <th className="px-4 py-3">Vehicle</th>
-                                    <th className="px-4 py-3 text-right">Base</th>
-                                    <th className="px-4 py-3 text-right">/Km</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {rules.map(rule => (
-                                    <tr key={rule.id}>
-                                        <td className="px-4 py-3 font-medium text-gray-900">{rule.vehicleType}</td>
-                                        <td className="px-4 py-3 text-right">₹{rule.baseFare}</td>
-                                        <td className="px-4 py-3 text-right">₹{rule.perKmRate}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Zones */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-900">Service Zones</h3>
-                            <button onClick={() => setShowZoneModal(true)} className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded hover:bg-gray-800">Add Zone</button>
-                        </div>
-                        <div className="divide-y divide-gray-100 p-4">
-                            {zones.map(zone => (
-                                <div key={zone.id} className="py-3">
-                                    <div className="flex justify-between">
-                                        <span className="font-bold text-gray-900">{zone.name}</span>
-                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">{zone.status}</span>
+                                        <div className="text-sm text-gray-500 flex items-center gap-2">
+                                            <MapPin size={14} /> {d.full_address || d.customer_name || 'Address not available'}
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1 font-mono truncate">{zone.pincodes}</p>
+                                    <div className="text-right">
+                                        <div className="font-bold text-gray-900">{d.customer_name || d.phone || '-'}</div>
+                                        <div className="text-xs text-blue-600 font-medium">{(d.delivery_status || '').replace(/_/g, ' ')}</div>
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
+                            ))
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
+
+
+
+
 
             {/* --- MODALS --- */}
             {/* Add Rule Modal */}

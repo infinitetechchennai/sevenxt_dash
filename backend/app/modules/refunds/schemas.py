@@ -18,6 +18,10 @@ class RefundAWBUpdate(BaseModel):
     return_awb_number: str
     return_label_path: str
 
+class RefundReject(BaseModel):
+    rejection_reason: str
+    admin_notes: Optional[str] = None
+
 class RefundResponse(BaseModel):
     id: int
     order_id: int
@@ -38,6 +42,10 @@ class RefundResponse(BaseModel):
     return_awb_number: Optional[str] = None
     return_label_path: Optional[str] = None
     return_delivery_status: Optional[str] = None  # Delhivery tracking status
+    
+    # Rejection details
+    rejection_reason: Optional[str] = None
+    admin_notes: Optional[str] = None
     
     created_at: Optional[datetime]
     updated_at: Optional[datetime]

@@ -4,6 +4,7 @@ from typing import List
 import requests
 from requests.auth import HTTPBasicAuth
 from pydantic import BaseModel
+from uuid import UUID
 
 from app.database import get_db
 from app.config import settings
@@ -29,7 +30,7 @@ def read_b2b_users(db: Session = Depends(get_db)):
 
 # 2. UPDATE STATUS (Existing workflow)
 @router.put("/verify/{id}", response_model=schemas.B2BResponse)
-def verify_b2b_user(id: int, status_update: schemas.B2BStatusUpdate, db: Session = Depends(get_db)):
+def verify_b2b_user(id: UUID, status_update: schemas.B2BStatusUpdate, db: Session = Depends(get_db)):
     updated_user = service.update_status(db, id, status_update.status)
     if not updated_user:
         raise HTTPException(status_code=404, detail="B2B Application not found")

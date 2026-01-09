@@ -19,6 +19,7 @@ class DelhiveryClient:
     def create_shipment(self, order_data: dict) -> dict:
         """
         Create shipment in Delhivery and generate AWB number
+        Supports both forward and return shipments
         """
         url = f"{self.base_url}/api/cmu/create.json"
         print("DELHIVERY CREATE SHIPMENT URL:", url)
@@ -27,43 +28,50 @@ class DelhiveryClient:
         phone = str(order_data.get("phone", ""))
         
         print(f"[DEBUG] Phone number being sent: {phone}")
+        
+        # Note: Reverse pickup is handled via payment_mode="Pickup" (not is_return flag)
+
+        shipment_payload = {
+            "name": order_data["customer_name"],
+            "add": order_data["address"],
+            "pin": str(order_data["pincode"]),  # Ensure string
+            "city": order_data["city"],
+            "state": order_data["state"],
+            "country": "India",
+            "phone": str(phone),  # Ensure string
+            "mobile": str(phone), # Add mobile field as well
+            "email": order_data.get("email", "noreply@sevenxt.com"),  # Add email field
+            "order": str(order_data["order_id"]),  # Ensure string
+            "payment_mode": (
+                "Pickup" if order_data.get("payment_status") == "Pickup"
+                else "Prepaid" if order_data.get("payment_status") in ["Paid", "Prepaid"]
+                else "COD"
+            ),
+            "products_desc": order_data.get("item_name", "Product"),
+            "hsn_code": "",
+            "cod_amount": (
+                0.0
+                if order_data.get("payment_status") in ["Paid", "Prepaid"]
+                else float(order_data["amount"])
+            ),
+            "order_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "total_amount": float(order_data["amount"]),
+            "quantity": int(order_data.get("quantity", 1)),
+            # Dimensions (CM)
+            "shipment_length": float(order_data["length"]),
+            "shipment_breadth": float(order_data["breadth"]),
+            "shipment_height": float(order_data["height"]),
+            # Weight in KG (IMPORTANT)
+            "shipment_weight": float(order_data["weight"]),
+            # Service Type: E (Express) or S (Surface)
+            "service": order_data.get("service_type", "E"),
+        }
+        
+        # For reverse pickup: payment_mode="Pickup" + customer address in main fields
+        # pickup_location.name specifies the warehouse (destination)
 
         payload_data = {
-            "shipments": [
-                {
-                    "name": order_data["customer_name"],
-                    "add": order_data["address"],
-                    "pin": str(order_data["pincode"]),  # Ensure string
-                    "city": order_data["city"],
-                    "state": order_data["state"],
-                    "country": "India",
-                    "phone": str(phone),  # Ensure string
-                    "mobile": str(phone), # Add mobile field as well
-                    "email": order_data.get("email", "noreply@sevenxt.com"),  # Add email field
-                    "order": str(order_data["order_id"]),  # Ensure string
-                    "payment_mode": "Prepaid"
-                    if order_data.get("payment_status") in ["Paid", "Prepaid"]
-                    else "COD",
-                    "products_desc": order_data.get("item_name", "Product"),
-                    "hsn_code": "",
-                    "cod_amount": (
-                        0.0
-                        if order_data.get("payment_status") in ["Paid", "Prepaid"]
-                        else float(order_data["amount"])
-                    ),
-                    "order_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "total_amount": float(order_data["amount"]),
-                    "quantity": int(order_data.get("quantity", 1)),
-                    # Dimensions (CM)
-                    "shipment_length": float(order_data["length"]),
-                    "shipment_breadth": float(order_data["breadth"]),
-                    "shipment_height": float(order_data["height"]),
-                    # Weight in KG (IMPORTANT)
-                    "shipment_weight": float(order_data["weight"]),
-                    # Service Type: E (Express) or S (Surface)
-                    "service": order_data.get("service_type", "E"),
-                }
-            ],
+            "shipments": [shipment_payload],
             "pickup_location": {
                 # MUST MATCH EXACT NAME CREATED IN DELHIVERY
                 "name": "sevenxt"
@@ -134,6 +142,65 @@ class DelhiveryClient:
         print("WAREHOUSE RESPONSE:", response.text)
         response.raise_for_status()
         return response.json()
+
+    # --------------------------------------------------
+    # FETCH WAREHOUSE DETAILS (WITH CACHING)
+    # --------------------------------------------------
+    def get_warehouse_details(self, warehouse_name: str = "sevenxt") -> dict:
+        """
+        Fetch warehouse/pickup location details from Delhivery
+        Returns warehouse address, phone, pincode, etc.
+        
+        This is cached to avoid repeated API calls.
+        Falls back to default values if API fails.
+        """
+        url = f"{self.base_url}/api/backend/clientwarehouse/all/"
+        
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/json",
+        }
+        
+        try:
+            print(f"[WAREHOUSE] Fetching warehouse details for: {warehouse_name}")
+            response = requests.get(url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                warehouses = data.get("data", [])
+                
+                # Find the warehouse by name
+                for warehouse in warehouses:
+                    if warehouse.get("name") == warehouse_name:
+                        print(f"[WAREHOUSE] Found warehouse: {warehouse.get('address')}")
+                        return {
+                            "name": warehouse.get("name", warehouse_name),
+                            "address": warehouse.get("address", ""),
+                            "city": warehouse.get("city", "Chennai"),
+                            "state": warehouse.get("state", "Tamil Nadu"),
+                            "pincode": warehouse.get("pin", "600014"),
+                            "phone": warehouse.get("phone", "9363286257"),
+                            "email": warehouse.get("email", "loguloges77@gmail.com"),
+                        }
+                
+                print(f"[WAREHOUSE] WARNING: Warehouse '{warehouse_name}' not found in API response")
+            else:
+                print(f"[WAREHOUSE] WARNING: API returned status {response.status_code}")
+                
+        except Exception as e:
+            print(f"[WAREHOUSE] WARNING: Error fetching warehouse: {e}")
+        
+        # Fallback to default values if API fails or warehouse not found
+        print(f"[WAREHOUSE] Using default warehouse values")
+        return {
+            "name": warehouse_name,
+            "address": "Sevenxt Electronic pvt ltd, Chennai",
+            "city": "Chennai",
+            "state": "Tamil Nadu",
+            "pincode": "600014",
+            "phone": "9363286257",
+            "email": "loguloges77@gmail.com",
+        }
 
     # --------------------------------------------------
     # FETCH AWB LABEL (PDF)

@@ -250,7 +250,7 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
 
 def create_return_shipment(db: Session, refund) -> tuple:
     """
-    Creates a RETURN shipment (customer → warehouse) for approved refund.
+    Creates a RETURN shipment (customer -> warehouse) for approved refund.
     Returns: (return_awb_number, return_label_path)
     """
     logger.info(f"[RETURN] Creating return shipment for refund ID: {refund.id}")
@@ -274,28 +274,20 @@ def create_return_shipment(db: Session, refund) -> tuple:
         logger.error(f"[RETURN] Invalid phone number")
         return (None, None)
     
-    # Prepare RETURN shipment data (reverse of forward shipment)
+    # Prepare RETURN shipment data (REVERSE PICKUP: Customer → Warehouse)
     return_order_data = {
-        # Destination: Your Warehouse
-        "customer_name": "SevenXT Warehouse",
-        "address": "Your Warehouse Address, Chennai",  # Update with your actual warehouse address
-        "pincode": "600001",  # Your warehouse pincode
-        "city": "Chennai",
-        "state": "Tamil Nadu",
-        "phone": "9876543210",  # Your warehouse phone
-        "email": "warehouse@sevenxt.com",
-        
-        # Pickup Location: Customer's address
-        "pickup_name": order.customer_name or "Customer",
-        "pickup_address": order.address,
-        "pickup_pincode": str(order.pincode),
-        "pickup_city": order.city or "Unknown",
-        "pickup_state": order.state or "Unknown",
-        "pickup_phone": phone,
+        # PICKUP POINT: Customer's Address (where courier will go to pick up)
+        "customer_name": order.customer_name or "Customer",
+        "address": order.address,
+        "pincode": str(order.pincode),
+        "city": order.city or "Unknown",
+        "state": order.state or "Unknown",
+        "phone": phone,
+        "email": order.email or "noreply@sevenxt.com",
         
         # Order details
         "order_id": f"RETURN-{refund.id}",  # Unique return order ID
-        "payment_status": "Prepaid",  # Returns are prepaid
+        "payment_status": "Pickup",  # CRITICAL: Triggers reverse pickup (NOT "Prepaid")
         "amount": float(refund.amount),
         
         # Package dimensions (use original order dimensions)
@@ -308,9 +300,6 @@ def create_return_shipment(db: Session, refund) -> tuple:
         "item_name": f"Return: {refund.reason[:50]}",  # Use refund reason
         "quantity": 1,
         "service_type": "E",  # Express service for returns
-        
-        # Mark as return shipment
-        "is_return": True,
     }
     
     logger.info(f"[RETURN] Payload prepared: {return_order_data}")
@@ -347,10 +336,27 @@ def create_return_shipment(db: Session, refund) -> tuple:
         
         logger.info(f"[RETURN] Return AWB Generated: {return_awb}")
         
-        # Fetch and save return label
+        # Fetch and save return label with retry logic
         return_label_path = None
         try:
-            pdf_content, error = client.fetch_awb_label(return_awb)
+            import time
+            max_retries = 3
+            retry_delay = 2
+            
+            pdf_content = None
+            for attempt in range(max_retries):
+                logger.info(f"[RETURN] Fetching label for AWB {return_awb} (Attempt {attempt + 1}/{max_retries})")
+                pdf_content, error = client.fetch_awb_label(return_awb)
+                
+                if pdf_content:
+                    logger.info(f"[RETURN] Label fetched successfully on attempt {attempt + 1}")
+                    break
+                else:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"[RETURN] Label not ready yet, waiting {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.error(f"[RETURN] Failed to fetch label after {max_retries} attempts: {error}")
             
             if pdf_content:
                 import os
@@ -369,7 +375,7 @@ def create_return_shipment(db: Session, refund) -> tuple:
                 # Send email with AWB label
                 send_return_label_email(order.email, order.customer_name, return_awb, file_path, refund.reason)
             else:
-                logger.error(f"[RETURN] Failed to fetch return label: {error}")
+                logger.error(f"[RETURN] Failed to fetch return label after all retries")
         
         except Exception as e:
             logger.exception(f"[RETURN] Error fetching/saving label: {e}")
@@ -387,19 +393,36 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
     """
     try:
         from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+        from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition, From
         from app.config import settings
         import base64
         import os
+        
+        logger.info(f"[EMAIL] Starting email send process to {customer_email}")
         
         # Use SendGrid credentials from config
         SENDGRID_API_KEY = settings.SENDGRID_API_KEY
         SENDGRID_FROM_EMAIL = settings.SENDGRID_FROM_EMAIL
         SENDGRID_FROM_NAME = settings.SENDGRID_FROM_NAME
         
+        logger.info(f"[EMAIL] Using SendGrid from: {SENDGRID_FROM_EMAIL}")
+        
+        # Validate email
+        if not customer_email or '@' not in customer_email:
+            logger.error(f"[EMAIL] Invalid customer email: {customer_email}")
+            return
+        
+        # Check if file exists
+        if not os.path.exists(label_path):
+            logger.error(f"[EMAIL] Label file not found: {label_path}")
+            return
+        
         # Read the PDF file
+        logger.info(f"[EMAIL] Reading label file: {label_path}")
         with open(label_path, 'rb') as f:
             pdf_data = f.read()
+        
+        logger.info(f"[EMAIL] PDF file size: {len(pdf_data)} bytes")
         
         # Encode to base64
         encoded_file = base64.b64encode(pdf_data).decode()
@@ -412,9 +435,11 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
             Disposition('attachment')
         )
         
-        # Create email
+        logger.info(f"[EMAIL] Attachment created successfully")
+        
+        # Create email with proper from format
         message = Mail(
-            from_email=SENDGRID_FROM_EMAIL,  # Use email from config
+            from_email=From(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
             to_emails=customer_email,
             subject=f'Return Label for Your Refund Request - AWB: {awb_number}',
             html_content=f'''
@@ -457,14 +482,25 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
         
         message.attachment = attached_file
         
+        logger.info(f"[EMAIL] Email message created, sending via SendGrid...")
+        
         # Send email
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         response = sg.send(message)
         
-        logger.info(f"[EMAIL] Return label sent to {customer_email}. Status: {response.status_code}")
+        logger.info(f"[EMAIL] ✅ Return label sent successfully to {customer_email}. Status: {response.status_code}")
+        logger.info(f"[EMAIL] Response headers: {response.headers}")
         
+        return True
+        
+    except FileNotFoundError as e:
+        logger.error(f"[EMAIL] ❌ Label file not found: {e}")
+        return False
     except Exception as e:
-        logger.exception(f"[EMAIL] Failed to send return label email: {e}")
+        logger.exception(f"[EMAIL] ❌ Failed to send return label email: {e}")
+        logger.error(f"[EMAIL] Error type: {type(e).__name__}")
+        logger.error(f"[EMAIL] Error details: {str(e)}")
+        return False
 
 
 def create_exchange_return_shipment(db: Session, exchange) -> tuple:
@@ -493,28 +529,20 @@ def create_exchange_return_shipment(db: Session, exchange) -> tuple:
         logger.error(f"[EXCHANGE] Invalid phone number")
         return (None, None)
     
-    # Prepare RETURN shipment data
+    # Prepare RETURN shipment data (REVERSE PICKUP: Customer → Warehouse)
     return_order_data = {
-        # Destination: Your Warehouse
-        "customer_name": "SevenXT Warehouse",
-        "address": "Your Warehouse Address, Chennai",
-        "pincode": "600001",
-        "city": "Chennai",
-        "state": "Tamil Nadu",
-        "phone": "9876543210",
-        "email": "warehouse@sevenxt.com",
-        
-        # Pickup Location: Customer's address
-        "pickup_name": order.customer_name or "Customer",
-        "pickup_address": order.address,
-        "pickup_pincode": str(order.pincode),
-        "pickup_city": order.city or "Unknown",
-        "pickup_state": order.state or "Unknown",
-        "pickup_phone": phone,
+        # PICKUP POINT: Customer's Address (where courier will go to pick up)
+        "customer_name": order.customer_name or "Customer",
+        "address": order.address,
+        "pincode": str(order.pincode),
+        "city": order.city or "Unknown",
+        "state": order.state or "Unknown",
+        "phone": phone,
+        "email": order.email or "noreply@sevenxt.com",
         
         # Order details
         "order_id": f"EXCH-RET-{exchange.id}",  # Unique return order ID for exchange
-        "payment_status": "Prepaid",
+        "payment_status": "Pickup",  # CRITICAL: Triggers reverse pickup (NOT "Prepaid")
         "amount": float(exchange.price) if exchange.price else 0.0,
         
         # Package dimensions (use original order dimensions or defaults)
@@ -527,8 +555,6 @@ def create_exchange_return_shipment(db: Session, exchange) -> tuple:
         "item_name": f"Exchange Return: {exchange.product_name}",
         "quantity": exchange.quantity,
         "service_type": "E",
-        
-        "is_return": True,
     }
     
     logger.info(f"[EXCHANGE] Return Payload prepared: {return_order_data}")
@@ -562,10 +588,28 @@ def create_exchange_return_shipment(db: Session, exchange) -> tuple:
         
         logger.info(f"[EXCHANGE] Return AWB Generated: {return_awb}")
         
-        # Fetch label
+        # Fetch label with retry logic (Delhivery might take a few seconds to generate label)
         return_label_path = None
         try:
-            pdf_content, error = client.fetch_awb_label(return_awb)
+            import time
+            max_retries = 3
+            retry_delay = 2  # seconds
+            
+            pdf_content = None
+            for attempt in range(max_retries):
+                logger.info(f"[EXCHANGE] Fetching label for AWB {return_awb} (Attempt {attempt + 1}/{max_retries})")
+                pdf_content, error = client.fetch_awb_label(return_awb)
+                
+                if pdf_content:
+                    logger.info(f"[EXCHANGE] Label fetched successfully on attempt {attempt + 1}")
+                    break
+                else:
+                    if attempt < max_retries - 1:  # Don't sleep on last attempt
+                        logger.warning(f"[EXCHANGE] Label not ready yet, waiting {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                    else:
+                        logger.error(f"[EXCHANGE] Failed to fetch label after {max_retries} attempts: {error}")
+            
             if pdf_content:
                 import os
                 upload_dir = os.path.join("uploads", "return_awb")
@@ -578,6 +622,8 @@ def create_exchange_return_shipment(db: Session, exchange) -> tuple:
                 
                 # Send email
                 send_return_label_email(order.email, order.customer_name, return_awb, file_path, f"Exchange Request: {exchange.reason}")
+            else:
+                logger.warning(f"[EXCHANGE] Proceeding without label - will need to fetch manually later")
         except Exception as e:
             logger.exception(f"[EXCHANGE] Error fetching/saving label: {e}")
             

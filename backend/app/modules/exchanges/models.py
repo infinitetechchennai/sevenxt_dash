@@ -32,11 +32,13 @@ class Exchange(Base):
     return_awb_number = Column(String(255), nullable=True)
     return_label_path = Column(String(500), nullable=True)
     return_delivery_status = Column(String(50), nullable=True)  # Delhivery status
+    delivery_attempts = Column(Integer, default=0, nullable=True)  # Track failed delivery attempts
     
     # Forward Shipment Details (Replacement Product - Warehouse to Customer)
     new_awb_number = Column(String(255), nullable=True)
     new_label_path = Column(String(500), nullable=True)
     new_delivery_status = Column(String(50), nullable=True)  # Delhivery status
+    new_delivery_attempts = Column(Integer, default=0, nullable=True)  # Track failed delivery attempts
     
     # Admin Actions
     admin_notes = Column(Text, nullable=True)

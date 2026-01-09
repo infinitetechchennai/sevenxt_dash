@@ -1,17 +1,16 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 class B2BStatus(str, Enum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
 
-from typing import Optional, List, Union
-
 class B2CUserResponse(BaseModel):
-    id: int
+    id: UUID
     full_name: Optional[str]
     email: Optional[str]
     phone_number: Optional[Union[str, int]]
@@ -21,7 +20,7 @@ class B2CUserResponse(BaseModel):
         from_attributes = True
 
 class B2BUserResponse(BaseModel):
-    id: int
+    id: UUID
     business_name: Optional[str]
     gstin: Optional[str]
     pan: Optional[str]

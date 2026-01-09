@@ -20,6 +20,10 @@ class Refund(Base):
     return_label_path = Column(String(500), nullable=True)
     return_delivery_status = Column(String(50), nullable=True)  # Track Delhivery status: Manifested, Picked Up, In Transit, Delivered
     
+    # Rejection details
+    rejection_reason = Column(Text, nullable=True)  # Admin's reason for rejecting the refund
+    admin_notes = Column(Text, nullable=True)  # Internal notes for admin reference
+    
     # Timestamps
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

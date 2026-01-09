@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
-=======
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
->>>>>>> 1e65977e (connnect)
+export const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
+
 
 export interface LoginRequest {
   email: string;
@@ -42,15 +39,12 @@ class ApiService {
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = this.getAuthToken();
-<<<<<<< HEAD
 
     // Normalize base URL and endpoint to avoid double-slashes
     const base = API_BASE_URL.replace(/\/+$/g, "");
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${base}${path}`;
 
-=======
->>>>>>> 1e65977e (connnect)
     const headers: HeadersInit = {
       "Content-Type": "application/json",
       ...options.headers,
@@ -60,16 +54,11 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-<<<<<<< HEAD
     const response = await fetch(url, {
-=======
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
->>>>>>> 1e65977e (connnect)
       ...options,
       headers,
     });
 
-<<<<<<< HEAD
     console.log('📡 API Response:', {
       url: url,
       status: response.status,
@@ -95,16 +84,6 @@ class ApiService {
     }
 
     return data;
-=======
-    if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
-        detail: "An error occurred",
-      }));
-      throw new Error(error.detail || `HTTP error: ${response.status}`);
-    }
-
-    return response.json();
->>>>>>> 1e65977e (connnect)
   }
 
   /** 🔐 LOGIN */
@@ -120,7 +99,6 @@ class ApiService {
     return response;
   }
 
-<<<<<<< HEAD
   /** 👤 Current Auth User */
   async getCurrentUser(): Promise<UserData> {
     return this.request<UserData>("/api/v1/auth/me");
@@ -140,31 +118,6 @@ class ApiService {
   }
 
   /** ➕ Create User */
-=======
-  /** 👤 CURRENT AUTH USER */
-  async getCurrentUser(): Promise<UserData> {
-    return this.request<UserData>("/api/v1/auth/me");
-  }
-  // async deleteUser(id: number) {
-  //   return this.request<UserData>(`/api/v1/auth/users/${id}`, {
-  //     method: "DELETE"
-  //   })
-  // }
-
-  /** 👥 ALL USERS (Employees + B2B/B2C) */
-  async getUsers(): Promise<UserData[]> {
-    // Fetch employees (Admin/Staff)
-    const employees = await this.request<UserData[]>("/api/v1/employees");
-
-    // Fetch users (B2B/B2C)
-    const users = await this.request<UserData[]>("/api/v1/auth/users");
-
-    // Combine and return
-    return [...employees, ...users];
-  }
-
-  /** ➕ CREATE USER (all go through register for now) */
->>>>>>> 1e65977e (connnect)
   async createUser(userData: {
     name: string;
     email: string;
@@ -177,7 +130,6 @@ class ApiService {
     pincode?: string;
     permissions?: string[];
   }): Promise<UserData> {
-<<<<<<< HEAD
     const isEmployee = userData.role === "admin" || userData.role === "staff";
     const endpoint = isEmployee
       ? "/api/v1/employees/create"
@@ -185,17 +137,10 @@ class ApiService {
 
     return this.request<UserData>(endpoint, {
       method: "POST",
-=======
-    const isEmployee = userData.role === 'admin' || userData.role === 'staff';
-    const endpoint = isEmployee ? '/api/v1/employees/create' : '/api/v1/auth/register';
-    return this.request<UserData>(endpoint, {
-      method: 'POST',
->>>>>>> 1e65977e (connnect)
       body: JSON.stringify(userData),
     });
   }
 
-<<<<<<< HEAD
   /** 🗑️ Delete User */
   async deleteUser(id: string, type: string): Promise<void> {
     // ID comes as "Admin-1", we need just "1"
@@ -215,23 +160,16 @@ class ApiService {
   }
 
   /** 🚪 Logout */
-=======
-
->>>>>>> 1e65977e (connnect)
   logout(): void {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user");
   }
 
-<<<<<<< HEAD
   /** 🔎 Check Auth State */
-=======
->>>>>>> 1e65977e (connnect)
   isAuthenticated(): boolean {
     return !!this.getAuthToken();
   }
 
-<<<<<<< HEAD
   // -------------- ADMIN PASSWORD RESET ----------------
 
   /** 🔑 Admin Reset User Password */
@@ -270,9 +208,6 @@ class ApiService {
 
   // -------------- PRODUCT APIs ----------------
 
-=======
-  // Product API Methods
->>>>>>> 1e65977e (connnect)
   async fetchProducts(): Promise<any[]> {
     return this.request<any[]>("/api/v1/products");
   }
@@ -296,13 +231,18 @@ class ApiService {
       method: "DELETE",
     });
   }
-<<<<<<< HEAD
 
   /** 📦 Import Products from Excel */
   async importProducts(file: File): Promise<{
-    success: number;
-    failed: number;
-    errors: string[];
+    status: string;
+    message: string;
+    details: {
+      success: number;
+      created: number;
+      updated: number;
+      failed: number;
+      errors: string[];
+    };
   }> {
     const token = this.getAuthToken();
     const formData = new FormData();
@@ -394,6 +334,13 @@ class ApiService {
     });
   }
 
+  async rejectRefund(refundId: number, rejectionReason: string, adminNotes?: string): Promise<any> {
+    return this.request<any>(`/api/v1/refunds/${refundId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ rejection_reason: rejectionReason, admin_notes: adminNotes }),
+    });
+  }
+
   async updateRefundAWB(refundId: number, awbData: {
     return_awb_number: string;
     return_label_path: string;
@@ -441,6 +388,14 @@ class ApiService {
       method: "POST",
     });
   }
+
+  async rejectExchange(exchangeId: number, rejectionReason: string): Promise<any> {
+    return this.request<any>(`/api/v1/exchanges/${exchangeId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ rejection_reason: rejectionReason }),
+    });
+  }
+
 
   // -------------- BULK AWB DOWNLOAD ----------------
 
@@ -529,32 +484,226 @@ class ApiService {
 
     return response.blob();
   }
+
+  /* =======================
+      CMS
+  ======================= */
+
+  async getCMSBanners(): Promise<any[]> {
+    return this.request("/api/v1/cms/banners");
+  }
+
+  async createCMSBanner(data: any): Promise<any> {
+    return this.request("/api/v1/cms/banners", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCMSBanner(id: number, data: any): Promise<any> {
+    return this.request(`/api/v1/cms/banners/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCMSBanner(id: number): Promise<any> {
+    return this.request(`/api/v1/cms/banners/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCMSCategoryBanners(): Promise<any> {
+    return this.request("/api/v1/cms/category-banners");
+  }
+
+  async updateCMSCategoryBanner(
+    category: string,
+    data: { image: string }
+  ): Promise<any> {
+    return this.request(`/api/v1/cms/category-banners/${category}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  async getCMSNotifications(): Promise<any[]> {
+    return this.request("/api/v1/cms/notifications");
+  }
+
+  async sendCMSNotification(data: any): Promise<any> {
+    return this.request("/api/v1/cms/notifications", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCMSPages(): Promise<any[]> {
+    return this.request("/api/v1/cms/pages");
+  }
+
+  async updateCMSPage(id: number, data: any): Promise<any> {
+    return this.request(`/api/v1/cms/pages/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  /* =======================
+      CAMPAIGNS
+  ======================= */
+
+  async getCampaignCoupons(): Promise<any[]> {
+    return this.request("/api/v1/campaigns/coupons");
+  }
+
+  async createCampaignCoupon(data: {
+    code: string;
+    type: string;
+    value: string;
+    target: string;
+    expiry?: string;
+  }): Promise<any> {
+    return this.request("/api/v1/campaigns/coupons", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCampaignCoupon(
+    id: number,
+    data: {
+      code: string;
+      type: string;
+      value: string;
+      target: string;
+      expiry?: string;
+    }
+  ): Promise<any> {
+    return this.request(`/api/v1/campaigns/coupons/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCampaignCoupon(id: number): Promise<any> {
+    return this.request(`/api/v1/campaigns/coupons/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCampaignFlashDeals(): Promise<any[]> {
+    return this.request("/api/v1/campaigns/flash-deals");
+  }
+
+  async getCampaignBanners(): Promise<any[]> {
+    return this.request("/api/v1/campaigns/banners");
+  }
+
+  async getCampaignAdCampaigns(): Promise<any[]> {
+    return this.request("/api/v1/campaigns/ad-campaigns");
+  }
+
+  /* =======================
+      B2B
+  ======================= */
+
+  async getB2BUsers(): Promise<any[]> {
+    return this.request("/api/v1/b2b/users");
+  }
+
+  async updateB2BStatus(id: number, data: { status: string }): Promise<any> {
+    return this.request(`/api/v1/b2b/verify/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  /* =======================
+      FINANCE & PAYMENTS
+  ======================= */
+
+  async getTransactions(): Promise<any[]> {
+    return this.request("/api/v1/finance/transactions");
+  }
+
+  async verifyPayment(paymentData: any): Promise<any> {
+    return this.request("/api/v1/finance/verify-payment", {
+      method: "POST",
+      body: JSON.stringify(paymentData),
+    });
+  }
+
+  /* =======================
+      REVIEWS
+  ======================= */
+
+  async fetchReviews(productId: string): Promise<any[]> {
+    return this.request<any[]>(`/api/v1/reviews/product/${productId}`);
+  }
+
+  async createReview(reviewData: any): Promise<any> {
+    return this.request<any>("/api/v1/reviews", {
+      method: "POST",
+      body: JSON.stringify(reviewData),
+    });
+  }
+
+  async deleteReview(reviewId: string): Promise<void> {
+    return this.request<void>(`/api/v1/reviews/${reviewId}`, {
+      method: "DELETE",
+    });
+  }
 }
 
 
 export const apiService = new ApiService();
 
-// Helper exports
-export const fetchProducts = () => apiService.fetchProducts();
-export const createProduct = (productData: any) =>
-  apiService.createProduct(productData);
-export const updateProduct = (id: string, productData: any) =>
-  apiService.updateProduct(id, productData);
-export const deleteProduct = (id: string) =>
-  apiService.deleteProduct(id);
-export const importProducts = (file: File) =>
-  apiService.importProducts(file);
-export const updateOrderStatus = (orderId: string, status: string) =>
-  apiService.updateOrderStatus(orderId, status);
+/* =======================
+   HELPER EXPORTS
+======================= */
 
-=======
-}
-
-export const apiService = new ApiService();
-
-// Export product functions for convenience
+// Products
 export const fetchProducts = () => apiService.fetchProducts();
 export const createProduct = (productData: any) => apiService.createProduct(productData);
 export const updateProduct = (id: string, productData: any) => apiService.updateProduct(id, productData);
 export const deleteProduct = (id: string) => apiService.deleteProduct(id);
->>>>>>> 1e65977e (connnect)
+export const importProducts = (file: File) => apiService.importProducts(file);
+
+// Orders
+export const updateOrderStatus = (orderId: string, status: string) => apiService.updateOrderStatus(orderId, status);
+
+// CMS
+export const getCMSBanners = () => apiService.getCMSBanners();
+export const createCMSBanner = (d: any) => apiService.createCMSBanner(d);
+export const updateCMSBanner = (id: number, d: any) => apiService.updateCMSBanner(id, d);
+export const deleteCMSBanner = (id: number) => apiService.deleteCMSBanner(id);
+export const getCMSCategoryBanners = () => apiService.getCMSCategoryBanners();
+export const updateCMSCategoryBanner = (category: string, data: { image: string }) => apiService.updateCMSCategoryBanner(category, data);
+export const getCMSNotifications = () => apiService.getCMSNotifications();
+export const sendCMSNotification = (d: any) => apiService.sendCMSNotification(d);
+export const getCMSPages = () => apiService.getCMSPages();
+export const updateCMSPage = (id: number, d: any) => apiService.updateCMSPage(id, d);
+
+// CAMPAIGNS
+export const getCampaignCoupons = () => apiService.getCampaignCoupons();
+export const createCampaignCoupon = (d: any) => apiService.createCampaignCoupon(d);
+export const updateCampaignCoupon = (id: number, d: any) => apiService.updateCampaignCoupon(id, d);
+export const deleteCampaignCoupon = (id: number) => apiService.deleteCampaignCoupon(id);
+export const getCampaignFlashDeals = () => apiService.getCampaignFlashDeals();
+export const getCampaignBanners = () => apiService.getCampaignBanners();
+export const getCampaignAdCampaigns = () => apiService.getCampaignAdCampaigns();
+
+// B2B
+export const getB2BUsers = () => apiService.getB2BUsers();
+export const updateB2BStatus = (id: number, d: { status: string }) => apiService.updateB2BStatus(id, d);
+
+// FINANCE & PAYMENTS
+export const getTransactions = () => apiService.getTransactions();
+export const verifyPayment = (d: any) => apiService.verifyPayment(d);
+
+// REVIEWS
+export const fetchReviews = (productId: string) => apiService.fetchReviews(productId);
+export const createReview = (reviewData: any) => apiService.createReview(reviewData);
+export const deleteReview = (reviewId: string) => apiService.deleteReview(reviewId);

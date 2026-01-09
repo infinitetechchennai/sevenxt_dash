@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 from app.database import get_db
@@ -7,9 +7,15 @@ from app.modules.auth.models import EmployeeUser, User, AdminUser
 from typing import Any, Union
 from app.modules.auth.routes import get_current_employee
 from app.modules.activity_logs.service import log_activity
+import logging
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users Management"])
+
 employees_router = APIRouter(prefix="/employees", tags=["Employees Management"])
+
 
 @router.get("/b2c", response_model=list[schemas.B2CUserResponse])
 def read_b2c_users(db: Session = Depends(get_db)):
@@ -119,28 +125,64 @@ def delete_user(
 def update_user(
     user_id: int,
     user_data: schemas.UserUpdate,
-    type: str,
-    db: Session = Depends(get_db)
+    user_type: str = Query(..., alias="type"), # Use alias to match frontend query param 'type'
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(get_current_employee)
 ):
     """Update a user/employee"""
-    updated_user = service.update_user(db, user_id, type, user_data.dict(exclude_unset=True))
-    if not updated_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Log activity
-    log_activity(
-        db=db,
-        action="Updated User",
-        module="Users",
-        user_name="Admin",
-        user_type="Admin",
-        details=f"Updated {type} user with ID: {user_id}",
-        status="Success",
-        affected_entity_type="User",
-        affected_entity_id=str(user_id)
-    )
-    
-    return {"message": "User updated successfully", "user": updated_user}
+    try:
+        updated_user = service.update_user(db, user_id, user_type, user_data.dict(exclude_unset=True))
+        if not updated_user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Determine current user's name and type
+        current_user_name = current_user.name if hasattr(current_user, 'name') else 'Unknown'
+        
+        # Check if user is Admin by model type
+        from app.modules.auth.models import AdminUser, EmployeeUser
+        
+        # Debug logging
+        logger.info(f"DEBUG: current_user type = {type(current_user)}")
+        logger.info(f"DEBUG: current_user.__class__.__name__ = {current_user.__class__.__name__}")
+        logger.info(f"DEBUG: isinstance(current_user, AdminUser) = {isinstance(current_user, AdminUser)}")
+        logger.info(f"DEBUG: isinstance(current_user, EmployeeUser) = {isinstance(current_user, EmployeeUser)}")
+        logger.info(f"DEBUG: current_user.role = {current_user.role if hasattr(current_user, 'role') else 'NO ROLE ATTR'}")
+        
+        # Determine user type based on MODEL CLASS (not role field)
+        # AdminUser table = Admin, EmployeeUser table = Staff
+        if isinstance(current_user, AdminUser):
+            current_user_type = 'Admin'
+            logger.info("DEBUG: User type set to Admin (from AdminUser table)")
+        elif isinstance(current_user, EmployeeUser):
+            current_user_type = 'Staff'
+            logger.info("DEBUG: User type set to Staff (from EmployeeUser table)")
+        else:
+            # Fallback to role check if model type is unclear
+            if hasattr(current_user, 'role') and current_user.role == 'admin':
+                current_user_type = 'Admin'
+                logger.info("DEBUG: User type set to Admin (by role fallback)")
+            else:
+                current_user_type = 'Staff'
+                logger.info("DEBUG: User type set to Staff (by default fallback)")
+        
+        
+        # Log activity
+        log_activity(
+            db=db,
+            action="Updated User",
+            module="Users",
+            user_name=current_user_name,
+            user_type=current_user_type,
+            details=f"Updated {user_type} user with ID: {user_id} (Name: {updated_user.name if hasattr(updated_user, 'name') else 'N/A'})",
+            status="Success",
+            affected_entity_type="User",
+            affected_entity_id=str(user_id)
+        )
+        
+        return {"message": "User updated successfully", "user": updated_user}
+    except Exception as e:
+        logger.error(f"Error updating user: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ========== EMPLOYEES ROUTER ==========
 

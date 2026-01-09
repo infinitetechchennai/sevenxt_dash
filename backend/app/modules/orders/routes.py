@@ -7,7 +7,7 @@ from app.modules.orders import schemas, service
 from app.modules.exchanges.models import Exchange
 from sqlalchemy.orm import joinedload
 import logging
-from PyPDF2 import PdfMerger
+from PyPDF2 import PdfWriter as PdfMerger
 import os
 from datetime import datetime
 from app.modules.activity_logs.service import log_activity
@@ -20,18 +20,45 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 @router.get("", response_model=List[schemas.OrderResponse])
 def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all orders with customer names"""
+    import json
+    
     orders = service.get_all_orders(db, skip=skip, limit=limit)
     
-    # Add customer_name to each order based on customer_type
+    # Process orders
     result = []
     for order in orders:
+        # Parse products JSON if it's a string
+        products_data = order.products
+        
+        if isinstance(products_data, str):
+            try:
+                products_data = json.loads(products_data.replace("'", '"').replace("None", "null"))
+            except Exception as e:
+                logger.error(f"Failed to parse products JSON for order {order.order_id}: {e}")
+                products_data = []
+        
+        if isinstance(products_data, dict):
+            products_data = [products_data]
+        
+        # Ensure products is a list (no enrichment, use data as-is from orders table)
+        if not isinstance(products_data, list):
+            products_data = []
+        
+        # Add HSN from order table to each product
+        if order.hsn and products_data:
+            for product in products_data:
+                if isinstance(product, dict) and 'hsn' not in product:
+                    product['hsn'] = order.hsn
+                    product['hsn_code'] = order.hsn
+                    product['hsnCode'] = order.hsn
+        
         order_dict = {
             "id": order.id,
             "order_id": order.order_id,
             "customer_type": order.customer_type,
-            "customer_name": order.customer_name, # Direct access
-            "user_id": None,  # Keeping for backward compatibility
-            "products": order.products,
+            "customer_name": order.customer_name,
+            "user_id": None,
+            "products": products_data,  # Use products data with HSN added
             "amount": float(order.amount) if order.amount else None,
             "payment": order.payment,
             "status": order.status,
@@ -46,11 +73,12 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "weight": order.weight,
             "breadth": order.breadth,
             "length": order.length,
+            "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
+            "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
             "created_at": order.created_at,
             "updated_at": order.updated_at,
         }
         
-        logger.info(f"Order {order.order_id} - Phone: {order.phone}, Name: {order.customer_name}")
         result.append(order_dict)
     
     return result
@@ -273,7 +301,10 @@ def read_deliveries(
                 "awb_label_path": d.awb_label_path,
                 "created_at": d.created_at,
                 "updated_at": d.updated_at,
-                "order_number": d.order.order_id if d.order else None
+                "updated_at": d.updated_at,
+                "order_number": d.order.order_id if d.order else None,
+                "sgst_percentage": float(d.order.sgst_percentage) if d.order and d.order.sgst_percentage is not None else 0.0,
+                "cgst_percentage": float(d.order.cgst_percentage) if d.order and d.order.cgst_percentage is not None else 0.0,
             }
             result.append(d_dict)
             
@@ -316,7 +347,9 @@ def update_delivery_schedule(delivery_id: int, schedule: schemas.DeliverySchedul
         "delivery_status": delivery.delivery_status,
         "created_at": delivery.created_at,
         "updated_at": delivery.updated_at,
-        "order_number": delivery.order.order_id if delivery.order else None
+        "order_number": delivery.order.order_id if delivery.order else None,
+        "sgst_percentage": float(delivery.order.sgst_percentage) if delivery.order and delivery.order.sgst_percentage is not None else 0.0,
+        "cgst_percentage": float(delivery.order.cgst_percentage) if delivery.order and delivery.order.cgst_percentage is not None else 0.0,
     }
     return d_dict
 
@@ -349,6 +382,8 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         "weight": order.weight,
         "breadth": order.breadth,
         "length": order.length,
+        "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
+        "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
         "created_at": order.created_at,
         "updated_at": order.updated_at,
     }
@@ -405,6 +440,8 @@ def update_order_status(order_id: str, status_update: schemas.OrderStatusUpdate,
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
+        "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
+        "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
         "created_at": updated_order.created_at,
         "updated_at": updated_order.updated_at,
     }
@@ -450,6 +487,8 @@ def update_order_dimensions(order_id: str, dimensions: schemas.OrderDimensionsUp
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
+        "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
+        "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
         "created_at": updated_order.created_at,
         "updated_order": updated_order.updated_at,
     }

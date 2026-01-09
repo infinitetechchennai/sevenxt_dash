@@ -23,8 +23,7 @@ debug_users.py
 fix_passwords.py
 fix_roles.py
 roles_output.txt
-<<<<<<< HEAD
+
 
 * text=auto
-=======
->>>>>>> 1e65977e (connnect)
+

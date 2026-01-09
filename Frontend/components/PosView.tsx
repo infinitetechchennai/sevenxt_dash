@@ -18,8 +18,8 @@ export const PosView: React.FC = () => {
   // Filter products
   const filteredProducts = useMemo(() => {
     return MOCK_PRODUCTS.filter(p => {
-      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.id && p.id.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCategory = activeCategory === 'All' || p.category.includes(activeCategory);
       return matchesSearch && matchesCategory;
     });
@@ -34,7 +34,7 @@ export const PosView: React.FC = () => {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        return prev.map(item => 
+        return prev.map(item =>
           item.id === product.id ? { ...item, qty: item.qty + 1 } : item
         );
       }
@@ -65,9 +65,9 @@ export const PosView: React.FC = () => {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search products by name or SKU..." 
+              <input
+                type="text"
+                placeholder="Search products by name or SKU..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none shadow-sm text-gray-900"
@@ -77,17 +77,16 @@ export const PosView: React.FC = () => {
               <ScanLine size={20} />
             </button>
           </div>
-          
+
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                  activeCategory === cat 
-                    ? 'bg-gray-900 text-white' 
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${activeCategory === cat
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                  }`}
               >
                 {cat}
               </button>
@@ -99,19 +98,19 @@ export const PosView: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredProducts.map(product => (
-              <div 
-                key={product.id} 
+              <div
+                key={product.id}
                 onClick={() => addToCart(product)}
                 className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer overflow-hidden group flex flex-col h-full"
               >
                 <div className="aspect-[4/3] bg-gray-100 relative">
-                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                   {product.stock < 10 && (
-                     <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-                       Only {product.stock} left
-                     </span>
-                   )}
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  {product.stock < 10 && (
+                    <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                      Only {product.stock} left
+                    </span>
+                  )}
                 </div>
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="font-medium text-gray-900 text-sm line-clamp-2 leading-tight mb-1">{product.name}</h3>
@@ -125,12 +124,12 @@ export const PosView: React.FC = () => {
                 </div>
               </div>
             ))}
-             {filteredProducts.length === 0 && (
-               <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
-                 <Search size={48} className="mb-4 opacity-20" />
-                 <p>No products found</p>
-               </div>
-             )}
+            {filteredProducts.length === 0 && (
+              <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400">
+                <Search size={48} className="mb-4 opacity-20" />
+                <p>No products found</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -152,10 +151,10 @@ export const PosView: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
-               <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
-                  <ShoppingCart size={32} className="opacity-20" />
-               </div>
-               <p className="text-sm">Cart is empty. Select products to begin.</p>
+              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
+                <ShoppingCart size={32} className="opacity-20" />
+              </div>
+              <p className="text-sm">Cart is empty. Select products to begin.</p>
             </div>
           ) : (
             cart.map(item => (
@@ -166,23 +165,23 @@ export const PosView: React.FC = () => {
                   <div className="flex items-center justify-between mt-1">
                     <div className="text-sm font-bold text-indigo-600">₹{(item.b2cPrice * item.qty).toLocaleString()}</div>
                     <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200 h-7">
-                      <button 
+                      <button
                         onClick={() => updateQty(item.id, -1)}
                         className="w-7 h-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-l-lg transition-colors"
                       >
                         <Minus size={12} />
                       </button>
                       <span className="w-8 text-center text-xs font-bold text-gray-900">{item.qty}</span>
-                      <button 
+                      <button
                         onClick={() => updateQty(item.id, 1)}
-                         className="w-7 h-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-r-lg transition-colors"
+                        className="w-7 h-full flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-r-lg transition-colors"
                       >
                         <Plus size={12} />
                       </button>
                     </div>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => removeFromCart(item.id)}
                   className="text-gray-300 hover:text-red-500 p-1 self-start -mr-1"
                 >
@@ -195,34 +194,34 @@ export const PosView: React.FC = () => {
 
         {/* Bill Summary Section */}
         <div className="bg-gray-50 border-t border-gray-200 p-6 space-y-3 shrink-0">
-           <div className="flex justify-between text-sm text-gray-600">
-             <span>Subtotal</span>
-             <span className="font-medium">₹{subtotal.toLocaleString()}</span>
-           </div>
-           <div className="flex justify-between text-sm text-gray-600">
-             <span>Tax (18% GST)</span>
-             <span className="font-medium">₹{tax.toLocaleString()}</span>
-           </div>
-           <div className="flex justify-between text-sm text-gray-600 border-b border-gray-200 pb-3">
-             <span>Discount</span>
-             <span className="font-medium text-green-600">- ₹0.00</span>
-           </div>
-           <div className="flex justify-between items-end pt-1">
-             <span className="text-gray-900 font-bold text-lg">Total</span>
-             <span className="text-2xl font-bold text-indigo-600">₹{total.toLocaleString()}</span>
-           </div>
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Subtotal</span>
+            <span className="font-medium">₹{subtotal.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Tax (18% GST)</span>
+            <span className="font-medium">₹{tax.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600 border-b border-gray-200 pb-3">
+            <span>Discount</span>
+            <span className="font-medium text-green-600">- ₹0.00</span>
+          </div>
+          <div className="flex justify-between items-end pt-1">
+            <span className="text-gray-900 font-bold text-lg">Total</span>
+            <span className="text-2xl font-bold text-indigo-600">₹{total.toLocaleString()}</span>
+          </div>
 
-           <div className="grid grid-cols-2 gap-3 pt-4">
-             <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 bg-white text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-               <Calculator size={18} /> Hold
-             </button>
-             <button 
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all disabled:opacity-50 disabled:shadow-none"
-                disabled={cart.length === 0}
-             >
-               <CreditCard size={18} /> Pay Now
-             </button>
-           </div>
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            <button className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 bg-white text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+              <Calculator size={18} /> Hold
+            </button>
+            <button
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all disabled:opacity-50 disabled:shadow-none"
+              disabled={cart.length === 0}
+            >
+              <CreditCard size={18} /> Pay Now
+            </button>
+          </div>
         </div>
       </div>
     </div>

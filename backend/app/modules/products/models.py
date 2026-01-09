@@ -9,10 +9,6 @@ class Product(Base):
     id = Column(String(50), primary_key=True, index=True) # Using String ID to match frontend "prod_" generation or UUID
     name = Column(String(255), nullable=False)
     category = Column(String(100))
-<<<<<<< HEAD
-=======
-    brand = Column(String(100))
->>>>>>> 1e65977e (connnect)
     
     # Pricing
     b2c_price = Column(Float, default=0.0)
@@ -20,7 +16,6 @@ class Product(Base):
     b2b_price = Column(Float, default=0.0)
     
     # Offers
-<<<<<<< HEAD
     b2c_active_offer = Column(Float, default=0.0) # Renamed from b2c_offer_percentage
     b2c_discount = Column(Float, default=0.0) # Discount for B2C
     b2c_offer_price = Column(Float, default=0.0) # Calculated Offer Price
@@ -37,30 +32,15 @@ class Product(Base):
     status = Column(String(50), default="Draft") # Active, Draft, Archived
     stock = Column(Integer, default=0)
     image = Column(Text(length=4294967295), nullable=True) # LONGTEXT
-=======
-    b2c_offer_percentage = Column(Float, default=0.0)
-    b2c_offer_start_date = Column(DateTime, nullable=True)
-    b2c_offer_end_date = Column(DateTime, nullable=True)
-    
-    b2b_offer_percentage = Column(Float, default=0.0)
-    b2b_offer_start_date = Column(DateTime, nullable=True)
-    b2b_offer_end_date = Column(DateTime, nullable=True)
-    
-    description = Column(Text, nullable=True)
-    status = Column(String(50), default="Draft") # Active, Draft, Archived
-    stock = Column(Integer, default=0)
-    image = Column(Text, nullable=True)
->>>>>>> 1e65977e (connnect)
     
     rating = Column(Float, default=0.0)
-    reviews = Column(Integer, default=0)
+    # reviews = Column(Integer, default=0)
     
-<<<<<<< HEAD
     # Tax and Compliance
     sgst = Column(Float, default=0.0)  # SGST percentage (State GST)
     cgst = Column(Float, default=0.0)  # CGST percentage (Central GST)
     hsn = Column(String(20), nullable=True)  # HSN code
-    return_policy = Column(Text, nullable=True)  # Return policy description
+    # return_policy = Column(Text, nullable=True)  # Return policy description
     
     # Dimensions (for shipping)
     height = Column(Float, default=0.0)  # in cm
@@ -68,8 +48,6 @@ class Product(Base):
     breadth = Column(Float, default=0.0)  # in cm
     length = Column(Float, default=0.0)  # in cm
     
-=======
->>>>>>> 1e65977e (connnect)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

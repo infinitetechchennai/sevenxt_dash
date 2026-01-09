@@ -2,12 +2,13 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional, Union
+from uuid import UUID
 
 class B2BStatusUpdate(BaseModel):
     status: str
 
 class B2BResponse(BaseModel):
-    id: int
+    id: UUID
     bussiness_name: str
     gstin: str
     pan: str

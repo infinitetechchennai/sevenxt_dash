@@ -137,6 +137,35 @@ def approve_exchange(
     return exchange
 
 
+@router.post("/{exchange_id}/reject", response_model=schemas.ExchangeResponse)
+def reject_exchange(
+    exchange_id: int,
+    reject_data: schemas.ExchangeRejectRequest,
+    db: Session = Depends(get_db)
+):
+    """Admin rejects exchange request and sends rejection email to customer"""
+    exchange = service.reject_exchange(db, exchange_id, reject_data.rejection_reason)
+    
+    if not exchange:
+        raise HTTPException(status_code=404, detail="Exchange not found")
+    
+    # Log activity
+    log_activity(
+        db=db,
+        action="Rejected Exchange",
+        module="Exchanges",
+        user_name="Admin",
+        user_type="Admin",
+        details=f"Rejected exchange {exchange_id}. Reason: {reject_data.rejection_reason}",
+        status="Rejected",
+        affected_entity_type="Exchange",
+        affected_entity_id=str(exchange_id)
+    )
+    
+    return exchange
+
+
+
 @router.post("/{exchange_id}/quality-check", response_model=schemas.ExchangeResponse)
 def quality_check(
     exchange_id: int,

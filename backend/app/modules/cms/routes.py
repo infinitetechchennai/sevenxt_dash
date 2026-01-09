@@ -6,6 +6,7 @@ import uuid
 import shutil
 from typing import List
 from app.database import get_db
+from app.config import settings
 from . import service, schemas
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ def upload_banner_image(file: UploadFile = File(...)):
     file_path = os.path.join(UPLOAD_DIR, filename)
     with open(file_path, "wb") as f:
         f.write(file.file.read())
-    return {"url": f"http://localhost:8001/{file_path}"}
+    return {"url": f"http://13.233.199.134:8000/{file_path}"}
 
 @router.post("/banners", response_model=schemas.BannerResponse)
 def create_banner(banner: schemas.BannerCreate, db: Session = Depends(get_db)):
@@ -58,7 +59,7 @@ def upload_category_banner(category_id: int, file: UploadFile = File(...)):
     file_path = os.path.join(UPLOAD_DIR, filename)
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    return {"url": f"http://subconjunctively-unrebated-curtis.ngrok-free.dev/uploads/cms/categories/{filename}"}
+    return {"url": f"http://13.233.199.134:8000/uploads/cms/categories/{filename}"}
 
 @router.put("/category-banners/{category_id}")
 def update_category_banner(category_id: int, data: dict, db: Session = Depends(get_db)):

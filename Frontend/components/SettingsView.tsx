@@ -1,45 +1,53 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Eye, Mail, Bell, Lock, FileText, Save, Upload, RefreshCw, 
-  CheckCircle, AlertTriangle, Server, Smartphone, Shield
+import axios from 'axios';
+import {
+  Eye, Bell, Lock, FileText, Save, Upload, RefreshCw,
+  AlertTriangle, Shield, ShoppingCart, RotateCcw, Package, User, LogOut
 } from 'lucide-react';
 import { MOCK_ACTIVITY_LOGS } from '../constants';
+import { API_BASE_URL } from '../services/api';
+
 
 interface SettingsViewProps {
   activeView?: string;
 }
 
-type TabId = 'set-branding' | 'set-gateway' | 'set-notifications' | 'set-security' | 'set-audit';
+type TabId = 'set-profile' | 'set-notifications';
 
 const TABS = [
-  { id: 'set-branding', label: 'App Branding', icon: <Eye size={18} /> },
-  { id: 'set-gateway', label: 'Email/SMS Gateway', icon: <Mail size={18} /> },
-  { id: 'set-notifications', label: 'Notification Triggers', icon: <Bell size={18} /> },
-  { id: 'set-security', label: 'Security Settings', icon: <Lock size={18} /> },
-  { id: 'set-audit', label: 'Audit Logs', icon: <FileText size={18} /> },
+  { id: 'set-profile', label: 'Edit Profile', icon: <User size={18} /> },
+  { id: 'set-notifications', label: 'Notification', icon: <Bell size={18} /> },
 ];
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ activeView }) => {
-  const [activeTab, setActiveTab] = useState<TabId>('set-branding');
+  const [activeTab, setActiveTab] = useState<TabId>('set-profile');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Sync activeTab with prop activeView if it matches one of our tabs
   useEffect(() => {
     if (activeView && TABS.some(t => t.id === activeView)) {
       setActiveTab(activeView as TabId);
+    } else if (activeView === 'set-notifications') {
+      setActiveTab('set-notifications');
+    } else if (activeView === 'set-profile') {
+      setActiveTab('set-profile');
     } else if (activeView === 'settings') {
-      setActiveTab('set-branding');
+      setActiveTab('set-profile');
     }
   }, [activeView]);
 
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = '/'; // Redirect to login
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'set-branding': return <BrandingSettings />;
-      case 'set-gateway': return <GatewaySettings />;
+      case 'set-profile': return <ProfileSettings />;
       case 'set-notifications': return <NotificationSettings />;
-      case 'set-security': return <SecuritySettings />;
-      case 'set-audit': return <AuditLogsSettings />;
-      default: return <BrandingSettings />;
+      default: return <ProfileSettings />;
     }
   };
 
@@ -47,8 +55,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ activeView }) => {
     <div className="flex flex-col h-full bg-gray-50 overflow-hidden font-sans">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6 shrink-0">
-        <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
-        <p className="text-gray-500 mt-1 text-sm">Manage application branding, integrations, and security protocols.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
+            <p className="text-gray-500 mt-1 text-sm">Manage application branding, integrations, and security protocols.</p>
+          </div>
+          <button
+            onClick={() => setShowLogoutModal(true)}
+            className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium hover:from-red-600 hover:to-red-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Tab Navigation */}
@@ -80,380 +99,483 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ activeView }) => {
           {renderContent()}
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-2xl">
+              <div className="flex items-center justify-center w-16 h-16 bg-white rounded-full mx-auto mb-4">
+                <LogOut size={32} className="text-red-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-white text-center">Logout Confirmation</h3>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-gray-600 text-center mb-6">
+                Are you sure you want to logout from the dashboard? You'll need to login again to access your account.
+              </p>
+
+              {/* Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg font-medium hover:from-red-600 hover:to-red-700 transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 // --- Sub-Components for Each Section ---
 
-const BrandingSettings = () => {
+const ProfileSettings = () => {
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    profilePicture: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await axios.get(`${API_BASE_URL}/api/v1/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProfileData({
+        name: response.data.name || '',
+        email: response.data.email || '',
+        phone: response.data.phone || '',
+        role: response.data.role || '',
+        profilePicture: response.data.profile_picture || '',
+        address: response.data.address || '',
+        city: response.data.city || '',
+        state: response.data.state || '',
+        pincode: response.data.pincode || ''
+      });
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setProfileData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (2MB max)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('File size must be less than 2MB');
+      return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      alert('Only JPG, PNG, and GIF files are allowed');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = localStorage.getItem('auth_token');
+      console.log('Token exists:', !!token);
+      console.log('Token value:', token?.substring(0, 20) + '...');
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/auth/upload-profile-picture`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      setProfileData(prev => ({
+        ...prev,
+        profilePicture: response.data.profile_picture
+      }));
+
+      // Refresh the entire profile to get updated data
+      await fetchProfile();
+
+      // Trigger a global event to refresh profile in header/sidebar
+      window.dispatchEvent(new Event('profileUpdated'));
+
+      alert('Profile picture uploaded successfully!');
+    } catch (error) {
+      console.error('Failed to upload profile picture:', error);
+      alert('Failed to upload profile picture');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth_token');
+      const response = await axios.put(
+        `${API_BASE_URL}/api/v1/auth/profile`,
+        {
+          name: profileData.name,
+          phone: profileData.phone,
+          email: profileData.email,
+          address: profileData.address,
+          city: profileData.city,
+          state: profileData.state,
+          pincode: profileData.pincode
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Refresh profile data
+      await fetchProfile();
+
+      // Trigger global event to update header/sidebar
+      window.dispatchEvent(new Event('profileUpdated'));
+
+      setIsEditing(false); // Exit edit mode
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      alert('Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    fetchProfile(); // Reload original data
+    setIsEditing(false); // Exit edit mode
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="animate-spin" size={32} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
         <div className="mb-6 pb-4 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Eye size={20} className="text-pink-500" />
-            Logo & Identity
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Customize the look and feel of the dashboard.</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-             <label className="block text-sm font-medium text-gray-700 mb-2">Application Name</label>
-             <input type="text" defaultValue="Nexus Commerce Dashboard" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-shadow text-gray-900" />
-             <p className="text-xs text-gray-500 mt-1">Displayed in browser title and emails.</p>
-          </div>
-          <div>
-             <label className="block text-sm font-medium text-gray-700 mb-2">Support Email</label>
-             <input type="email" defaultValue="support@nexus.com" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-shadow text-gray-900" />
-          </div>
-          <div className="col-span-full">
-             <label className="block text-sm font-medium text-gray-700 mb-3">App Logo</label>
-             <div className="flex items-center gap-6">
-                <div 
-                  onClick={() => alert("Upload dialog opened")}
-                  className="w-24 h-24 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer"
-                >
-                    <Upload size={24} className="text-gray-400" />
-                </div>
-                <div>
-                    <button 
-                      onClick={() => alert("Upload dialog opened")}
-                      className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm"
-                    >
-                        Upload New
-                    </button>
-                    <p className="text-xs text-gray-500 mt-2">Recommended size: 512x512px. PNG or SVG.</p>
-                </div>
-             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <div className="mb-6 pb-4 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <RefreshCw size={20} className="text-pink-500" />
-            Theme Customization
-            </h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex items-center justify-between">
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Primary Color</label>
-                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <input type="color" defaultValue="#4f46e5" className="h-8 w-8 rounded border-0 cursor-pointer bg-transparent" />
-                    <span className="text-sm font-mono text-gray-600">#4f46e5</span>
-                </div>
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Secondary Color</label>
-                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <input type="color" defaultValue="#0f172a" className="h-8 w-8 rounded border-0 cursor-pointer bg-transparent" />
-                    <span className="text-sm font-mono text-gray-600">#0f172a</span>
-                </div>
-            </div>
-             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Accent Color</label>
-                <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-lg bg-gray-50">
-                    <input type="color" defaultValue="#f43f5e" className="h-8 w-8 rounded border-0 cursor-pointer bg-transparent" />
-                    <span className="text-sm font-mono text-gray-600">#f43f5e</span>
-                </div>
-            </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end pt-2">
-          <button 
-            onClick={() => alert("Branding settings saved!")}
-            className="px-6 py-2.5 bg-gray-900 text-white rounded-lg font-bold shadow-sm hover:bg-gray-800 transition-all flex items-center gap-2"
-          >
-              <Save size={18} />
-              Save Branding
-          </button>
-      </div>
-    </div>
-  );
-};
-
-const GatewaySettings = () => {
-  return (
-    <div className="space-y-6">
-       {/* SMTP Section */}
-       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Server size={20} className="text-blue-500" />
-                SMTP Configuration
+                <User size={20} className="text-indigo-500" />
+                Profile Information
               </h2>
-              <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-500">Connection Status:</span>
-                  <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-100">
-                      <CheckCircle size={10} /> Connected
-                  </span>
-              </div>
+              <p className="text-sm text-gray-500 mt-1">Update your personal information and profile picture</p>
+            </div>
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <User size={16} />
+                Edit Profile
+              </button>
+            )}
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
-                  <input type="text" defaultValue="smtp.gmail.com" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono text-gray-900" />
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Port</label>
-                  <input type="text" defaultValue="587" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono text-gray-900" />
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Encryption</label>
-                  <select className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900">
-                      <option>TLS</option>
-                      <option>SSL</option>
-                      <option>None</option>
-                  </select>
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                  <input type="text" defaultValue="notifications@nexus.com" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-              </div>
-               <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                  <input type="password" defaultValue="••••••••••••" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-              </div>
-          </div>
-       </div>
+        </div>
 
-       {/* SMS API Section */}
-       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-          <div className="mb-6 pb-4 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Smartphone size={20} className="text-blue-500" />
-                SMS API Gateway
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Configure third-party SMS providers.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Profile Picture */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-bold text-gray-700 mb-3">Profile Picture</label>
+            <div className="flex items-center gap-6">
+              {profileData.profilePicture ? (
+                <img
+                  src={`${API_BASE_URL}${profileData.profilePicture}`}
+                  alt="Profile"
+                  className="h-24 w-24 rounded-full object-cover border-4 border-white shadow-lg"
+                />
+              ) : (
+                <div className="h-24 w-24 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-2xl border-4 border-white shadow-lg">
+                  {profileData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'SA'}
+                </div>
+              )}
+              <div>
+                <input
+                  type="file"
+                  id="profile-picture-upload"
+                  accept="image/jpeg,image/png,image/gif"
+                  onChange={handleFileUpload}
+                  disabled={!isEditing}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="profile-picture-upload"
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors shadow-sm flex items-center gap-2 ${!isEditing || uploading
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer'
+                    }`}
+                >
+                  {uploading ? <RefreshCw size={16} className="animate-spin" /> : <Upload size={16} />}
+                  {uploading ? 'Uploading...' : isEditing ? 'Upload New Picture' : 'Upload Disabled'}
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  {isEditing ? 'JPG, PNG or GIF. Max size 2MB' : 'Click "Edit Profile" to upload'}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-6">
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Provider</label>
-                  <select className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900">
-                      <option>Twilio</option>
-                      <option>AWS SNS</option>
-                      <option>Msg91</option>
-                      <option>Custom Webhook</option>
-                  </select>
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">API Key / SID</label>
-                  <input type="text" defaultValue="AC8f832j2390jf023jd023jd2" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono text-gray-900" />
-              </div>
-              <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Auth Token</label>
-                  <input type="password" defaultValue="••••••••••••••••••••••••" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono text-gray-900" />
-              </div>
-          </div>
-       </div>
 
-       <div className="flex justify-end pt-2">
-          <button 
-            onClick={() => alert("Gateway settings saved!")}
-            className="px-6 py-2.5 bg-gray-900 text-white rounded-lg font-bold shadow-sm hover:bg-gray-800 transition-all flex items-center gap-2"
-          >
+          {/* Full Name */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Full Name</label>
+            <input
+              type="text"
+              value={profileData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              readOnly={!isEditing}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              placeholder="Enter your full name"
+            />
+          </div>
+
+          {/* Address */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Address</label>
+            <input
+              type="text"
+              value={profileData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+              readOnly={!isEditing}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              placeholder="Enter your address"
+            />
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">City</label>
+            <input
+              type="text"
+              value={profileData.city}
+              onChange={(e) => handleInputChange('city', e.target.value)}
+              readOnly={!isEditing}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              placeholder="Enter your city"
+            />
+          </div>
+
+          {/* State */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">State</label>
+            <input
+              type="text"
+              value={profileData.state}
+              onChange={(e) => handleInputChange('state', e.target.value)}
+              readOnly={!isEditing}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              placeholder="Enter your state"
+            />
+          </div>
+
+          {/* Pincode */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Pincode</label>
+            <input
+              type="text"
+              value={profileData.pincode}
+              onChange={(e) => handleInputChange('pincode', e.target.value)}
+              readOnly={!isEditing}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              placeholder="Enter your pincode"
+            />
+          </div>
+
+          {/* Role (Read-only) */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Role</label>
+            <input
+              type="text"
+              value={profileData.role}
+              disabled
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+        </div>
+
+
+        {isEditing && (
+          <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
+            <button
+              onClick={handleCancel}
+              className="px-6 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveProfile}
+              className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2"
+            >
               <Save size={18} />
-              Save Configurations
-          </button>
+              Save Changes
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 };
+
+
 
 const NotificationSettings = () => {
-  const TRIGGERS = [
-      { name: 'New Order Placed', desc: 'When a customer successfully completes checkout.', email: true, sms: false, push: true },
-      { name: 'Refund Requested', desc: 'When a customer submits a return form.', email: true, sms: false, push: true },
-      { name: 'Low Stock Alert', desc: 'When product inventory dips below threshold.', email: true, sms: true, push: false },
-      { name: 'New User Registration', desc: 'When a new B2B/B2C account is created.', email: false, sms: false, push: true },
-      { name: 'Delivery Status Update', desc: 'When Porter status changes to "Out for Delivery".', email: true, sms: true, push: true },
-  ];
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/api/v1/notifications/recent`);
+      setNotifications(response.data.slice(0, 5)); // Show only latest 5
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'order': return <ShoppingCart size={16} className="text-blue-500" />;
+      case 'refund': return <RotateCcw size={16} className="text-red-500" />;
+      case 'exchange': return <RefreshCw size={16} className="text-amber-500" />;
+      default: return <Package size={16} className="text-gray-500" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'order': return 'bg-blue-50 border-blue-200';
+      case 'refund': return 'bg-red-50 border-red-200';
+      case 'exchange': return 'bg-amber-50 border-amber-200';
+      default: return 'bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    if (statusLower.includes('delivered') || statusLower.includes('completed') || statusLower.includes('approved')) {
+      return 'bg-green-100 text-green-800 border-green-200';
+    }
+    if (statusLower.includes('pending') || statusLower.includes('processing')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    }
+    if (statusLower.includes('rejected') || statusLower.includes('failed')) {
+      return 'bg-red-100 text-red-800 border-red-200';
+    }
+    return 'bg-gray-100 text-gray-800 border-gray-200';
+  };
 
   return (
     <div className="space-y-6">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 pb-0 mb-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Bell size={20} className="text-amber-500" />
-                    Auto Alerts & Triggers
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Configure which channels to use for system events.</p>
+      {/* Recent Activity Section */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-6 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Bell size={20} className="text-amber-500" />
+                Recent Activity
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">Latest orders, refunds, and exchanges</p>
             </div>
-
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Event Trigger</th>
-                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-24">Email</th>
-                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-24">SMS</th>
-                            <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider w-24">In-App</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {TRIGGERS.map((t, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="text-sm font-medium text-gray-900">{t.name}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{t.desc}</div>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="checkbox" defaultChecked={t.email} className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="checkbox" defaultChecked={t.sms} className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                    <input type="checkbox" defaultChecked={t.push} className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" />
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div className="flex justify-end pt-2">
-            <button 
-              onClick={() => alert("Triggers updated successfully!")}
-              className="px-6 py-2.5 bg-gray-900 text-white rounded-lg font-bold shadow-sm hover:bg-gray-800 transition-all flex items-center gap-2"
+            <button
+              onClick={fetchNotifications}
+              className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
             >
-                <Save size={18} />
-                Update Triggers
+              <RefreshCw size={14} />
+              Refresh
             </button>
-        </div>
-    </div>
-  );
-};
+          </div>
 
-const SecuritySettings = () => {
-  return (
-    <div className="space-y-6">
-         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <div className="mb-6 pb-4 border-b border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <Shield size={20} className="text-red-500" />
-                    Password Policy
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Define complexity requirements for user passwords.</p>
+          {loading ? (
+            <div className="text-center py-8 text-gray-400">
+              <RefreshCw size={24} className="animate-spin mx-auto mb-2" />
+              <p className="text-sm">Loading...</p>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Length</label>
-                    <input type="number" defaultValue="8" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-                </div>
-                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Password Expiry (Days)</label>
-                    <input type="number" defaultValue="90" className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm text-gray-900" />
-                </div>
-                <div className="col-span-full space-y-3">
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
-                         <span className="text-sm font-medium text-gray-700">Require Special Character</span>
-                         <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" defaultChecked className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                            <label className="toggle-label block overflow-hidden h-5 rounded-full bg-indigo-600 cursor-pointer"></label>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-gray-50">
-                         <span className="text-sm font-medium text-gray-700">Require Number</span>
-                         <div className="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" defaultChecked className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                            <label className="toggle-label block overflow-hidden h-5 rounded-full bg-indigo-600 cursor-pointer"></label>
-                        </div>
-                    </div>
-                </div>
+          ) : notifications.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <Bell size={24} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No recent activity</p>
             </div>
-         </div>
-
-         <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Lock size={20} className="text-red-500" />
-                Two-Factor Authentication (2FA)
-            </h2>
-            <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-lg border border-blue-100 mb-6">
-                <AlertTriangle size={20} className="text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                    <p className="text-sm font-bold text-blue-900">Enforce 2FA for Staff</p>
-                    <p className="text-xs text-blue-700 mt-1">Turning this on will force all ADMIN and MANAGER roles to setup 2FA on next login.</p>
-                </div>
-                <div className="ml-auto relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
-                    <input type="checkbox" className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
-                    <label className="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
-                </div>
-            </div>
-         </div>
-    </div>
-  );
-};
-
-const AuditLogsSettings = () => {
-  return (
-    <div className="space-y-6">
-         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-6 flex items-center justify-between">
-                 <div>
-                    <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <FileText size={20} className="text-gray-500" />
-                        Admin Activity Tracker
-                    </h2>
-                    <p className="text-sm text-gray-500 mt-1">Track sensitive actions performed by staff.</p>
-                 </div>
-                <button 
-                  onClick={() => alert("Audit logs exported to CSV")}
-                  className="px-4 py-2 text-xs font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          ) : (
+            <div className="space-y-2">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 rounded-lg border ${getTypeColor(notification.type)} hover:shadow-sm transition-all`}
                 >
-                    Export CSV
-                </button>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5">{getTypeIcon(notification.type)}</div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-gray-900">{notification.title}</h4>
+                      <p className="text-xs text-gray-600 mt-0.5">{notification.message}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(notification.status)}`}>
+                          {notification.status}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(notification.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            
-            <div className="overflow-x-auto">
-                 <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Time</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">User</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Action</th>
-                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Module</th>
-                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200 text-sm">
-                        {MOCK_ACTIVITY_LOGS.slice(0, 8).map((log) => (
-                            <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-gray-500 text-xs">
-                                    {new Date(log.timestamp).toLocaleString()}
-                                </td>
-                                <td className="px-6 py-4 font-medium text-gray-900">
-                                    {log.user.name}
-                                </td>
-                                <td className="px-6 py-4 text-gray-700">
-                                    {log.action}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                        {log.module}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                        log.status === 'SUCCESS' ? 'bg-green-100 text-green-800 border border-green-200' :
-                                        log.status === 'FAILURE' ? 'bg-red-100 text-red-800 border border-red-200' :
-                                        'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                                    }`}>
-                                        {log.status}
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-         </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

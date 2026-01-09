@@ -1,58 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from typing import List
 from app.database import get_db
 from app.modules.auth.routes import get_current_employee
 from app.modules.auth.models import EmployeeUser
 from . import schemas, service
-<<<<<<< HEAD
 from datetime import datetime
 from app.modules.activity_logs.service import log_activity
-=======
->>>>>>> 1e65977e (connnect)
+from app.modules.reviews.models import ProductReview
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
-@router.post("/import")
-async def import_products(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-<<<<<<< HEAD
-    # current_user: EmployeeUser = Depends(get_current_employee)
-):
-    """
-    Bulk import products from Excel or CSV file.
-    """
-    print(f"\n{'='*60}")
-    print(f"📥 IMPORT REQUEST RECEIVED")
-    print(f"Filename: {file.filename}")
-    print(f"Content-Type: {file.content_type}")
-    print(f"{'='*60}\n")
-    
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-        error_msg = f"Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file. Received: {file.filename}"
-        print(f"❌ {error_msg}")
-        raise HTTPException(status_code=400, detail=error_msg)
-    
-    try:
-        contents = await file.read()
-        print(f"✅ File read successfully. Size: {len(contents)} bytes")
-        
-        result = service.process_bulk_import(db, contents, verbose=False)
-        
-        return result
-    except Exception as e:
-        print(f"\n❌ Import failed with error: {str(e)}\n")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+# ... (keep existing imports and code) ...
 
 @router.get("")
 def read_products(
     skip: int = 0, 
-    limit: int = 10000,  # Increased to fetch all products (was 100)
+    limit: int = 10000,
     db: Session = Depends(get_db),
-    # current_user: EmployeeUser = Depends(get_current_employee) # Optional: Protect route
+    # current_user: EmployeeUser = Depends(get_current_employee) 
 ):
     try:
         print(f"DEBUG ROUTE: Fetching products with skip={skip}, limit={limit}")
@@ -62,6 +29,24 @@ def read_products(
         # Manually serialize to ensure all fields are included
         result = []
         for product in products:
+            try:
+                # DEBUG: Check review count first
+                p_id_str = str(product.id)
+                review_count = db.query(ProductReview).filter(ProductReview.product_id == p_id_str).count()
+                print(f"DEBUG: Product {p_id_str} has {review_count} reviews in DB. Fetching latest...")
+                
+                if review_count > 0:
+                    latest_review = db.query(ProductReview).filter(
+                        ProductReview.product_id == p_id_str
+                    ).order_by(desc(ProductReview.created_at)).first()
+                    print(f"DEBUG: Latest review for {p_id_str}: {latest_review.comment if latest_review else 'None'}")
+                else:
+                    latest_review = None
+                    
+            except Exception as e:
+                print(f"DEBUG: Error fetching review for product {product.id}: {e}")
+                latest_review = None
+            
             product_dict = {
                 "id": product.id,
                 "name": product.name,
@@ -85,13 +70,14 @@ def read_products(
                 "stock": product.stock,
                 "image": product.image,
                 "rating": product.rating if product.rating is not None else 0.0,
-                "reviews": product.reviews if product.reviews is not None else 0,
+                # "reviews": product.reviews if product.reviews is not None else 0,
+                "latestReview": latest_review.comment if latest_review else None,
                 
                 # Tax and Compliance
                 "sgst": product.sgst if product.sgst is not None else 0.0,
                 "cgst": product.cgst if product.cgst is not None else 0.0,
                 "hsn": product.hsn,
-                "returnPolicy": product.return_policy,
+                # "returnPolicy": product.return_policy,
                 
                 # Dimensions
                 "height": product.height if product.height is not None else 0.0,
@@ -114,34 +100,6 @@ def read_products(
         raise HTTPException(status_code=500, detail=f"Error fetching products: {str(e)}")
 
 @router.get("/{product_id}", response_model=schemas.ProductResponse, response_model_by_alias=True)
-=======
-    current_user: EmployeeUser = Depends(get_current_employee)
-):
-    """
-    Bulk import products from Excel file.
-    """
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel file.")
-    
-    try:
-        contents = await file.read()
-        result = service.process_bulk_import(db, contents)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-
-@router.get("", response_model=List[schemas.ProductResponse])
-def read_products(
-    skip: int = 0, 
-    limit: int = 100, 
-    db: Session = Depends(get_db),
-    # current_user: EmployeeUser = Depends(get_current_employee) # Optional: Protect route
-):
-    products = service.get_products(db, skip=skip, limit=limit)
-    return products
-
-@router.get("/{product_id}", response_model=schemas.ProductResponse)
->>>>>>> 1e65977e (connnect)
 def read_product(
     product_id: str, 
     db: Session = Depends(get_db),
@@ -152,12 +110,11 @@ def read_product(
         raise HTTPException(status_code=404, detail="Product not found")
     return db_product
 
-<<<<<<< HEAD
 @router.post("", response_model=schemas.ProductResponse, response_model_by_alias=True)
 def create_product(
     product: schemas.ProductCreate, 
     db: Session = Depends(get_db),
-    # current_user: EmployeeUser = Depends(get_current_employee)
+    current_user: EmployeeUser = Depends(get_current_employee)
 ):
     new_product = service.create_product(db=db, product=product)
     
@@ -166,8 +123,8 @@ def create_product(
         db=db,
         action="Created Product",
         module="Products",
-        user_name="Admin",  # TODO: Get from current_user
-        user_type="Admin",
+        user_name=current_user.name if current_user else "System",
+        user_type=current_user.role if current_user else "System",
         details=f"Created new product: {product.name} (ID: {new_product.id})",
         status="Success",
         affected_entity_type="Product",
@@ -177,39 +134,23 @@ def create_product(
     return new_product
 
 @router.put("/{product_id}", response_model=schemas.ProductResponse, response_model_by_alias=True)
-=======
-@router.post("", response_model=schemas.ProductResponse)
-def create_product(
-    product: schemas.ProductCreate, 
-    db: Session = Depends(get_db),
-    current_user: EmployeeUser = Depends(get_current_employee)
-):
-    return service.create_product(db=db, product=product)
-
-@router.put("/{product_id}", response_model=schemas.ProductResponse)
->>>>>>> 1e65977e (connnect)
 def update_product(
     product_id: str, 
     product: schemas.ProductUpdate, 
     db: Session = Depends(get_db),
-<<<<<<< HEAD
-    # current_user: EmployeeUser = Depends(get_current_employee)
-=======
     current_user: EmployeeUser = Depends(get_current_employee)
->>>>>>> 1e65977e (connnect)
 ):
     db_product = service.update_product(db=db, product_id=product_id, product=product)
     if db_product is None:
         raise HTTPException(status_code=404, detail="Product not found")
-<<<<<<< HEAD
     
     # Log activity
     log_activity(
         db=db,
         action="Updated Product",
         module="Products",
-        user_name="Admin",  # TODO: Get from current_user
-        user_type="Admin",
+        user_name=current_user.name if current_user else "System",
+        user_type=current_user.role if current_user else "System",
         details=f"Updated product: {db_product.name} (ID: {product_id})",
         status="Success",
         affected_entity_type="Product",
@@ -222,7 +163,7 @@ def update_product(
 def delete_product(
     product_id: str, 
     db: Session = Depends(get_db),
-    # current_user: EmployeeUser = Depends(get_current_employee)
+    current_user: EmployeeUser = Depends(get_current_employee)
 ):
     success = service.delete_product(db=db, product_id=product_id)
     if not success:
@@ -233,8 +174,8 @@ def delete_product(
         db=db,
         action="Deleted Product",
         module="Products",
-        user_name="Admin",  # TODO: Get from current_user
-        user_type="Admin",
+        user_name=current_user.name if current_user else "System",
+        user_type=current_user.role if current_user else "System",
         details=f"Deleted product with ID: {product_id}",
         status="Success",
         affected_entity_type="Product",
@@ -242,17 +183,41 @@ def delete_product(
     )
     
     return {"status": "success"}
-=======
-    return db_product
 
-# @router.delete("/{product_id}")
-# def delete_product(
-#     product_id: str, 
-#     db: Session = Depends(get_db),
-#     current_user: EmployeeUser = Depends(get_current_employee)
-# ):
-#     success = service.delete_product(db=db, product_id=product_id)
-#     if not success:
-#         raise HTTPException(status_code=404, detail="Product not found")
-#     return {"status": "success"}
->>>>>>> 1e65977e (connnect)
+@router.post("/import")
+async def import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: EmployeeUser = Depends(get_current_employee)
+):
+    """Bulk import products from Excel/CSV file"""
+    # Endpoint for bulk product import via Excel/CSV upload
+    try:
+        # Read file contents
+        contents = await file.read()
+        
+        # Process the import
+        result = service.process_bulk_import(db, contents, verbose=True)
+        
+        # Log activity
+        log_activity(
+            db=db,
+            action="Bulk Import Products",
+            module="Products",
+            user_name=current_user.name if current_user else "System",
+            user_type=current_user.role if current_user else "System",
+            details=f"Imported {result['success']} products ({result['created']} created, {result['updated']} updated, {result['failed']} failed)",
+            status="Success" if result['failed'] == 0 else "Partial Success",
+            affected_entity_type="Product",
+            affected_entity_id="bulk_import"
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Import completed: {result['success']} successful, {result['failed']} failed",
+            "details": result
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")

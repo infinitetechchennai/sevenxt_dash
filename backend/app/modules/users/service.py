@@ -117,30 +117,47 @@ def reset_user_password(db: Session, user_id: int, new_password: str) -> bool:
 
 def update_user(db: Session, user_id: int, user_type: str, update_data: dict) -> Optional[Union[EmployeeUser, AdminUser, User]]:
     """Update a user/employee by ID and type"""
+    logger.info(f"UPDATE_USER called: user_id={user_id}, user_type={user_type}, update_data={update_data}")
     target = None
     
     # Identify target table
     if user_type in ['Admin', 'Staff']:
         # Check Admin
         if user_type == 'Admin':
+            logger.info(f"Looking for Admin with ID {user_id}")
             target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
         else:
+            logger.info(f"Looking for Staff (EmployeeUser) with ID {user_id}")
             target = db.query(EmployeeUser).filter(EmployeeUser.id == user_id).first()
     else:
         # B2B / B2C
+        logger.info(f"Looking for B2B/B2C User with ID {user_id}")
         target = db.query(User).filter(User.id == user_id).first()
         
     if not target:
+        logger.error(f"Target user not found: user_id={user_id}, user_type={user_type}")
         return None
+    
+    logger.info(f"Found target: {target.__class__.__name__} - {target.email}")
         
     # Update fields
     for key, value in update_data.items():
         if hasattr(target, key) and value is not None:
+            # Convert role and status to lowercase to match DB constraints
+            if key in ['role', 'status'] and isinstance(value, str):
+                value = value.lower()
+            logger.info(f"Setting {key} = {value}")
             setattr(target, key, value)
-            
-    db.commit()
-    db.refresh(target)
-    return target
+    
+    try:
+        db.commit()
+        db.refresh(target)
+        logger.info(f"Successfully updated user {user_id}")
+        return target
+    except Exception as e:
+        logger.error(f"Error committing update: {e}")
+        db.rollback()
+        raise
 
 from app.modules.orders.models import B2CApplication, B2BApplication
 

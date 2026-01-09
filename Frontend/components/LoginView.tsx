@@ -8,22 +8,14 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
-<<<<<<< HEAD
   const [view, setView] = useState<'login' | 'forgot' | 'otp' | 'success'>('login');
-  const [email, setEmail] = useState('admin@ecommerce.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [devOtp, setDevOtp] = useState<string | undefined>(undefined);
-=======
-  const [view, setView] = useState<'login' | 'forgot' | 'success'>('login');
-  const [email, setEmail] = useState('admin@ecommerce.com');
-  const [password, setPassword] = useState('admin123');
-  const [error, setError] = useState('');
-  const [resetSent, setResetSent] = useState(false);
->>>>>>> 1e65977e (connnect)
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -35,12 +27,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
       console.log('Attempting login with:', { email, password: '***' });
       const response = await apiService.login({ email, password });
       console.log('Login successful:', response);
-<<<<<<< HEAD
       setIsLoading(false);
       setError('');
-=======
-      setIsLoading(true);
->>>>>>> 1e65977e (connnect)
       onLogin();
     } catch (err) {
       console.error('Login error:', err);
@@ -49,17 +37,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     }
   };
 
-<<<<<<< HEAD
   const handleRequestOTP = async (e: React.FormEvent) => {
-=======
-  const handleForgotPassword = (e: React.FormEvent) => {
->>>>>>> 1e65977e (connnect)
     e.preventDefault();
     if (!email) {
       setError('Please enter your email address.');
       return;
     }
-<<<<<<< HEAD
     setError('');
     setIsLoading(true);
 
@@ -100,14 +83,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
       setError(err instanceof Error ? err.message : 'Invalid OTP. Please try again.');
       setIsLoading(false);
     }
-=======
-    setIsLoading(true);
-    setTimeout(() => {
-      setResetSent(true);
-      setIsLoading(false);
-      setView('success');
-    }, 1200);
->>>>>>> 1e65977e (connnect)
   };
 
   return (
@@ -123,10 +98,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-8">
               <img src={logo} className="w-[250px]  h-[170px]    shadow" />
-<<<<<<< HEAD
-=======
-              {/* <span className="text-2xl font-bold tracking-tight text-white">SEVEN<span className="text-red-600">XT</span></span> */}
->>>>>>> 1e65977e (connnect)
             </div>
             <h2 className="text-4xl font-bold mb-4 leading-tight">Manage your<br />Digital Empire.</h2>
             <p className="text-gray-400 text-sm leading-relaxed">
@@ -166,7 +137,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@ecommerce.com"
+                      placeholder="Enter your email"
                       className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black transition-all"
                       required
                     />
@@ -181,7 +152,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      placeholder="Enter your password"
                       className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black transition-all"
                       required
                     />
@@ -210,19 +181,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             </div>
           )}
 
-<<<<<<< HEAD
           {/* Forgot Password - Step 1: Request OTP */}
           {view === 'forgot' && (
             <div className="animate-fadeIn">
               <button
                 onClick={() => { setView('login'); setError(''); }}
-=======
-          {/* Forgot Password View */}
-          {view === 'forgot' && (
-            <div className="animate-fadeIn">
-              <button
-                onClick={() => setView('login')}
->>>>>>> 1e65977e (connnect)
                 className="absolute top-8 left-8 p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <ArrowLeft size={20} className="text-gray-500" />
@@ -232,19 +195,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center mb-4">
                   <KeyRound size={24} className="text-blue-600" />
                 </div>
-<<<<<<< HEAD
                 <h3 className="text-2xl font-bold text-gray-900 mb-1">Forgot Password?</h3>
                 <p className="text-sm text-gray-500">Enter your email to receive a 6-digit OTP code.</p>
               </div>
 
               <form onSubmit={handleRequestOTP} className="space-y-6">
-=======
-                <h3 className="text-2xl font-bold text-gray-900 mb-1">Reset Password</h3>
-                <p className="text-sm text-gray-500">Enter your email and we will send reset instructions.</p>
-              </div>
-
-              <form onSubmit={handleForgotPassword} className="space-y-6">
->>>>>>> 1e65977e (connnect)
                 {error && (
                   <p className="text-xs text-red-500 font-medium animate-pulse flex items-center gap-1">
                     {error}
@@ -259,13 +214,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-<<<<<<< HEAD
                       className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black transition-all"
                       placeholder="Enter your email"
-=======
-                      placeholder="admin@ecommerce.com"
-                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black transition-all"
->>>>>>> 1e65977e (connnect)
                       required
                     />
                   </div>
@@ -274,21 +224,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 <button
                   type="submit"
                   disabled={isLoading}
-<<<<<<< HEAD
                   className="w-full bg-black text-white py-3.5 rounded-lg font-bold text-sm hover:bg-gray-900 transition-all flex items-center justify-center gap-2"
                 >
                   {isLoading ? <Loader2 size={18} className="animate-spin" /> : 'Send OTP Code'}
-=======
-                  className="w-full bg-black text-white py-3.5 rounded-lg font-bold text-sm hover:bg-gray-900 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? <Loader2 size={18} className="animate-spin" /> : 'Send Reset Link'}
->>>>>>> 1e65977e (connnect)
                 </button>
               </form>
             </div>
           )}
 
-<<<<<<< HEAD
           {/* Forgot Password - Step 2: Verify OTP & Reset */}
           {view === 'otp' && (
             <div className="animate-fadeIn">
@@ -379,15 +322,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
           )}
 
           {/* Success View */}
-=======
-          {/* Reset Success */}
->>>>>>> 1e65977e (connnect)
           {view === 'success' && (
             <div className="animate-fadeIn text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle size={32} className="text-green-600" />
               </div>
-<<<<<<< HEAD
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Password Reset!</h3>
               <p className="text-gray-500 mb-8 text-sm">
                 Your password has been successfully updated. You can now login with your new password.
@@ -398,18 +337,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                 className="w-full bg-black text-white py-3.5 rounded-lg font-bold text-sm hover:bg-gray-900 transition-all"
               >
                 Return to Login
-=======
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h3>
-              <p className="text-sm text-gray-500 mb-8">
-                We’ve sent a password reset link to <span className="font-bold text-gray-900">{email}</span>
-              </p>
-
-              <button
-                onClick={() => { setView('login'); setResetSent(false); }}
-                className="w-full bg-white border border-gray-300 text-gray-700 py-3.5 rounded-lg font-bold text-sm hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-              >
-                <ArrowLeft size={16} /> Return to Login
->>>>>>> 1e65977e (connnect)
               </button>
             </div>
           )}

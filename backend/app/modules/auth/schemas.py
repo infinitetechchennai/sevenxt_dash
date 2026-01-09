@@ -1,9 +1,5 @@
 from pydantic import BaseModel, EmailStr
-<<<<<<< HEAD
 from typing import Optional, List, Dict, Any
-=======
-from typing import Optional, List
->>>>>>> 1e65977e (connnect)
 from datetime import datetime
 
 # Login Schemas
@@ -21,11 +17,7 @@ class EmployeeCreate(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
-<<<<<<< HEAD
     permissions: Optional[Any] = None
-=======
-    permissions: Optional[List[str]] = None
->>>>>>> 1e65977e (connnect)
 
 # User Response Schemas
 class UserResponse(BaseModel):
@@ -39,11 +31,7 @@ class UserResponse(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None
-<<<<<<< HEAD
     permissions: Optional[Any] = None
-=======
-    permissions: Optional[List[str]] = None
->>>>>>> 1e65977e (connnect)
     last_login: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -63,7 +51,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
     user_type: Optional[str] = None
-<<<<<<< HEAD
 
 # Admin Password Reset Schemas
 class ResetPasswordAdminRequest(BaseModel):
@@ -95,5 +82,3 @@ class MessageResponse(BaseModel):
 
 
 
-=======
->>>>>>> 1e65977e (connnect)

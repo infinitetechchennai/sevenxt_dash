@@ -6,25 +6,16 @@ from datetime import datetime
 from app.database import get_db
 from app.config import settings
 from app.modules.auth import schemas, service
-<<<<<<< HEAD
 from app.modules.auth.models import EmployeeUser, User, AdminUser
 from typing import Union, Any
-=======
-from app.modules.auth.models import EmployeeUser, User
->>>>>>> 1e65977e (connnect)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login-json")
 
-<<<<<<< HEAD
 def get_current_employee(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Union[EmployeeUser, AdminUser]:
     """Get the current authenticated employee"""
     print(f"DEBUG: get_current_employee called with token: {token[:10]}...")
-=======
-def get_current_employee(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """Get the current authenticated employee"""
->>>>>>> 1e65977e (connnect)
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -47,13 +38,9 @@ def get_current_employee(token: str = Depends(oauth2_scheme), db: Session = Depe
 @router.post("/login-json", response_model=schemas.Token)
 def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db)):
     """Login endpoint for admin/staff"""
-<<<<<<< HEAD
     print(f"DEBUG LOGIN: Received email='{login_data.email}', password='{login_data.password}'")
     employee = service.authenticate_employee(db, login_data.email, login_data.password)
     print(f"DEBUG LOGIN: Result={employee}")
-=======
-    employee = service.authenticate_employee(db, login_data.email, login_data.password)
->>>>>>> 1e65977e (connnect)
     if not employee:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -90,7 +77,6 @@ def register(
     return new_user
 
 @router.get("/me", response_model=schemas.EmployeeResponse)
-<<<<<<< HEAD
 def read_users_me(current_employee: Any = Depends(get_current_employee)):
     """Get current logged in employee details"""
     return current_employee
@@ -148,86 +134,121 @@ def reset_password_otp(
         )
     
     return {"message": "Password has been reset successfully"}
-=======
-def read_users_me(current_employee: EmployeeUser = Depends(get_current_employee)):
-    """Get current logged in employee details"""
-    return current_employee
 
-@router.get("/users", response_model=list[schemas.UserResponse])
-def read_users(
-    skip: int = 0, 
-    limit: int = 100, 
-    current_employee: EmployeeUser = Depends(get_current_employee),
+# ========== PROFILE PICTURE UPLOAD ==========
+
+from fastapi import File, UploadFile
+import os
+import shutil
+from pathlib import Path
+
+@router.post("/upload-profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_employee: Any = Depends(get_current_employee),
     db: Session = Depends(get_db)
 ):
-    """Get all B2B/B2C users (Display only)"""
-    users = service.get_all_users(db, skip=skip, limit=limit)
-    return users
-
-# Create a separate router for employees to match frontend expectations
-employees_router = APIRouter(prefix="/employees", tags=["Employees"])
-
-@employees_router.get("", response_model=list[schemas.EmployeeResponse])
-def get_employees(
-    current_employee: EmployeeUser = Depends(get_current_employee),
-    db: Session = Depends(get_db)
-):
-    """Get all employees (Admin/Staff)"""
-    employees = service.get_all_employees(db)
-    return employees
-
-@employees_router.post("/create", response_model=schemas.EmployeeResponse)
-def create_employee(
-    employee_data: schemas.EmployeeCreate,
-    db: Session = Depends(get_db),
-    current_employee: EmployeeUser = Depends(get_current_employee)
-):
-    """Create a new employee (admin/staff)"""
-    # Check if email already exists
-    existing = service.get_employee_by_email(db, employee_data.email)
-    if existing:
+    """Upload profile picture for current user"""
+    try:
+        # Create uploads directory if it doesn't exist
+        upload_dir = Path("uploads/profiles")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        filename = f"{current_employee.id}_{int(datetime.now().timestamp())}{file_extension}"
+        file_path = upload_dir / filename
+        
+        # Save file
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Update database based on user type
+        profile_picture_url = f"/uploads/profiles/{filename}"
+        
+        if isinstance(current_employee, AdminUser):
+            current_employee.profile_picture = profile_picture_url
+        elif isinstance(current_employee, EmployeeUser):
+            current_employee.profile_picture = profile_picture_url
+        
+        db.commit()
+        db.refresh(current_employee)
+        
+        return {
+            "message": "Profile picture uploaded successfully",
+            "profile_picture": profile_picture_url
+        }
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload profile picture: {str(e)}"
         )
-    
-    # Create employee
-    new_employee = service.create_employee(db, employee_data.dict())
-    return new_employee
 
-
-@router.delete("/users/{user_id}")
-def delete_user(
-    user_id: int, 
-    db: Session = Depends(get_db),
-    current_employee: EmployeeUser = Depends(get_current_employee)
+@router.get("/profile")
+def get_profile(
+    current_employee: Any = Depends(get_current_employee)
 ):
-    """Delete a user (soft delete by setting deleted_at timestamp)"""
-    
-    # Try to find in employee_users table first (Admin/Staff)
-    employee = db.query(EmployeeUser).filter(
-        EmployeeUser.id == user_id,
-        EmployeeUser.deleted_at.is_(None)
-    ).first()
-    
-    if employee:
-        # Soft delete employee
-        employee.deleted_at = datetime.utcnow()
+    """Get current user profile with picture"""
+    return {
+        "id": current_employee.id,
+        "name": current_employee.name,
+        "email": current_employee.email,
+        "phone": current_employee.phone,
+        "role": current_employee.role,
+        "profile_picture": current_employee.profile_picture,
+        "address": current_employee.address if hasattr(current_employee, "address") else None,
+        "city": current_employee.city if hasattr(current_employee, "city") else None,
+        "state": current_employee.state if hasattr(current_employee, "state") else None,
+        "pincode": current_employee.pincode if hasattr(current_employee, "pincode") else None,
+        "permissions": current_employee.permissions if hasattr(current_employee, "permissions") else [],
+        "user_type": "admin" if isinstance(current_employee, AdminUser) else "employee"
+    }
+
+@router.put("/profile")
+def update_profile(
+    profile_data: dict,
+    current_employee: Any = Depends(get_current_employee),
+    db: Session = Depends(get_db)
+):
+    """Update current user profile"""
+    try:
+        if "name" in profile_data:
+            current_employee.name = profile_data["name"]
+        if "phone" in profile_data:
+            current_employee.phone = profile_data["phone"]
+        if "email" in profile_data:
+            current_employee.email = profile_data["email"]
+        if "address" in profile_data:
+            current_employee.address = profile_data["address"]
+        if "city" in profile_data:
+            current_employee.city = profile_data["city"]
+        if "state" in profile_data:
+            current_employee.state = profile_data["state"]
+        if "pincode" in profile_data:
+            current_employee.pincode = profile_data["pincode"]
+        
         db.commit()
-        return {"message": "Employee deleted successfully", "type": "employee"}
-    
-    # Try to find in users table (B2B/B2C)
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.deleted_at.is_(None)
-    ).first()
-    
-    if user:
-        # Soft delete user
-        user.deleted_at = datetime.utcnow()
-        db.commit()
-        return {"message": "User deleted successfully", "type": "user"}
-    
-    # Not found in either table
-    raise HTTPException(status_code=404, detail="User not found")
->>>>>>> 1e65977e (connnect)
+        db.refresh(current_employee)
+        
+        return {
+            "message": "Profile updated successfully",
+            "profile": {
+                "id": current_employee.id,
+                "name": current_employee.name,
+                "email": current_employee.email,
+                "phone": current_employee.phone,
+                "role": current_employee.role,
+                "profile_picture": current_employee.profile_picture,
+                "address": current_employee.address,
+                "city": current_employee.city,
+                "state": current_employee.state,
+                "pincode": current_employee.pincode
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update profile: {str(e)}"
+        )
+# Trigger reload

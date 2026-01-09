@@ -54,12 +54,33 @@ def update_refund_status(db: Session, refund_id: int, status: str) -> Optional[R
     
     refund.status = status
     
+    # Sync order status
+    if refund.order:
+        if status == 'Approved':
+            refund.order.status = "Refund Approved"
+        elif status == 'Completed':
+            refund.order.status = "Refunded"
+            
     # Set timestamps based on status
     if status == 'Approved':
         refund.approved_at = datetime.now()
         refund.return_delivery_status = 'Manifested'  # Initial status
         
-        # 🔥 TRIGGER RETURN AWB GENERATION
+        # 1. Send Approval Email
+        try:
+            from app.modules.auth.sendgrid_utils import sendgrid_service
+            if refund.order and refund.order.email:
+                sendgrid_service.send_refund_approval_email(
+                    to_email=refund.order.email,
+                    customer_name=refund.order.customer_name or "Customer",
+                    order_id=refund.order.order_id,
+                    amount=float(refund.amount)
+                )
+                logger.info(f"[REFUND] Approval email sent to {refund.order.email}")
+        except Exception as e:
+            logger.error(f"[REFUND] Failed to send approval email: {e}")
+        
+        # 2. TRIGGER RETURN AWB GENERATION
         try:
             from app.modules.delivery.shipment_service import create_return_shipment
             
@@ -91,6 +112,55 @@ def update_refund_status(db: Session, refund_id: int, status: str) -> Optional[R
     db.refresh(refund)
     
     logger.info(f"[REFUND] Updated refund {refund_id} status to {status}")
+    return refund
+
+
+def reject_refund(db: Session, refund_id: int, rejection_reason: str, admin_notes: Optional[str] = None) -> Optional[Refund]:
+    """Reject a refund request with a reason and send email"""
+    refund = db.query(Refund).options(joinedload(Refund.order)).filter(Refund.id == refund_id).first()
+    
+    if not refund:
+        return None
+    
+    # Update refund status
+    refund.status = 'Rejected'
+    refund.rejection_reason = rejection_reason
+    refund.admin_notes = admin_notes
+    
+    # Update order status
+    if refund.order:
+        refund.order.status = "Refund Rejected"
+    
+    db.commit()
+    db.refresh(refund)
+    
+    # Send Rejection Email
+    try:
+        from app.modules.auth.sendgrid_utils import sendgrid_service
+        
+        print(f"[DEBUG] Attempting to send rejection email to {refund.order.email}")
+        print(f"[DEBUG] Reason: {rejection_reason}")
+        
+        if refund.order and refund.order.email:
+            email_sent = sendgrid_service.send_refund_rejection_email(
+                to_email=refund.order.email,
+                customer_name=refund.order.customer_name or "Customer",
+                order_id=refund.order.order_id,
+                amount=float(refund.amount),
+                rejection_reason=rejection_reason
+            )
+            
+            if email_sent:
+                logger.info(f"[REFUND] Rejection email sent successfully to {refund.order.email}")
+            else:
+                logger.error(f"[REFUND] Failed to send rejection email (function returned False)")
+        else:
+            logger.warning(f"[REFUND] No customer email found for order {refund.order_id}")
+            
+    except Exception as e:
+        logger.exception(f"[REFUND] Error sending rejection email: {e}")
+    
+    logger.info(f"[REFUND] Rejected refund {refund_id}. Reason: {rejection_reason}")
     return refund
 
 

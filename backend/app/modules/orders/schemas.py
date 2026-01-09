@@ -22,6 +22,10 @@ class OrderBase(BaseModel):
     weight: Optional[float] = None
     breadth: Optional[float] = None
     length: Optional[float] = None
+    
+    # GST Percentages
+    sgst_percentage: Optional[float] = 0.0
+    cgst_percentage: Optional[float] = 0.0
 
 class OrderCreate(OrderBase):
     pass
@@ -54,6 +58,11 @@ class DeliveryResponse(BaseModel):
     height: float
     awb_number: Optional[str] = None
     courier_partner: Optional[str] = None
+    
+    # GST Percentages
+    sgst_percentage: Optional[float] = 0.0
+    cgst_percentage: Optional[float] = 0.0
+    
     pickup_location: str
     payment: str
     amount: float

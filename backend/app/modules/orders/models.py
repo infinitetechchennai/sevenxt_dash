@@ -1,33 +1,38 @@
 from sqlalchemy import Column, Integer, String, DECIMAL, Text, DateTime, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 
 class B2BApplication(Base):
     __tablename__ = "b2b_applications"
+    __table_args__ = {'extend_existing': True}
 
-    id = Column(Integer, primary_key=True, index=True)
-    business_name = Column(Text, nullable=True)
-    gstin = Column(String(20), nullable=True)
-    pan = Column(String(10), nullable=True)
-    email = Column(String(255), nullable=True)
-    phone_number = Column(String(20), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), nullable=True)
+    business_name = Column(Text, nullable=False)
+    gstin = Column(String(20), nullable=False)
+    pan = Column(String(15), nullable=False)
+    email = Column(String(255), nullable=False)
+    phone_number = Column(String(20), nullable=False)
     gst_certificate_url = Column(Text, nullable=True)
     business_license_url = Column(Text, nullable=True)
-    status = Column(String(30), nullable=True)
-    created_at = Column(DateTime, nullable=True)
-    address_id = Column(String(36), nullable=True)
+    status = Column(String(30), nullable=False, default='pending_approval')
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    address_id = Column(UUID(as_uuid=True), nullable=True)
 
 class B2CApplication(Base):
     __tablename__ = "b2c_applications"
+    __table_args__ = {'extend_existing': True}
 
-    id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(Text, nullable=True)  # Actual column name in DB
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    full_name = Column(Text, nullable=True)
     phone_number = Column(String(20), nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now())
     email = Column(String(255), nullable=True)
-    created_at = Column(DateTime, nullable=False)
-    updated_at = Column(DateTime, nullable=False)
-    address_id = Column(String(36), nullable=True)
+    address_id = Column(UUID(as_uuid=True), nullable=True)
 
 class Order(Base):
     __tablename__ = "orders"
@@ -58,6 +63,13 @@ class Order(Base):
     weight = Column(Integer, nullable=True)
     breadth = Column(Integer, nullable=True)
     length = Column(Integer, nullable=True)
+    
+    # HSN Code
+    hsn = Column(String(20), nullable=True)
+
+    # GST Percentages
+    sgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
+    cgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
 
     #return AWb number annd label
     # return_awb_number = Column(String(255), nullable=True)

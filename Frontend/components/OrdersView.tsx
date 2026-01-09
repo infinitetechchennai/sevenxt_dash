@@ -1,43 +1,18 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-<<<<<<< HEAD
 import {
   Search, Eye, Download, ShoppingBag, Printer, X, CreditCard, MapPin, Phone, Mail, ArrowLeft, Calendar, PlayCircle, CheckCircle, Package
 } from 'lucide-react';
 import Barcode from 'react-barcode';
 
 import logo from '../assets/logo.jpg';
-import { apiService } from '../services/api';
-=======
-import { 
-  Search, Eye, Download, ShoppingBag, Printer, X, CreditCard, MapPin, Phone, Mail, ArrowLeft, Calendar, PlayCircle
-} from 'lucide-react';
-import logo from '../assets/logo.jpg';
-// Mock Data (Local to ensure type safety with amount as number for calculations)
-const MOCK_ORDERS = [
-  { id: 'ORD-7001', customer: 'TechCorp Solutions', date: 'May 14, 2024', amount: 4500.00, items: 12, status: 'Processing', payment: 'Paid', type: 'B2B', email: 'accounts@techcorp.com', address: 'Tech Park, Sector 4, Bangalore' },
-  { id: 'ORD-7002', customer: 'Alice Freeman', date: 'May 13, 2024', amount: 129.99, items: 1, status: 'On the way', payment: 'Paid', type: 'B2C', email: 'alice.f@gmail.com', address: '123 Maple Drive, Mumbai' },
-  { id: 'ORD-7003', customer: 'John Doe', date: 'May 12, 2024', amount: 45.50, items: 2, status: 'Delivered', payment: 'Paid', type: 'B2C', email: 'john.d@yahoo.com', address: '45 Park Avenue, Delhi' },
-  { id: 'ORD-7004', customer: 'Global Logistics', date: 'May 11, 2024', amount: 1200.50, items: 5, status: 'Pending', payment: 'Unpaid', type: 'B2B', email: 'logistics@global.com', address: 'Warehouse 9, Chennai Port' },
-  { id: 'ORD-7005', customer: 'Sarah Jenkins', date: 'May 10, 2024', amount: 899.00, items: 1, status: 'Cancelled', payment: 'Refunded', type: 'B2C', email: 'sarah.j@outlook.com', address: '78 Hilltop View, Pune' },
-  { id: 'ORD-7006', customer: 'Wayne Enterprises', date: 'May 14, 2024', amount: 25000.00, items: 50, status: 'Confirmed', payment: 'Paid', type: 'B2B', email: 'procurement@wayne.com', address: 'Gotham Tower, Mumbai' },
-  { id: 'ORD-7007', customer: 'Peter Parker', date: 'May 14, 2024', amount: 25.00, items: 1, status: 'Pickup', payment: 'Paid', type: 'B2C', email: 'p.parker@dailybugle.com', address: '20 Ingram St, Queens' },
-  { id: 'ORD-7008', customer: 'Stark Ind', date: 'May 14, 2024', amount: 9999.00, items: 10, status: 'On the way', payment: 'Paid', type: 'B2B', email: 'tony@stark.com', address: 'Malibu Point, Goa' },
-  { id: 'ORD-7009', customer: 'Bruce Banner', date: 'April 20, 2024', amount: 150.00, items: 3, status: 'Delivered', payment: 'Paid', type: 'B2C', email: 'bruce@hulk.com', address: 'Green St, Dayton' },
-  { id: 'ORD-7010', customer: 'Clark Kent', date: 'January 15, 2023', amount: 55.00, items: 1, status: 'Delivered', payment: 'Paid', type: 'B2C', email: 'ck@dailyplanet.com', address: 'Metropolis' },
-];
->>>>>>> 1e65977e (connnect)
+import { apiService, API_BASE_URL } from '../services/api';
 
 const STATUS_TABS = [
   'All Orders',
   'Confirmed',
   'Processing',
-<<<<<<< HEAD
   'Ready to Pickup',
-=======
-  'Pickup',
->>>>>>> 1e65977e (connnect)
-  'On the way',
   'Delivered',
   'Cancelled'
 ];
@@ -47,7 +22,6 @@ interface OrdersViewProps {
 }
 
 export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }) => {
-<<<<<<< HEAD
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState('All Orders');
@@ -65,19 +39,53 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   // Pickup Time State
   const [pickupTimes, setPickupTimes] = useState<Record<string, string>>({});
 
-=======
-  const [orders, setOrders] = useState(MOCK_ORDERS);
-  const [activeStatus, setActiveStatus] = useState('All Orders');
-  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
-  
->>>>>>> 1e65977e (connnect)
   // Date Filters
   const [filterDate, setFilterDate] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
 
-<<<<<<< HEAD
+  // Count State
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
+    'All Orders': 0, 'Confirmed': 0, 'Processing': 0, 'Ready to Pickup': 0, 'Delivered': 0, 'Cancelled': 0
+  });
+
+  // Calculate counts
+  useEffect(() => {
+    const updateCounts = async () => {
+      if (activeStatus === 'Ready to Pickup') {
+        // When in Delivery view, we don't have all orders in state, so fetch them for counts
+        try {
+          const data = await apiService.fetchOrders();
+          const normalize = (s: string) => (s && s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) || 'Pending';
+
+          setStatusCounts({
+            'All Orders': data.length,
+            'Confirmed': data.filter((o: any) => normalize(o.status) === 'Confirmed').length,
+            'Processing': data.filter((o: any) => normalize(o.status) === 'Processing').length,
+            'Ready to Pickup': orders.filter((o: any) => {
+              if (!o.status) return false;
+              const s = o.status.toUpperCase().replace('_', ' ');
+              return s === 'READY TO PICKUP' || s === 'PICKUP TIME SCHEDULED' || s === 'AWB GENERATED';
+            }).length,
+            'Delivered': data.filter((o: any) => normalize(o.status) === 'Delivered').length,
+            'Cancelled': data.filter((o: any) => normalize(o.status) === 'Cancelled').length
+          });
+        } catch (e) { console.error(e); }
+      } else {
+        // When in standard views, 'orders' contains the full list
+        setStatusCounts({
+          'All Orders': orders.length,
+          'Confirmed': orders.filter(o => o.status === 'Confirmed').length,
+          'Processing': orders.filter(o => o.status === 'Processing').length,
+          'Ready to Pickup': orders.filter(o => ['Ready to Pickup', 'Pickup Time Scheduled', 'AWB Generated'].includes(o.status)).length,
+          'Delivered': orders.filter(o => o.status === 'Delivered').length,
+          'Cancelled': orders.filter(o => o.status === 'Cancelled').length
+        });
+      }
+    };
+    updateCounts();
+  }, [orders, activeStatus]);
+
   // Fetch Orders
   useEffect(() => {
     if (activeStatus === 'Ready to Pickup') {
@@ -127,7 +135,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
           schedule_pickup: d.schedule_pickup,
           awb_label_path: d.awb_label_path,
           awb_number: d.awb_number, // AWB number for barcode
-          rawDate: d.created_at
+          rawDate: d.created_at,
+          sgst_percentage: d.sgst_percentage,
+          cgst_percentage: d.cgst_percentage
         };
       });
 
@@ -220,6 +230,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
           breadth: order.breadth,
           length: order.length,
           awb_number: order.awb_number, // AWB number for barcode
+          sgst_percentage: order.sgst_percentage,
+          cgst_percentage: order.cgst_percentage,
 
           rawDate: order.created_at // Keep raw date for sorting
 
@@ -234,8 +246,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     }
   };
 
-=======
->>>>>>> 1e65977e (connnect)
   // Sync with global search prop
   useEffect(() => {
     if (initialSearchTerm !== undefined) {
@@ -252,7 +262,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   // Filter Logic
   const filteredOrders = orders.filter(order => {
     const orderDate = new Date(order.date);
-<<<<<<< HEAD
     const matchesStatus = activeStatus === 'All Orders'
       || order.status === activeStatus
       || (activeStatus === 'Ready to Pickup' && (order.status === 'Pickup Time Scheduled' || order.status === 'AWB Generated'));
@@ -275,28 +284,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
       if (filterYear) {
         matchesDate = matchesDate && orderDate.getFullYear() === parseInt(filterYear);
       }
-=======
-    const matchesStatus = activeStatus === 'All Orders' || order.status === activeStatus;
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) || order.customer.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Date Logic
-    let matchesDate = true;
-    
-    if (filterDate) {
-        // Exact Date Match
-        const selDate = new Date(filterDate);
-        matchesDate = orderDate.getDate() === selDate.getDate() &&
-                      orderDate.getMonth() === selDate.getMonth() &&
-                      orderDate.getFullYear() === selDate.getFullYear();
-    } else {
-        // Month & Year Logic
-        if (filterMonth) {
-            matchesDate = matchesDate && orderDate.getMonth() === parseInt(filterMonth);
-        }
-        if (filterYear) {
-            matchesDate = matchesDate && orderDate.getFullYear() === parseInt(filterYear);
-        }
->>>>>>> 1e65977e (connnect)
     }
 
     return matchesStatus && matchesSearch && matchesDate;
@@ -304,11 +291,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
 
   // Group Orders by Date
   const groupedOrders = useMemo(() => {
-<<<<<<< HEAD
     const groups: Record<string, any[]> = {};
-=======
-    const groups: Record<string, typeof MOCK_ORDERS> = {};
->>>>>>> 1e65977e (connnect)
     filteredOrders.forEach(order => {
       if (!groups[order.date]) {
         groups[order.date] = [];
@@ -322,25 +305,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   const sortedDates = Object.keys(groupedOrders).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
   const getStatusColor = (status: string) => {
-<<<<<<< HEAD
     switch (status) {
-=======
-    switch(status) {
->>>>>>> 1e65977e (connnect)
       case 'Delivered': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'On the way': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'Processing': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       case 'Confirmed': return 'bg-violet-100 text-violet-700 border-violet-200';
-<<<<<<< HEAD
       case 'Ready to Pickup':
       case 'AWB Generated':
         return 'bg-amber-100 text-amber-700 border-amber-200';
       case 'Pickup Time Scheduled':
         return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'Pickup': return 'bg-amber-100 text-amber-700 border-amber-200'; // Fallback
-=======
-      case 'Pickup': return 'bg-amber-100 text-amber-700 border-amber-200';
->>>>>>> 1e65977e (connnect)
       case 'Pending': return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'Cancelled': return 'bg-rose-100 text-rose-700 border-rose-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -379,7 +354,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   };
 
   const clearDateFilters = () => {
-<<<<<<< HEAD
     setFilterDate('');
     setFilterMonth('');
     setFilterYear('');
@@ -387,20 +361,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
 
   const handleProcessOrder = (orderId: string) => {
     setOrders(prevOrders => prevOrders.map(order =>
-=======
-      setFilterDate('');
-      setFilterMonth('');
-      setFilterYear('');
-  };
-
-  const handleProcessOrder = (orderId: string) => {
-    setOrders(prevOrders => prevOrders.map(order => 
->>>>>>> 1e65977e (connnect)
       order.id === orderId ? { ...order, status: 'Processing' } : order
     ));
   };
 
-<<<<<<< HEAD
   const handleConfirmOrder = async (orderId: string) => {
     try {
       await apiService.updateOrderStatus(orderId, 'Confirmed');
@@ -537,8 +501,62 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   };
 
 
-=======
->>>>>>> 1e65977e (connnect)
+  // Determine available bulk action
+  const activeBulkAction = useMemo(() => {
+    if (selectedOrders.size === 0) return null;
+
+    const selected = orders.filter(o => selectedOrders.has(o.id));
+
+    // Priority 1: Pending -> Confirmed
+    const pendingOrders = selected.filter(o => o.status === 'Pending');
+    if (pendingOrders.length > 0) {
+      return { label: `Move ${pendingOrders.length} to Confirmed`, next: 'Confirmed', targetIds: pendingOrders.map(o => o.id) };
+    }
+
+    // Priority 2: Confirmed -> Processing
+    const confirmedOrders = selected.filter(o => o.status === 'Confirmed');
+    if (confirmedOrders.length > 0) {
+      return { label: `Move ${confirmedOrders.length} to Processing`, next: 'Processing', targetIds: confirmedOrders.map(o => o.id) };
+    }
+
+    // Priority 3: Processing -> Pickup
+    const processingOrders = selected.filter(o => o.status === 'Processing');
+    if (processingOrders.length > 0) {
+      return { label: `Move ${processingOrders.length} to Pickup`, next: 'Ready to Pickup', targetIds: processingOrders.map(o => o.id) };
+    }
+
+    // Priority 4: Pickup -> Delivered
+    const pickupOrders = selected.filter(o => ['Ready to Pickup', 'Pickup Time Scheduled', 'AWB Generated'].includes(o.status));
+    if (pickupOrders.length > 0) {
+      return { label: `Mark ${pickupOrders.length} Delivered`, next: 'Delivered', targetIds: pickupOrders.map(o => o.id) };
+    }
+
+    return null;
+  }, [selectedOrders, orders]);
+
+  const handleBulkMove = async () => {
+    if (!activeBulkAction) return;
+
+    if (!window.confirm(`${activeBulkAction.label}?`)) return;
+
+    try {
+      setLoading(true);
+      // Use targetIds from the derived action, not all selectedOrders
+      const promises = activeBulkAction.targetIds.map((id: string) => apiService.updateOrderStatus(id, activeBulkAction.next));
+      await Promise.all(promises);
+
+      if (activeStatus === 'Ready to Pickup') fetchDeliveries();
+      else fetchOrders();
+
+      setSelectedOrders(new Set());
+    } catch (error) {
+      console.error("Bulk update failed", error);
+      alert("Failed to update status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 -m-4 sm:-m-6 lg:-m-8 font-sans overflow-hidden relative">
       {/* Header */}
@@ -564,7 +582,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               {status}
               {status !== 'All Orders' && (
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeStatus === status ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                  {orders.filter(o => o.status === status).length}
+                  {statusCounts[status] || 0}
                 </span>
               )}
             </button>
@@ -575,7 +593,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
       {/* Toolbar */}
       <div className="px-6 py-4 flex flex-col gap-4 shrink-0 bg-slate-50 border-b border-slate-200">
         <div className="flex items-center justify-between gap-4">
-<<<<<<< HEAD
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
@@ -587,6 +604,15 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
             />
           </div>
           <div className="flex items-center gap-2">
+            {activeBulkAction && (
+              <button
+                onClick={handleBulkMove}
+                className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white border border-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                <CheckCircle size={16} />
+                {activeBulkAction.label} ({selectedOrders.size})
+              </button>
+            )}
             {activeStatus === 'Ready to Pickup' && selectedOrders.size > 0 && (
               <button
                 onClick={downloadBulkAWBLabels}
@@ -604,32 +630,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               Export
             </button>
           </div>
-=======
-            <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                    type="text" 
-                    placeholder="Search by Order ID or Customer..."
-                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm text-gray-900"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
-            </div>
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={downloadCSV}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-slate-600 text-sm font-medium hover:bg-slate-50"
-                >
-                    <Download size={16} />
-                    Export
-                </button>
-            </div>
->>>>>>> 1e65977e (connnect)
         </div>
 
         {/* Date Filters */}
         <div className="flex flex-wrap items-center gap-3">
-<<<<<<< HEAD
           {/* Specific Date */}
           <div className="flex items-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
             <span className="text-xs text-slate-500 mr-2 font-medium">Date:</span>
@@ -684,86 +688,28 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               <X size={12} /> Clear Filters
             </button>
           )}
-=======
-            {/* Specific Date */}
-            <div className="flex items-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
-                <span className="text-xs text-slate-500 mr-2 font-medium">Date:</span>
-                <input 
-                    type="date" 
-                    value={filterDate}
-                    onChange={(e) => {
-                        setFilterDate(e.target.value);
-                        setFilterMonth(''); 
-                        setFilterYear('');
-                    }}
-                    className="text-sm outline-none text-slate-700 bg-transparent border-none focus:ring-0 h-5"
-                />
-            </div>
-
-            <span className="text-xs text-slate-400 font-medium">OR</span>
-
-            {/* Month */}
-            <select 
-                value={filterMonth}
-                onChange={(e) => {
-                    setFilterMonth(e.target.value);
-                    setFilterDate(''); 
-                }}
-                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 outline-none shadow-sm focus:border-indigo-500"
-            >
-                <option value="">All Months</option>
-                {Array.from({length: 12}, (_, i) => (
-                    <option key={i} value={i}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>
-                ))}
-            </select>
-
-            {/* Year */}
-            <select 
-                value={filterYear}
-                onChange={(e) => {
-                    setFilterYear(e.target.value);
-                    setFilterDate('');
-                }}
-                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 outline-none shadow-sm focus:border-indigo-500"
-            >
-                <option value="">All Years</option>
-                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-
-            {/* Clear Filters */}
-            {(filterDate || filterMonth || filterYear) && (
-                <button 
-                    onClick={clearDateFilters}
-                    className="text-xs text-red-600 hover:text-red-800 hover:underline ml-auto sm:ml-0 flex items-center gap-1"
-                >
-                    <X size={12} /> Clear Filters
-                </button>
-            )}
->>>>>>> 1e65977e (connnect)
         </div>
       </div>
 
       {/* Table */}
       <div className="flex-1 overflow-y-auto px-6 pb-8 pt-4">
-<<<<<<< HEAD
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-max">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
-                {activeStatus === 'Ready to Pickup' && (
-                  <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </th>
-                )}
+                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                  />
+                </th>
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Order ID</th>
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
                 {activeStatus !== 'Ready to Pickup' && (
                   <>
+                    <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[150px]">Product</th>
                     <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
                     <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
                   </>
@@ -784,18 +730,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                 ) : (
                   <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Process</th>
                 )}
-=======
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-200">
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Order ID</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Process</th>
->>>>>>> 1e65977e (connnect)
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Invoice</th>
               </tr>
             </thead>
@@ -803,27 +737,23 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               {sortedDates.map(date => (
                 <React.Fragment key={date}>
                   <tr className="bg-gray-50 border-b border-gray-100">
-<<<<<<< HEAD
-                    <td colSpan={10} className="py-2 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-=======
-                    <td colSpan={7} className="py-2 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
->>>>>>> 1e65977e (connnect)
-                      <Calendar size={12} /> {date}
+                    <td colSpan={10} className="py-2.5 px-4 text-xs font-bold text-slate-700 bg-slate-100 border-y border-slate-200 uppercase tracking-wider pl-4">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-slate-500" />
+                        <span>{date}</span>
+                      </div>
                     </td>
                   </tr>
                   {groupedOrders[date].map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
-<<<<<<< HEAD
-                      {activeStatus === 'Ready to Pickup' && (
-                        <td className="py-4 px-6">
-                          <input
-                            type="checkbox"
-                            checked={selectedOrders.has(order.id)}
-                            onChange={() => toggleOrderSelection(order.id)}
-                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                          />
-                        </td>
-                      )}
+                      <td className="py-4 px-6">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.has(order.id)}
+                          onChange={() => toggleOrderSelection(order.id)}
+                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="py-4 px-6 font-medium text-indigo-600 text-sm">{order.id}</td>
                       <td className="py-4 px-6 text-sm text-slate-900">
                         <div className="flex items-center gap-2">
@@ -838,6 +768,20 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                       </td>
                       {activeStatus !== 'Ready to Pickup' && (
                         <>
+                          <td className="py-4 px-6 text-sm text-slate-600 max-w-[200px]">
+                            <div className="flex flex-col gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                              {order.productList && order.productList.length > 0 ? (
+                                order.productList.map((p: any, i: number) => (
+                                  <div key={i} className="text-xs flex justify-between gap-2 border-b border-gray-50 last:border-0 pb-1 last:pb-0">
+                                    <span className="truncate flex-1" title={p.name}>{p.name}</span>
+                                    <span className="font-semibold text-slate-500 shrink-0">x{p.quantity || 1}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-slate-300 italic">-</span>
+                              )}
+                            </div>
+                          </td>
                           <td className="py-4 px-6 text-sm font-bold text-slate-900">₹{order.amount.toLocaleString()}</td>
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${order.payment === 'Paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
@@ -847,27 +791,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                           </td>
                         </>
                       )}
-=======
-                      <td className="py-4 px-6 font-medium text-indigo-600 text-sm">{order.id}</td>
-                      <td className="py-4 px-6 text-sm text-slate-900">
-                        {order.customer}
-                        <div className="text-[10px] text-slate-400 uppercase">{order.type}</div>
-                      </td>
-                      <td className="py-4 px-6 text-sm font-bold text-slate-900">₹{order.amount.toLocaleString()}</td>
-                      <td className="py-4 px-6">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          order.payment === 'Paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                        }`}>
-                          {order.payment}
-                        </span>
-                      </td>
->>>>>>> 1e65977e (connnect)
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(order.status)}`}>
                           {order.status}
                         </span>
                       </td>
-<<<<<<< HEAD
                       {(activeStatus === 'Processing' || activeStatus === 'Confirmed' || activeStatus === 'Ready to Pickup') && (
                         <td className="py-4 px-6">
                           {(order.height || order.weight || order.breadth || order.length) ? (
@@ -924,7 +852,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                           <td className="py-4 px-6 text-center">
                             {order.awb_label_path ? (
                               <a
-                                href={`${(import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001"}${order.awb_label_path}`}
+                                href={`${API_BASE_URL}${order.awb_label_path}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
@@ -1056,28 +984,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                           </button>
                         ) : (
                           <span className="text-slate-300">-</span>
-=======
-                      <td className="py-4 px-6 text-center">
-                        {order.status === 'Confirmed' ? (
-                            <button 
-                              onClick={() => handleProcessOrder(order.id)}
-                              className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm w-full max-w-[100px] mx-auto"
-                              title="Move to Processing"
-                            >
-                              <PlayCircle size={14} /> Process
-                            </button>
-                        ) : (
-                            <span className="text-slate-300">-</span>
->>>>>>> 1e65977e (connnect)
                         )}
                       </td>
                       <td className="py-4 px-6 text-center">
                         <div className="flex items-center justify-center gap-2">
-<<<<<<< HEAD
                           <button
-=======
-                          <button 
->>>>>>> 1e65977e (connnect)
                             onClick={() => setSelectedOrder(order)}
                             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title="View Invoice"
@@ -1102,7 +1013,6 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
             </div>
           )}
         </div>
-<<<<<<< HEAD
       </div >
 
       {/* Invoice Modal */}
@@ -1195,36 +1105,29 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
       }
 
     </div >
-=======
-      </div>
-
-      {/* Invoice Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-[1000] flex justify-center items-start bg-black/60 backdrop-blur-sm p-4 pt-24 overflow-y-auto">
-          <InvoiceModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
-        </div>
-      )}
-    </div>
->>>>>>> 1e65977e (connnect)
   );
 };
 
 const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) => {
   // Robust amount handling: parse string if needed, or use number directly
-<<<<<<< HEAD
   const amountValue = typeof order.amount === 'string'
     ? parseFloat(order.amount.replace(/[^0-9.-]+/g, ""))
-=======
-  const amountValue = typeof order.amount === 'string' 
-    ? parseFloat(order.amount.replace(/[^0-9.-]+/g,"")) 
->>>>>>> 1e65977e (connnect)
     : order.amount;
 
-  const taxRate = 0.18;
-  const subtotal = amountValue / (1 + taxRate);
-  const sgst = subtotal * 0.09;
-  const cgst = subtotal * 0.09;
-<<<<<<< HEAD
+  // Calculate GST dynamically based on stored percentages
+  // Default to 0 if not present
+  const sgstPercent = Number(order.sgst_percentage) || 0;
+  const cgstPercent = Number(order.cgst_percentage) || 0;
+
+  // Total Tax Rate (e.g., 18% = 0.18)
+  const totalTaxRate = (sgstPercent + cgstPercent) / 100;
+
+  // Subtotal = Amount / (1 + Tax Rate)
+  const subtotal = totalTaxRate > 0 ? (amountValue / (1 + totalTaxRate)) : amountValue;
+
+  // Calculate specific tax amounts
+  const sgst = subtotal * (sgstPercent / 100);
+  const cgst = subtotal * (cgstPercent / 100);
 
   // Generate dummy items based on item count
   // Use actual product list if available, otherwise fallback to dummy items
@@ -1250,16 +1153,6 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
       qty: 1,
       price: (subtotal / (order.items || 1))
     }));
-=======
-  
-  // Generate dummy items based on item count
-  const invoiceItems = Array.from({ length: order.items }).map((_, i) => ({
-    id: i + 1,
-    desc: i === 0 ? `Main Product - ${order.type} SKU` : `Accessory / Component Part #${1000 + i}`,
-    qty: 1,
-    price: (subtotal / order.items)
-  }));
->>>>>>> 1e65977e (connnect)
 
   return (
     <div className="bg-white w-full max-w-3xl rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 mb-8">
@@ -1269,23 +1162,14 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
           <CreditCard size={16} /> Invoice Preview
         </span>
         <div className="flex items-center gap-2">
-<<<<<<< HEAD
           <button
             onClick={() => window.print()}
-=======
-          <button 
-            onClick={() => window.print()} 
->>>>>>> 1e65977e (connnect)
             className="p-2 hover:bg-slate-700 rounded-md transition-colors text-slate-300 hover:text-white"
             title="Print Invoice"
           >
             <Printer size={18} />
           </button>
-<<<<<<< HEAD
           <button
-=======
-          <button 
->>>>>>> 1e65977e (connnect)
             onClick={onClose}
             className="p-2 bg-red-600 hover:bg-red-700 rounded-md transition-colors text-white"
             title="Close Invoice"
@@ -1297,6 +1181,9 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
 
       {/* Invoice Content (Printable Area) */}
       <div className="p-8 print:p-0" id="invoice-content">
+
+
+
         {/* Header */}
         <div className="flex justify-between items-start mb-8 border-b border-gray-100 pb-8">
           <div>
@@ -1304,20 +1191,15 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
               <img src={logo} alt="Logo" className="h-[90px] w-auto" />
               {/* <h1 className="text-2xl font-bold text-gray-900">Sevenxt</h1> */}
             </div>
-            <p className="text-sm text-gray-500">123 Innovation Park, Tech City</p>
-            <p className="text-sm text-gray-500">Bangalore, Karnataka 560103</p>
+            <p className="text-sm text-gray-500">123 Innovation Park, Tech CitNo.181/1, Old No.80/1, Swamy Naicken Street,y</p>
+            <p className="text-sm text-gray-500">Chintadripet Chennai 600002</p>
             <p className="text-sm text-gray-500 mt-1">GSTIN: 29ABCDE1234F1Z5</p>
           </div>
           <div className="text-right">
             <h2 className="text-4xl font-light text-gray-200 uppercase tracking-widest mb-2">Invoice</h2>
-<<<<<<< HEAD
             <p className="text-sm text-gray-500 mb-1">Invoice Number</p>
-            <p className="text-lg font-bold text-gray-900 font-mono">INV-{order.id.split('-')[1] || order.id}</p>
+            <p className="text-lg font-bold text-gray-900 font-mono">INV-{order.order_id || order.id}</p>
             <p className="text-sm text-gray-500 mt-2">Date: {order.date}</p>
-=======
-            <p className="text-sm font-bold text-gray-900">INV-{order.id.split('-')[1]}</p>
-            <p className="text-sm text-gray-500">Date: {order.date}</p>
->>>>>>> 1e65977e (connnect)
             <div className={`mt-2 inline-block px-3 py-1 rounded border text-xs font-bold uppercase ${order.payment === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
               {order.payment}
             </div>
@@ -1332,32 +1214,20 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
             <div className="text-sm text-gray-600 mt-1 space-y-1">
               <p className="flex items-start gap-2"><MapPin size={14} className="mt-0.5 shrink-0" /> {order.address || 'Address on file'}</p>
               <p className="flex items-center gap-2"><Mail size={14} /> {order.email || 'email@example.com'}</p>
-<<<<<<< HEAD
               <p className="flex items-center gap-2"><Phone size={14} /> {order.phone || '+91 98765 43210'}</p>
             </div>
 
-=======
-              <p className="flex items-center gap-2"><Phone size={14} /> +91 98765 43210</p>
-            </div>
->>>>>>> 1e65977e (connnect)
           </div>
           <div className="text-right">
             <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Order Details</h3>
             <div className="text-sm text-gray-600 space-y-1">
-<<<<<<< HEAD
               <p>Order ID: <span className="font-mono font-medium text-gray-900">{order.id}</span></p>
               <p>Order Type: <span className="font-medium text-gray-900">{order.type}</span></p>
               <p>Total Items: <span className="font-medium text-gray-900">{order.items}</span></p>
-=======
-               <p>Order ID: <span className="font-mono font-medium text-gray-900">{order.id}</span></p>
-               <p>Order Type: <span className="font-medium text-gray-900">{order.type}</span></p>
-               <p>Total Items: <span className="font-medium text-gray-900">{order.items}</span></p>
->>>>>>> 1e65977e (connnect)
             </div>
           </div>
         </div>
 
-<<<<<<< HEAD
         {/* AWB Barcode Section - Only show if AWB number exists */}
         {order.awb_number && (
           <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg">
@@ -1379,23 +1249,15 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
           </div>
         )}
 
-=======
->>>>>>> 1e65977e (connnect)
         {/* Line Items */}
         <div className="mb-8">
           <table className="w-full text-left">
             <thead className="bg-gray-50 text-gray-500 text-xs font-bold uppercase">
               <tr>
                 <th className="px-4 py-3 rounded-l-md">#</th>
-<<<<<<< HEAD
                 <th className="px-4 py-3 w-1/2">Items</th>
                 <th className="px-4 py-3 text-center">HSN Code</th>
                 <th className="px-4 py-3 text-right">Qty</th>
-=======
-                <th className="px-4 py-3 w-1/2">Item Description</th>
-                <th className="px-4 py-3 text-right">Qty</th>
-                <th className="px-4 py-3 text-right">Rate</th>
->>>>>>> 1e65977e (connnect)
                 <th className="px-4 py-3 text-right rounded-r-md">Amount</th>
               </tr>
             </thead>
@@ -1404,13 +1266,8 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
                 <tr key={idx}>
                   <td className="px-4 py-3 text-sm text-gray-400 font-mono">{idx + 1}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 font-medium">{item.desc}</td>
-<<<<<<< HEAD
                   <td className="px-4 py-3 text-sm text-gray-600 text-center font-mono">{item.hsn || 'N/A'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.qty}</td>
-=======
-                  <td className="px-4 py-3 text-sm text-gray-600 text-right">{item.qty}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600 text-right">₹{item.price.toFixed(2)}</td>
->>>>>>> 1e65977e (connnect)
                   <td className="px-4 py-3 text-sm text-gray-900 font-bold text-right">₹{(item.price * item.qty).toFixed(2)}</td>
                 </tr>
               ))}
@@ -1423,27 +1280,15 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
           <div className="w-64 space-y-3">
             <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal</span>
-<<<<<<< HEAD
               <span className="font-medium">₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm text-gray-600">
-              <span>SGST (9%)</span>
+              <span>SGST ({sgstPercent}%)</span>
               <span className="font-medium">₹{sgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm text-gray-600">
-              <span>CGST (9%)</span>
+              <span>CGST ({cgstPercent}%)</span>
               <span className="font-medium">₹{cgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-=======
-              <span className="font-medium">₹{subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>SGST (9%)</span>
-              <span className="font-medium">₹{sgst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>CGST (9%)</span>
-              <span className="font-medium">₹{cgst.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
->>>>>>> 1e65977e (connnect)
             </div>
             <div className="flex justify-between text-lg font-bold text-gray-900 border-t border-gray-200 pt-3">
               <span>Total</span>
@@ -1460,7 +1305,6 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
 
         {/* Exit Button */}
         <div className="mt-8 flex justify-center print:hidden border-t border-gray-100 pt-6">
-<<<<<<< HEAD
           <button
             onClick={onClose}
             className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all shadow-sm font-medium text-sm"
@@ -1468,16 +1312,9 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
             <ArrowLeft size={16} />
             Exit to Dashboard
           </button>
-=======
-            <button 
-                onClick={onClose}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all shadow-sm font-medium text-sm"
-            >
-                <ArrowLeft size={16} />
-                Exit to Dashboard
-            </button>
->>>>>>> 1e65977e (connnect)
         </div>
+
+
       </div>
     </div>
   );

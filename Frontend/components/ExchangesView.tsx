@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, RefreshCw, CheckCircle, XCircle, Clock, Truck, Search, AlertCircle, Camera, X, ArrowRight, RotateCcw } from 'lucide-react';
-import { apiService } from '../services/api';
+import { apiService, API_BASE_URL } from '../services/api';
 
 interface Exchange {
     id: number;
@@ -44,6 +44,8 @@ const ExchangesView: React.FC = () => {
     const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
     const [qcNotes, setQcNotes] = useState('');
     const [processingId, setProcessingId] = useState<number | null>(null);
+    const [rejectModalOpen, setRejectModalOpen] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState('');
 
     useEffect(() => {
         fetchExchanges();
@@ -127,8 +129,31 @@ const ExchangesView: React.FC = () => {
         }
     };
 
+    const handleReject = async () => {
+        if (!selectedExchange) return;
+        if (!rejectionReason.trim()) {
+            alert('Please enter a rejection reason');
+            return;
+        }
+
+        setProcessingId(selectedExchange.id);
+        try {
+            await apiService.rejectExchange(selectedExchange.id, rejectionReason);
+            fetchExchanges();
+            setRejectModalOpen(false);
+            setRejectionReason('');
+            alert('Exchange rejected! Rejection email sent to customer.');
+        } catch (error) {
+            console.error('Failed to reject exchange:', error);
+            alert('Failed to reject exchange');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
+
     const handleViewProof = (path: string) => {
-        const baseUrl = "http://localhost:8001";
+        const baseUrl = API_BASE_URL;
         setSelectedProof(`${baseUrl}${path}`);
         setProofModalOpen(true);
     };
@@ -154,7 +179,6 @@ const ExchangesView: React.FC = () => {
         'Pending',
         'Approved',
         'Return Received',
-        'Quality Check Passed',
         'Completed'
     ];
 
@@ -266,7 +290,8 @@ const ExchangesView: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Product</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Reason</th>
                                 <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Delivery</th>
+                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Return Delivery</th>
+                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">New Exchange</th>
                                 <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Proof</th>
                                 <th className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Action</th>
                             </tr>
@@ -302,21 +327,46 @@ const ExchangesView: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
-                                        <div className="space-y-1">
-                                            {item.return_delivery_status && (
-                                                <div className="text-xs flex items-center gap-1 justify-center text-orange-600">
-                                                    <Truck size={10} /> Return: {item.return_delivery_status}
+                                        {item.return_awb_number ? (
+                                            <div className="space-y-1">
+                                                <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                                    {item.return_awb_number}
                                                 </div>
-                                            )}
-                                            {item.new_delivery_status && (
-                                                <div className="text-xs flex items-center gap-1 justify-center text-green-600">
-                                                    <Truck size={10} /> New: {item.new_delivery_status}
+                                                {item.return_delivery_status ? (
+                                                    <div className="flex items-center gap-1 justify-center">
+                                                        <Truck size={12} className="text-orange-600" />
+                                                        <span className="text-xs font-medium text-orange-600">
+                                                            {item.return_delivery_status}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Pending Pickup</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 text-xs">-</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        {item.new_awb_number ? (
+                                            <div className="space-y-1">
+                                                <div className="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                                    {item.new_awb_number}
                                                 </div>
-                                            )}
-                                            {!item.return_delivery_status && !item.new_delivery_status && (
-                                                <span className="text-gray-400 text-xs">-</span>
-                                            )}
-                                        </div>
+                                                {item.new_delivery_status ? (
+                                                    <div className="flex items-center gap-1 justify-center">
+                                                        <Truck size={12} className="text-green-600" />
+                                                        <span className="text-xs font-medium text-green-600">
+                                                            {item.new_delivery_status}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">Pending Dispatch</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 text-xs">-</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         {item.proof_image_path ? (
@@ -333,25 +383,46 @@ const ExchangesView: React.FC = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             {item.status === 'Pending' && (
-                                                <button
-                                                    onClick={() => handleApprove(item.id)}
-                                                    disabled={processingId === item.id}
-                                                    className="px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 text-xs font-bold transition-colors"
-                                                >
-                                                    {processingId === item.id ? 'Processing...' : 'Approve'}
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => handleApprove(item.id)}
+                                                        disabled={processingId === item.id}
+                                                        className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-bold transition-colors"
+                                                    >
+                                                        {processingId === item.id ? 'Processing...' : 'Approve'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedExchange(item);
+                                                            setRejectModalOpen(true);
+                                                        }}
+                                                        disabled={processingId === item.id}
+                                                        className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 text-xs font-bold transition-colors"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </>
                                             )}
 
                                             {item.status === 'Return Received' && (
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedExchange(item);
-                                                        setQcModalOpen(true);
-                                                    }}
-                                                    className="px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-bold transition-colors"
-                                                >
-                                                    Quality Check
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => handleProcessReplacement(item.id)}
+                                                        disabled={processingId === item.id}
+                                                        className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-bold transition-colors flex items-center gap-1"
+                                                        title="Process Exchange - Generate New AWB"
+                                                    >
+                                                        <RefreshCw size={12} /> Exchange
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRefund(item.id)}
+                                                        disabled={processingId === item.id}
+                                                        className="px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 text-xs font-bold transition-colors flex items-center gap-1"
+                                                        title="Out of Stock - Refund Customer"
+                                                    >
+                                                        <RotateCcw size={12} /> Out of Stock
+                                                    </button>
+                                                </>
                                             )}
 
                                             {item.status === 'Quality Check Passed' && (
@@ -384,7 +455,7 @@ const ExchangesView: React.FC = () => {
                             ))}
                             {filteredExchanges.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-10 text-center text-gray-500">
+                                    <td colSpan={9} className="px-6 py-10 text-center text-gray-500">
                                         No exchange requests found.
                                     </td>
                                 </tr>
@@ -451,6 +522,64 @@ const ExchangesView: React.FC = () => {
                                     className="flex-1 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg text-sm font-bold transition-colors"
                                 >
                                     ✓ Pass
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Exchange Modal */}
+            {rejectModalOpen && selectedExchange && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-red-50">
+                            <h3 className="font-bold text-lg text-gray-900">Reject Exchange Request</h3>
+                            <button onClick={() => {
+                                setRejectModalOpen(false);
+                                setRejectionReason('');
+                            }} className="text-gray-400 hover:text-gray-600">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-800">
+                                    <strong>Order:</strong> {selectedExchange.order_id}<br />
+                                    <strong>Product:</strong> {selectedExchange.product_name}<br />
+                                    <strong>Customer:</strong> {selectedExchange.customer_name}
+                                </p>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Please provide a reason for rejecting this exchange request. This reason will be sent to the customer via email.
+                            </p>
+                            <div className="mb-4">
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Rejection Reason *</label>
+                                <textarea
+                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-500 outline-none resize-none"
+                                    rows={4}
+                                    placeholder="e.g., Product is not damaged, normal wear and tear, does not meet exchange criteria..."
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                    required
+                                ></textarea>
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => {
+                                        setRejectModalOpen(false);
+                                        setRejectionReason('');
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-sm font-bold transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleReject}
+                                    disabled={!rejectionReason.trim() || processingId === selectedExchange.id}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {processingId === selectedExchange.id ? 'Rejecting...' : 'Reject & Send Email'}
                                 </button>
                             </div>
                         </div>

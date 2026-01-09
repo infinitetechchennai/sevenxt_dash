@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { API_BASE_URL } from "./services/api";
 import {
   LayoutDashboard,
   Users,
@@ -7,7 +9,7 @@ import {
   Truck,
   RotateCcw,
   Package,
-  FolderTree,
+
   CreditCard,
   Menu,
   Bell,
@@ -20,12 +22,8 @@ import {
   BarChart3,
   LogOut,
   Plane,
-<<<<<<< HEAD
   MapPin,
   RefreshCw
-=======
-  MapPin
->>>>>>> 1e65977e (connnect)
 } from "lucide-react";
 import { DashboardView } from "./components/DashboardView";
 import { ProductsView } from "./components/ProductsView";
@@ -33,19 +31,14 @@ import { UsersView } from "./components/UsersView";
 import { B2BView } from "./components/B2BView";
 import { OrdersView } from "./components/OrdersView";
 import { DeliveryView } from "./components/DeliveryView";
-<<<<<<< HEAD
 import { PorterView } from "./components/LocalDelivery";
 import { RefundsView } from "./components/RefundsView";
 import ExchangesView from "./components/ExchangesView";
-=======
-import { PorterView } from "./components/PorterView";
-import { RefundsView } from "./components/RefundsView";
->>>>>>> 1e65977e (connnect)
-import { CategoriesView } from "./components/CategoriesView";
+
 import { SettingsView } from "./components/SettingsView";
 import { FinanceView } from "./components/FinanceView";
 import { CampaignsView } from "./components/CampaignsView";
-import { CMSView } from "./components/CMSView";
+import CMSView from "./components/CMSView";
 import { ReportsView } from "./components/ReportsView";
 import { LoginView } from "./components/LoginView";
 import { ViewState } from "./types";
@@ -55,10 +48,138 @@ import { apiService } from "./services/api";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(apiService.isAuthenticated());
-  const [activeView, setActiveView] = useState<ViewState | string>(
-    ViewState.DASHBOARD
-  );
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
+
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      fetchUserProfile();
+    };
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, [isAuthenticated]);
+
+  // Helper to check permission (case-insensitive) - MOVED TO TOP SCOPE
+  const hasPermission = (permissionName: string) => {
+    // If no profile yet or explicitly Admin, show all
+    if (!userProfile) return true; // Default to true while loading to avoid flash, or handled downstream
+
+    // Check if Admin
+    if (userProfile.user_type === 'admin' || userProfile.role === 'admin' || userProfile.role === 'super_admin') {
+      return true;
+    }
+
+    const permissions = userProfile.permissions || [];
+    return permissions.some((p: string) => p.toLowerCase() === permissionName.toLowerCase());
+  };
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      console.log('🔍 Fetching user profile with token:', token ? 'Token exists' : 'No token');
+
+      if (!token) {
+        console.error('❌ No auth token found');
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log('📡 Profile API response status:', response.status);
+
+      if (!response.ok) {
+        console.error('❌ Profile fetch failed:', response.status, response.statusText);
+        // If unauthorized, clear auth and redirect to login
+        if (response.status === 401) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+          return;
+        }
+        throw new Error(`Failed to fetch profile: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Profile data received:', data);
+      setUserProfile(data);
+
+      // Auto-redirect if current view is not allowed
+      // If user just logged in or refreshed, location might be /dashboard.
+      // If user doesn't have Dashboard permission, move them to first allowed item.
+      if (data.user_type !== 'admin' && data.role !== 'admin' && data.role !== 'super_admin') {
+        const permissions = (data.permissions || []).map((p: string) => p.toLowerCase());
+        const hasDashboard = permissions.includes('dashboard');
+
+        if (!hasDashboard && location.pathname === '/dashboard') {
+          // Find first allowed module
+          const firstAllowed = menuItems.find(item => {
+            if (item.id === ViewState.DASHBOARD) return false;
+            // Map permission logic again here strictly for redirect
+            let reqPerm = '';
+            if (item.id === 'USERS') reqPerm = 'users';
+            else if (item.id === 'B2B') reqPerm = 'b2b';
+            else if (item.id === ViewState.ORDERS) reqPerm = 'orders';
+            else if (item.id === 'FINANCE') reqPerm = 'finance';
+            else if (item.id === 'REPORTS') reqPerm = 'reports';
+            else if (item.id === 'DELIVERY' || item.id === 'PORTER') reqPerm = 'delivery';
+            else if (item.id === 'REFUNDS' || item.id === 'EXCHANGES') reqPerm = 'refunds';
+            else if (item.id === ViewState.PRODUCTS || item.id === 'CATEGORIES' || item.id === 'PRICING') reqPerm = 'products';
+            else if (item.id === 'CMS') reqPerm = 'cms';
+            else if (item.id === ViewState.SETTINGS) reqPerm = 'settings';
+
+            return permissions.includes(reqPerm);
+          });
+
+          if (firstAllowed) {
+            const routePath = getRoutePathFromId(firstAllowed.id);
+            navigate(routePath);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch profile:', error);
+      // On error, log out the user to prevent infinite loading
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      setIsAuthenticated(false);
+      alert('Session expired or invalid. Please login again.');
+    }
+  };
+
+  // Helper function to convert menu item ID to route path
+  const getRoutePathFromId = (id: string): string => {
+    const routeMap: Record<string, string> = {
+      [ViewState.DASHBOARD]: '/dashboard',
+      'USERS': '/users',
+      'B2B': '/b2b',
+      [ViewState.ORDERS]: '/orders',
+      'FINANCE': '/finance',
+      'REPORTS': '/reports',
+      'DELIVERY': '/delivery',
+      'PORTER': '/local-delivery',
+      'REFUNDS': '/refunds',
+      'EXCHANGES': '/exchanges',
+      [ViewState.PRODUCTS]: '/products',
+      'PRICING': '/campaigns',
+      'CMS': '/cms',
+      [ViewState.SETTINGS]: '/settings',
+    };
+    return routeMap[id] || '/dashboard';
+  };
 
   // Sidebar Menu Items configuration
   const menuItems = [
@@ -68,23 +189,45 @@ const App: React.FC = () => {
     { id: ViewState.ORDERS, label: "Orders", icon: ShoppingCart },
     { id: "FINANCE", label: "Payments & Finance", icon: DollarSign },
     { id: "REPORTS", label: "Reports", icon: BarChart3 },
-    { id: "DELIVERY", label: "Delivery (Outstation)", icon: Truck }, // Updated label and icon
-    { id: "PORTER", label: "Local Delivery (Chennai)", icon: MapPin }, // Updated label and icon
+    { id: "DELIVERY", label: "Delivery (Outstation)", icon: Truck },
+    { id: "PORTER", label: "Local Delivery (Chennai)", icon: MapPin },
     { id: "REFUNDS", label: "Refunds", icon: RotateCcw },
-<<<<<<< HEAD
     { id: "EXCHANGES", label: "Exchanges", icon: RefreshCw },
-=======
->>>>>>> 1e65977e (connnect)
     { id: ViewState.PRODUCTS, label: "Products", icon: Package },
-    { id: "CATEGORIES", label: "Categories", icon: FolderTree },
+
     { id: "PRICING", label: "Campaigns", icon: CreditCard },
     { id: "CMS", label: "CMS", icon: Layout },
     { id: ViewState.SETTINGS, label: "Settings", icon: Settings },
   ];
 
+  // Filter menu items based on user permissions
+  const filteredMenuItems = menuItems.filter(item => {
+    // If no profile yet, return true (or false depending on strategy, but true avoids flicker)
+    if (!userProfile) return true;
+
+    // STRICT Mapping based on AVAILABLE_PERMISSIONS in UsersView
+    switch (item.id) {
+      case ViewState.DASHBOARD: return hasPermission('Dashboard');
+      case 'USERS': return hasPermission('Users');
+      case 'B2B': return hasPermission('B2B');
+      case ViewState.ORDERS: return hasPermission('Orders');
+      case 'FINANCE': return hasPermission('Finance');
+      case 'REPORTS': return hasPermission('Reports');
+      case 'DELIVERY':
+      case 'PORTER': return hasPermission('Delivery');
+      case 'REFUNDS': return hasPermission('Refunds');
+      case 'EXCHANGES': return hasPermission('Exchanges');
+      case ViewState.PRODUCTS:
+      case 'PRICING': return hasPermission('Products');
+      case 'CMS': return hasPermission('CMS');
+      case ViewState.SETTINGS: return hasPermission('Settings');
+      default: return false;
+    }
+  });
+
   const handleLogin = () => {
     setIsAuthenticated(true);
-    setActiveView(ViewState.DASHBOARD);
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
@@ -94,56 +237,23 @@ const App: React.FC = () => {
     }
   };
 
-  const renderContent = () => {
-    switch (activeView) {
-      case ViewState.DASHBOARD:
-        return <DashboardView onNavigate={setActiveView} />;
-      case ViewState.PRODUCTS:
-        return <ProductsView />;
-      case "USERS":
-        return <UsersView />;
-      case "B2B":
-        return <B2BView />;
-      case ViewState.ORDERS:
-        return <OrdersView />;
-      case "FINANCE":
-        return <FinanceView />;
-      case "REPORTS":
-        return <ReportsView />;
-      case "DELIVERY":
-        return <DeliveryView />;
-      case "PORTER":
-        return <PorterView />;
-      case "REFUNDS":
-        return <RefundsView />;
-<<<<<<< HEAD
-      case "EXCHANGES":
-        return <ExchangesView />;
-=======
->>>>>>> 1e65977e (connnect)
-      case "CATEGORIES":
-        return <CategoriesView />;
-      case "PRICING":
-        return <CampaignsView />;
-      case "CMS":
-        return <CMSView activeView={activeView} />;
-      case ViewState.SETTINGS:
-        return <SettingsView activeView={activeView} />;
-      default:
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] bg-white rounded-lg border border-dashed border-gray-300 m-4">
-            <div className="p-4 rounded-full bg-gray-50 mb-4">
-              <Package size={32} className="text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900">
-              Work in Progress
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              This module is currently under development.
-            </p>
-          </div>
-        );
+  // Protected Route Component
+  const ProtectedRoute: React.FC<{ children: React.ReactElement; permission: string }> = ({ children, permission }) => {
+    if (!userProfile) {
+      return <div className="p-8">Loading profile...</div>;
     }
+
+    if (permission && !hasPermission(permission)) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-500">
+          <Package size={48} className="mb-4 text-gray-300" />
+          <h2 className="text-xl font-semibold text-gray-700">Access Denied</h2>
+          <p className="text-sm mt-2">You do not have permission to view the {permission} module.</p>
+        </div>
+      );
+    }
+
+    return children;
   };
 
   if (!isAuthenticated) {
@@ -167,63 +277,40 @@ const App: React.FC = () => {
         transform transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
         md:translate-x-0
-<<<<<<< HEAD
         overflow-hidden shadow-xl
-=======
-        overflow-y-auto no-scrollbar shadow-xl
->>>>>>> 1e65977e (connnect)
       `}
       >
         {/* Sidebar Header - Admin Box - Black */}
         <div className="h-24 flex items-center justify-between px-6 bg-black shrink-0">
           <div className="flex items-center">
-<<<<<<< HEAD
             <img
               src={logo}
               alt="Logo"
               className="h-full w-full object-cover"
             />
-=======
-              <img
-                src={logo}
-                alt="Logo"
-                className="h-full w-full object-cover"
-              />
->>>>>>> 1e65977e (connnect)
-          </div>
+          </div >
           <button
             onClick={() => setIsMobileMenuOpen(false)}
             className="md:hidden text-white/80 hover:text-white"
           >
             <X size={24} />
           </button>
-        </div>
+        </div >
 
         {/* Navigation - Dark Ace */}
-<<<<<<< HEAD
         <nav className="flex-1 px-3 space-y-1 py-4 bg-[#000000] overflow-y-auto no-scrollbar">
-=======
-        <nav className="flex-1 px-3 space-y-1 py-4 bg-[#000000]">
->>>>>>> 1e65977e (connnect)
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => {
-                setActiveView(item.id);
+                const routePath = getRoutePathFromId(item.id);
+                navigate(routePath);
                 setIsMobileMenuOpen(false);
               }}
-<<<<<<< HEAD
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeView === item.id
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${location.pathname === getRoutePathFromId(item.id)
                 ? "bg-[#DC2626] text-white shadow-sm ring-1 ring-white/10" /* Active Red */
                 : "text-gray-300 hover:bg-white/5 hover:text-white"
                 }`}
-=======
-              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                activeView === item.id
-                  ? "bg-[#DC2626] text-white shadow-sm ring-1 ring-white/10" /* Active Red */
-                  : "text-gray-300 hover:bg-white/5 hover:text-white"
-              }`}
->>>>>>> 1e65977e (connnect)
             >
               <item.icon size={20} />
               <span>{item.label}</span>
@@ -232,25 +319,29 @@ const App: React.FC = () => {
         </nav>
 
         {/* User Profile Footer */}
-<<<<<<< HEAD
-        <div className="p-4 border-t border-white/10 mt-auto bg-[#222a2d] ">
-=======
-        <div className="p-4 border-t border-white/10 mt-auto bg-[#222a2d]">
->>>>>>> 1e65977e (connnect)
+        < div className="p-4 border-t border-white/10 mt-auto bg-[#222a2d] " >
           <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors">
             <div
               className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-              onClick={() => setActiveView(ViewState.SETTINGS)}
+              onClick={() => navigate('/settings')}
             >
-              <div className="h-9 w-9 rounded-full bg-[#DC2626] flex items-center justify-center text-white font-semibold border-2 border-white/20">
-                SA
-              </div>
+              {userProfile?.profile_picture ? (
+                <img
+                  src={`${API_BASE_URL}${userProfile.profile_picture}`}
+                  alt="Profile"
+                  className="h-9 w-9 rounded-full object-cover border-2 border-white/20"
+                />
+              ) : (
+                <div className="h-9 w-9 rounded-full bg-[#DC2626] flex items-center justify-center text-white font-semibold border-2 border-white/20">
+                  {userProfile?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'SA'}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">
-                  Super Admin
+                  {userProfile?.name || 'Super Admin'}
                 </p>
                 <p className="text-xs text-gray-400 truncate">
-                  admin@ecommerce.com
+                  {userProfile?.email || 'admin@ecommerce.com'}
                 </p>
               </div>
             </div>
@@ -262,13 +353,13 @@ const App: React.FC = () => {
               <LogOut size={18} />
             </button>
           </div>
-        </div>
-      </aside>
+        </div >
+      </aside >
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      < main className="flex-1 flex flex-col min-w-0 overflow-hidden" >
         {/* Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
+        < header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30" >
           <div className="flex items-center gap-4">
             <button
               className="md:hidden text-gray-500 hover:text-gray-900"
@@ -282,13 +373,8 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             {/* Search */}
             <div className="hidden md:flex items-center relative">
-<<<<<<< HEAD
               {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" /> */}
               {/* <input
-=======
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
->>>>>>> 1e65977e (connnect)
                 type="text"
                 placeholder="Search..."
                 className="pl-10 pr-4 py-2 rounded-full bg-gray-100 border-none focus:ring-2 focus:ring-[#DC2626] text-sm w-64 outline-none text-gray-900"
@@ -296,15 +382,11 @@ const App: React.FC = () => {
                   e.key === "Enter" &&
                   alert(`Searching for: ${e.currentTarget.value}`)
                 }
-<<<<<<< HEAD
               /> */}
-=======
-              />
->>>>>>> 1e65977e (connnect)
-            </div>
+            </div >
 
             <button
-              onClick={() => alert("You have 3 new notifications")}
+              onClick={() => navigate('/settings')}
               className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-full"
             >
               <Bell size={20} />
@@ -312,28 +394,56 @@ const App: React.FC = () => {
             </button>
 
             <div
-              onClick={() => handleLogout()}
+              onClick={() => navigate('/settings')}
               className="flex items-center gap-2 cursor-pointer pl-2 border-l border-gray-200 group"
-              title="Logout"
+              title="Edit Profile"
             >
-              <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#DC2626] to-red-600"></div>
+              {userProfile?.profile_picture ? (
+                <img
+                  src={`${API_BASE_URL}${userProfile.profile_picture}`}
+                  alt="Profile"
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#DC2626] to-red-600"></div>
+              )}
               <span className="text-sm font-medium text-gray-700 hidden sm:block group-hover:text-gray-900">
-                Super Admin
+                {userProfile?.name || 'Super Admin'}
               </span>
               <ChevronDown
                 size={16}
                 className="text-gray-400 hidden sm:block group-hover:text-gray-600"
               />
             </div>
-          </div>
-        </header>
+          </div >
+        </header >
 
         {/* Dashboard Content Area */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-          {renderContent()}
-        </div>
-      </main>
-    </div>
+        < div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" >
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute permission="Dashboard">
+                <DashboardView onNavigate={(id) => navigate(getRoutePathFromId(id))} />
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={<ProtectedRoute permission="Users"><UsersView /></ProtectedRoute>} />
+            <Route path="/b2b" element={<ProtectedRoute permission="B2B"><B2BView /></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute permission="Orders"><OrdersView /></ProtectedRoute>} />
+            <Route path="/finance" element={<ProtectedRoute permission="Finance"><FinanceView /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute permission="Reports"><ReportsView /></ProtectedRoute>} />
+            <Route path="/delivery" element={<ProtectedRoute permission="Delivery"><DeliveryView /></ProtectedRoute>} />
+            <Route path="/local-delivery" element={<ProtectedRoute permission="Delivery"><PorterView /></ProtectedRoute>} />
+            <Route path="/refunds" element={<ProtectedRoute permission="Refunds"><RefundsView /></ProtectedRoute>} />
+            <Route path="/exchanges" element={<ProtectedRoute permission="Exchanges"><ExchangesView /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute permission="Products"><ProductsView /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute permission="Products"><CampaignsView /></ProtectedRoute>} />
+            <Route path="/cms" element={<ProtectedRoute permission="CMS"><CMSView activeView={location.pathname.substring(1)} /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute permission="Settings"><SettingsView activeView={location.pathname.substring(1)} /></ProtectedRoute>} />
+          </Routes>
+        </div >
+      </main >
+    </div >
   );
 };
 

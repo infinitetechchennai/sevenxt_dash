@@ -12,7 +12,7 @@ class CMSPage(Base):
     title = Column(String(255), nullable=False)
     slug = Column(String(255), unique=True, nullable=False)
     content = Column(Text, nullable=False)
-    status = Column(Enum("Published", "Draft"), default="Published")
+    status = Column(Enum("Published", "Draft", name="page_status"), default="Published")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 # --- WORKFLOW: CATEGORY BANNERS ---
@@ -32,7 +32,7 @@ class CMSBanner(Base):
     title = Column(String(255), nullable=False)
     image = Column(String(500), nullable=False)
     position = Column(String(50), nullable=False)
-    status = Column(Enum("Active", "Inactive"), default="Active")
+    status = Column(Enum("Active", "Inactive", name="banner_status"), default="Active")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- WORKFLOW: NOTIFICATIONS ---
@@ -43,5 +43,5 @@ class CMSNotification(Base):
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     audience = Column(String(100), nullable=False)
-    status = Column(Enum("SENT", "FAILED"), default="SENT")
+    status = Column(Enum("SENT", "FAILED", name="notification_status"), default="SENT")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

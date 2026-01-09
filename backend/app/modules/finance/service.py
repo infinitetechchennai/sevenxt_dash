@@ -4,15 +4,15 @@ from . import models, schemas
 from app.config import settings
 from fastapi import HTTPException
 
-# Initialize Razorpay Client
-client = razorpay.Client(auth=(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)) 
-# Note: Use your RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET here from settings
+# ✅ CORRECTED: Initializing with Razorpay credentials, not Twilio
+client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)) 
 
 def get_all_transactions(db: Session):
+    """Fetches all transactions from the transactions table"""
     return db.query(models.Transaction).order_by(models.Transaction.created_at.desc()).all()
 
 def verify_payment(db: Session, data: schemas.PaymentVerifyRequest):
-    # 1. Verify Signature
+    """Verifies the Razorpay signature before marking payment as SUCCESS"""
     params_dict = {
         'razorpay_order_id': data.razorpay_order_id,
         'razorpay_payment_id': data.razorpay_payment_id,
@@ -20,11 +20,10 @@ def verify_payment(db: Session, data: schemas.PaymentVerifyRequest):
     }
 
     try:
-        # This will raise an error if the signature is fake
-        # Use settings.RAZORPAY_KEY_SECRET (Add this to your config.py)
+        # Verify the authenticity of the payment signature
         client.utility.verify_payment_signature(params_dict)
         
-        # 2. Update/Create Transaction in DB
+        # Check if transaction exists, otherwise create it
         txn = db.query(models.Transaction).filter(
             models.Transaction.razorpay_order_id == data.razorpay_order_id
         ).first()
@@ -38,6 +37,7 @@ def verify_payment(db: Session, data: schemas.PaymentVerifyRequest):
             )
             db.add(txn)
 
+        # Update details and set status to SUCCESS
         txn.razorpay_payment_id = data.razorpay_payment_id
         txn.razorpay_signature = data.razorpay_signature
         txn.status = "SUCCESS"
@@ -47,7 +47,7 @@ def verify_payment(db: Session, data: schemas.PaymentVerifyRequest):
         return txn
 
     except Exception as e:
-        # If verification fails, mark as FAILED
+        # Mark as FAILED in database if signature check fails
         db_txn = db.query(models.Transaction).filter(
             models.Transaction.razorpay_order_id == data.razorpay_order_id
         ).first()

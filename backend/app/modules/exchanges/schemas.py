@@ -55,3 +55,7 @@ class ExchangeStatusUpdate(BaseModel):
 class QualityCheckRequest(BaseModel):
     approved: bool
     notes: Optional[str] = None
+
+
+class ExchangeRejectRequest(BaseModel):
+    rejection_reason: str

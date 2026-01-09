@@ -1,19 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { apiService } from '../services/api';
 import { Search, MoreVertical, Plus, Activity, CheckCircle, XCircle, AlertTriangle, X, ShieldAlert, Lock, Eye, Package, Edit, Trash2, UserX, UserCheck, MapPin, ShoppingCart, Heart, RotateCcw, FileText } from 'lucide-react';
-<<<<<<< HEAD
 import { MOCK_PRODUCTS } from '../constants';
 import { User } from '../types';
 
 export const UsersView: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'B2B Users' | 'B2C Users' | 'Admin Users' | 'Staff Users' | 'Activity Logs'>('Admin Users');
-=======
-import { MOCK_USERS, MOCK_USER_ACTIVITY_LOGS, MOCK_PRODUCTS } from '../constants';
-import { User } from '../types';
-
-export const UsersView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'B2B Users' | 'B2C Users' | 'Admin Users' | 'Staff Users' | 'Activity Logs'>('B2B Users');
->>>>>>> 1e65977e (connnect)
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
@@ -22,7 +14,6 @@ export const UsersView: React.FC = () => {
         const fetchUsers = async () => {
             try {
                 const data = await apiService.getUsers();
-<<<<<<< HEAD
                 console.log("Raw API Data:", data);
 
                 // Map API response to User interface
@@ -57,22 +48,6 @@ export const UsersView: React.FC = () => {
                 });
 
                 console.log("Mapped Users:", mappedUsers);
-=======
-                // Map API response to User interface
-                const mappedUsers: User[] = data.map((u: any) => ({
-                    id: u.id.toString(),
-                    name: u.full_name || u.name || 'Unknown',
-                    email: u.email,
-                    status: u.is_active ? 'Active' : 'Inactive',
-                    joinDate: u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                    type: u.role === 'super_admin' ? 'Admin' : (u.role === 'admin' ? 'Admin' : (u.role === 'b2b' || u.role === 'seller' ? 'B2B' : (u.role === 'staff' ? 'Staff' : 'B2C'))), // Map roles
-                    permissions: [],
-                    address: u.address || '',
-                    city: u.city || '',
-                    state: u.state || '',
-                    pincode: u.pincode || ''
-                }));
->>>>>>> 1e65977e (connnect)
                 setUsers(mappedUsers);
             } catch (error) {
                 console.error("Failed to fetch users:", error);
@@ -87,11 +62,7 @@ export const UsersView: React.FC = () => {
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [newUser, setNewUser] = useState({
-<<<<<<< HEAD
         name: '', email: '', password: '', role: 'Staff', status: 'Active',
-=======
-        name: '', email: '', password: '', role: 'B2C', status: 'Active',
->>>>>>> 1e65977e (connnect)
         address: '', city: '', state: '', pincode: ''
     });
     const [newPermissions, setNewPermissions] = useState<string[]>([]);
@@ -105,12 +76,8 @@ export const UsersView: React.FC = () => {
     const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
     const actionMenuRef = useRef<HTMLDivElement>(null);
 
-<<<<<<< HEAD
     const tabs = ['Admin Users', 'Staff Users', 'B2B Users', 'B2C Users', 'Activity Logs'];
-=======
-    const tabs = ['B2B Users', 'B2C Users', 'Admin Users', 'Staff Users', 'Activity Logs'];
->>>>>>> 1e65977e (connnect)
-    const AVAILABLE_PERMISSIONS = ['Orders', 'Products', 'Users', 'B2B', 'Finance', 'Delivery', 'Refunds', 'CMS', 'Settings'];
+    const AVAILABLE_PERMISSIONS = ['Dashboard', 'Orders', 'Products', 'Users', 'B2B', 'Finance', 'Reports', 'Delivery', 'Refunds', 'Exchanges', 'CMS', 'Settings'];
 
     // Click outside to close action menu
     useEffect(() => {
@@ -160,10 +127,7 @@ export const UsersView: React.FC = () => {
             default: return <Activity size={14} className="text-gray-500" />;
         }
     };
-<<<<<<< HEAD
 
-=======
->>>>>>> 1e65977e (connnect)
     const handleSaveUser = async () => {
         if (newUser.name && newUser.email) {
             // Validate password for new users
@@ -174,7 +138,6 @@ export const UsersView: React.FC = () => {
 
             if (editingId) {
                 // Update existing user
-<<<<<<< HEAD
                 try {
                     const userToUpdate = users.find(u => u.id === editingId);
                     if (!userToUpdate) return;
@@ -209,21 +172,6 @@ export const UsersView: React.FC = () => {
                     console.error("Failed to update user:", error);
                     alert("Failed to update user");
                 }
-=======
-                setUsers(prev => prev.map(u => u.id === editingId ? {
-                    ...u,
-                    name: newUser.name,
-                    email: newUser.email,
-                    type: newUser.role as any,
-                    status: newUser.status as any,
-                    address: newUser.address,
-                    city: newUser.city,
-                    state: newUser.state,
-                    pincode: newUser.pincode,
-                    permissions: newUser.role === 'Staff' ? newPermissions : undefined
-                } : u));
-                closeUserModal();
->>>>>>> 1e65977e (connnect)
             } else {
                 // Create new user - Call API
                 try {
@@ -242,11 +190,7 @@ export const UsersView: React.FC = () => {
 
                     // Add the created user to the local state
                     const user: User = {
-<<<<<<< HEAD
                         id: `${newUser.role}-${createdUser.id}`,
-=======
-                        id: createdUser.id.toString(),
->>>>>>> 1e65977e (connnect)
                         name: createdUser.name || newUser.name,
                         email: createdUser.email,
                         type: newUser.role as any,
@@ -274,11 +218,7 @@ export const UsersView: React.FC = () => {
     const closeUserModal = () => {
         setIsAddUserModalOpen(false);
         setEditingId(null);
-<<<<<<< HEAD
         setNewUser({ name: '', email: '', password: '', role: 'Staff', status: 'Active', address: '', city: '', state: '', pincode: '' });
-=======
-        setNewUser({ name: '', email: '', password: '', role: 'B2C', status: 'Active', address: '', city: '', state: '', pincode: '' });
->>>>>>> 1e65977e (connnect)
         setNewPermissions([]);
     };
 
@@ -325,7 +265,6 @@ export const UsersView: React.FC = () => {
         setOpenActionMenuId(null);
     };
 
-<<<<<<< HEAD
     const handleDeactivateUser = async (user: User) => {
         const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
         try {
@@ -356,60 +295,6 @@ export const UsersView: React.FC = () => {
     const getMockCart = (user: User) => [];
     const getMockWishlist = (user: User) => [];
     const getMockReturns = (user: User) => [];
-=======
-    const handleDeactivateUser = (user: User) => {
-        // Immediate toggle without confirm
-        const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
-        setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
-        setOpenActionMenuId(null);
-    };
-
-    const handleDeleteUser = (user: User) => {
-        // Immediate delete without confirm
-        setUsers(prev => prev.filter(u => u.id !== user.id));
-        setOpenActionMenuId(null);
-    };
-    // const handleDeleteUser = async (user: User) => {
-    //     try {
-    //         await apiService.deleteUser(parseInt(user.id));
-    //         setUsers(prev => prev.filter(u => u.id !== user.id))
-    //         setOpenActionMenuId(null);
-    //     }
-    //     catch (error) {
-    //         console.log(error);
-    //     }
-    // }
-    // Mock Data Generators for Modal
-    const getMockHistory = (user: User) => {
-        return [
-            { id: 'ORD-8812', date: '2024-05-20', amount: user.type === 'B2B' ? '₹1,12,500' : '₹12,500', status: 'Delivered', items: user.type === 'B2B' ? 25 : 3 },
-            { id: 'ORD-8810', date: '2024-05-15', amount: user.type === 'B2B' ? '₹45,200' : '₹4,200', status: 'Processing', items: user.type === 'B2B' ? 10 : 1 },
-            { id: 'ORD-8790', date: '2024-04-10', amount: user.type === 'B2B' ? '₹89,900' : '₹8,900', status: 'Delivered', items: user.type === 'B2B' ? 20 : 2 },
-        ];
-    };
-
-    const getMockCart = (user: User) => {
-        // Deterministic random slice based on name length
-        const start = user.name.length % 5;
-        return MOCK_PRODUCTS.slice(start, start + 3).map(p => ({
-            ...p,
-            qty: Math.floor(Math.random() * 3) + 1
-        }));
-    };
-
-    const getMockWishlist = (user: User) => {
-        const start = (user.name.length + 2) % 5;
-        return MOCK_PRODUCTS.slice(start, start + 4);
-    };
-
-    const getMockReturns = (user: User) => {
-        // Simulate some returns
-        return [
-            { id: 'RET-1002', product: MOCK_PRODUCTS[0].name, date: '2024-01-15', reason: 'Defective', status: 'Processed', amount: MOCK_PRODUCTS[0].b2cPrice },
-            { id: 'RET-1089', product: MOCK_PRODUCTS[2].name, date: '2023-11-20', reason: 'Changed Mind', status: 'Rejected', amount: MOCK_PRODUCTS[2].b2cPrice },
-        ];
-    };
->>>>>>> 1e65977e (connnect)
 
     // Explicitly show access level column for Admin OR Staff tabs
     const showAccessLevel = activeTab === 'Admin Users' || activeTab === 'Staff Users';
@@ -419,11 +304,7 @@ export const UsersView: React.FC = () => {
             {/* Header */}
             <div>
                 <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-<<<<<<< HEAD
                 <p className="text-gray-500 mt-1">Manage admin and staff users</p>
-=======
-                <p className="text-gray-500 mt-1">Manage B2B, B2C, admin and staff users</p>
->>>>>>> 1e65977e (connnect)
             </div>
 
             {/* Tabs */}
@@ -449,57 +330,7 @@ export const UsersView: React.FC = () => {
             {/* Content Switch */}
             {activeTab === 'Activity Logs' ? (
                 /* Activity Logs View */
-<<<<<<< HEAD
                 <ActivityLogsSection />
-=======
-                <div className="space-y-4">
-                    <div className="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                            <h3 className="text-sm font-bold text-gray-700 uppercase">Recent System Activity</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-white">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">User</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Action</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Details</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase">Timestamp</th>
-                                        <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {MOCK_USER_ACTIVITY_LOGS.map((log) => (
-                                        <tr key={log.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">{log.user}</div>
-                                                <div className="text-xs text-gray-500">{log.role}</div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                {log.action}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {log.details}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                                                {log.timestamp}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium
-                                              ${log.status === 'Success' ? 'bg-green-50 text-green-700 border border-green-100' :
-                                                        log.status === 'Failed' ? 'bg-red-50 text-red-700 border border-red-100' :
-                                                            'bg-amber-50 text-amber-700 border border-amber-100'}`}>
-                                                    {getStatusIcon(log.status)} {log.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
->>>>>>> 1e65977e (connnect)
             ) : (
                 /* Users List View */
                 <>
@@ -517,11 +348,7 @@ export const UsersView: React.FC = () => {
                                 className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:placeholder-gray-500 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 sm:text-sm text-gray-900"
                             />
                         </div>
-<<<<<<< HEAD
-                        {(activeTab !== 'Activity Logs') && (
-=======
-                        {(activeTab === 'Admin Users' || activeTab === 'Staff Users') && (
->>>>>>> 1e65977e (connnect)
+                        {(activeTab !== 'Activity Logs' && activeTab !== 'B2B Users' && activeTab !== 'B2C Users') && (
                             <button
                                 onClick={openCreateModal}
                                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
@@ -541,7 +368,6 @@ export const UsersView: React.FC = () => {
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Name
                                         </th>
-<<<<<<< HEAD
 
                                         {/* Conditional Columns based on Tab */}
                                         {activeTab === 'B2B Users' && (
@@ -568,22 +394,6 @@ export const UsersView: React.FC = () => {
                                             </>
                                         )}
 
-=======
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Email
-                                        </th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        {showAccessLevel && (
-                                            <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                                Access Level
-                                            </th>
-                                        )}
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                            Join Date
-                                        </th>
->>>>>>> 1e65977e (connnect)
                                         <th scope="col" className="px-6 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
                                             Action
                                         </th>
@@ -595,7 +405,6 @@ export const UsersView: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="text-sm font-medium text-gray-900">{user.name}</div>
                                             </td>
-<<<<<<< HEAD
 
                                             {/* B2B Columns */}
                                             {activeTab === 'B2B Users' && (
@@ -665,48 +474,6 @@ export const UsersView: React.FC = () => {
                                                 </>
                                             )}
 
-=======
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-500">{user.email}</div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.status === 'Active'
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                    {user.status}
-                                                </span>
-                                            </td>
-                                            {showAccessLevel && (
-                                                <td className="px-6 py-4 whitespace-normal max-w-[250px]">
-                                                    {user.type === 'Admin' ? (
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                                                            <ShieldAlert size={10} /> All Access
-                                                        </span>
-                                                    ) : (
-                                                        <div className="flex flex-col items-start gap-2">
-                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                                                                <Activity size={10} /> Limited Access
-                                                            </span>
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {user.permissions && user.permissions.length > 0 ? (
-                                                                    user.permissions.map((perm, idx) => (
-                                                                        <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                                                            {perm}
-                                                                        </span>
-                                                                    ))
-                                                                ) : (
-                                                                    <span className="text-xs text-gray-400 italic">No specific permissions</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            )}
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {user.joinDate}
-                                            </td>
->>>>>>> 1e65977e (connnect)
                                             <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium relative">
                                                 <div className="flex items-center justify-center gap-2">
                                                     {(user.type === 'B2B' || user.type === 'B2C') && (
@@ -859,11 +626,7 @@ export const UsersView: React.FC = () => {
                             </div>
 
                             {/* Address Fields - Only for Staff users */}
-<<<<<<< HEAD
                             {(newUser.role === 'Staff' || newUser.role === 'Admin') && (
-=======
-                            {newUser.role === 'Staff' && (
->>>>>>> 1e65977e (connnect)
                                 <div className="border-t border-slate-100 pt-4">
                                     <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
                                         <MapPin size={16} className="text-slate-400" /> Address Details
@@ -987,11 +750,7 @@ export const UsersView: React.FC = () => {
                         </div>
 
                         <div className="overflow-y-auto bg-slate-50 flex-1 p-6">
-<<<<<<< HEAD
                             {/* Address Card */}
-=======
-                            {/* Address Card (Always Visible or dependent? Typically helpful to see context) */}
->>>>>>> 1e65977e (connnect)
                             <div className="bg-white p-4 rounded-lg border border-slate-200 mb-6 shadow-sm">
                                 <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
                                     <MapPin size={16} className="text-blue-600" /> Registered Address
@@ -1147,7 +906,6 @@ export const UsersView: React.FC = () => {
             )}
         </div>
     );
-<<<<<<< HEAD
 };
 
 // Activity Logs Section Component
@@ -1174,12 +932,8 @@ const ActivityLogsSection: React.FC = () => {
                 search: searchTerm || undefined
             });
 
-            // Filter to show only Admin and Staff activities (exclude B2B and B2C)
-            const filteredLogs = logs.filter(log =>
-                log.user_type === 'Admin' || log.user_type === 'Staff'
-            );
-
-            setActivityLogs(filteredLogs);
+            // Show both Admin and Staff activities
+            setActivityLogs(logs);
         } catch (error) {
             console.error('Failed to fetch activity logs:', error);
         } finally {
@@ -1369,6 +1123,3 @@ const ActivityLogsSection: React.FC = () => {
         </div>
     );
 };
-=======
-};
->>>>>>> 1e65977e (connnect)
