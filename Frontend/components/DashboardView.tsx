@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
+=======
+import React, { useState, useMemo, useEffect } from 'react';
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import {
     Users, ShoppingCart, IndianRupee, RefreshCcw,
     Truck, AlertTriangle, TrendingUp, ArrowRight
@@ -13,8 +17,106 @@ import { Product } from '../types';
 
 import { API_BASE_URL } from '../services/api';
 
+<<<<<<< HEAD
 // API Configuration
 const API_BASE = `${API_BASE_URL}/api/v1/dashboard`;
+=======
+const DASHBOARD_DATA = {
+
+    Today: {
+        revenue: { value: '₹45,230', trend: 'up', percent: '+12%', subtext: 'vs yesterday' },
+        orders: { value: '124', trend: 'up', percent: '+5%', subtext: 'vs yesterday' },
+        users: { value: '45', trend: 'up', percent: '+8%', subtext: 'new signups' },
+        refunds: { value: '2', trend: 'down', percent: '-50%', subtext: 'vs yesterday' },
+        chart: [
+            { name: '8 AM', B2B: 4000, B2C: 2400 },
+            { name: '10 AM', B2B: 3000, B2C: 1398 },
+            { name: '12 PM', B2B: 2000, B2C: 9800 },
+            { name: '2 PM', B2B: 2780, B2C: 3908 },
+            { name: '4 PM', B2B: 1890, B2C: 4800 },
+            { name: '6 PM', B2B: 2390, B2C: 3800 },
+            { name: '8 PM', B2B: 3490, B2C: 4300 },
+        ],
+        porter: [
+            { name: 'On Time', value: 95, color: '#10B981' },
+            { name: 'Late', value: 5, color: '#EF4444' },
+        ],
+        bestSellers: [
+            { id: 1, name: 'Wireless Mouse M2', category: 'Accessories', sales: 42, revenue: '₹18,900', growth: '+5%' },
+            { id: 2, name: 'USB-C Cable', category: 'Accessories', sales: 38, revenue: '₹11,400', growth: '+2%' },
+        ]
+    },
+    Weekly: {
+        revenue: { value: '₹5,68,900', trend: 'up', percent: '+8%', subtext: 'vs last week' },
+        orders: { value: '1,245', trend: 'up', percent: '+14%', subtext: 'vs last week' },
+        users: { value: '340', trend: 'up', percent: '+12%', subtext: 'new signups' },
+        refunds: { value: '15', trend: 'down', percent: '-10%', subtext: 'vs last week' },
+        chart: [
+            { name: 'Mon', B2B: 12000, B2C: 8400 },
+            { name: 'Tue', B2B: 15000, B2C: 9300 },
+            { name: 'Wed', B2B: 18000, B2C: 12800 },
+            { name: 'Thu', B2B: 16780, B2C: 10908 },
+            { name: 'Fri', B2B: 21890, B2C: 14800 },
+            { name: 'Sat', B2B: 24390, B2C: 18800 },
+            { name: 'Sun', B2B: 19490, B2C: 15300 },
+        ],
+        porter: [
+            { name: 'On Time', value: 88, color: '#10B981' },
+            { name: 'Late', value: 12, color: '#EF4444' },
+        ],
+        bestSellers: [
+            { id: 1, name: 'Gaming Laptop Ryzen 7', category: 'Computers', sales: 24, revenue: '₹21,59,976', growth: '+15%' },
+            { id: 2, name: '5G Smartphone 256GB', category: 'Mobile', sales: 45, revenue: '₹29,24,955', growth: '+8%' },
+            { id: 3, name: 'Smart Home Security Camera', category: 'Smart Home', sales: 89, revenue: '₹2,22,411', growth: '+12%' },
+        ]
+    },
+    Monthly: {
+        revenue: { value: '₹25,68,900', trend: 'up', percent: '+15%', subtext: 'vs last month' },
+        orders: { value: '8,456', trend: 'up', percent: '+23%', subtext: 'vs last month' },
+        users: { value: '1,240', trend: 'up', percent: '+18%', subtext: 'new signups' },
+        refunds: { value: '45', trend: 'down', percent: '-3%', subtext: 'vs last month' },
+        chart: [
+            { name: 'Week 1', B2B: 45000, B2C: 24000 },
+            { name: 'Week 2', B2B: 52000, B2C: 28000 },
+            { name: 'Week 3', B2B: 48000, B2C: 32000 },
+            { name: 'Week 4', B2B: 61000, B2C: 45000 },
+        ],
+        porter: [
+            { name: 'On Time', value: 82, color: '#10B981' },
+            { name: 'Late', value: 18, color: '#EF4444' },
+        ],
+        bestSellers: [
+            { id: 1, name: 'Ultra HD 4K Smart TV 55"', category: 'Electronics', sales: 142, revenue: '₹63,90,000', growth: '+12%' },
+            { id: 2, name: 'Gaming Laptop Ryzen 7', category: 'Computers', sales: 89, revenue: '₹80,09,911', growth: '+8%' },
+            { id: 3, name: '5G Smartphone 256GB', category: 'Mobile', sales: 234, revenue: '₹1,52,09,766', growth: '+24%' },
+            { id: 4, name: 'Smart Home Security Camera', category: 'Smart Home', sales: 450, revenue: '₹11,24,550', growth: '+5%' },
+        ]
+    },
+    All: {
+        revenue: { value: '₹1,82,45,000', trend: 'up', percent: '+45%', subtext: 'Total Lifetime' },
+        orders: { value: '89,231', trend: 'up', percent: '+67%', subtext: 'Total Lifetime' },
+        users: { value: '46,912', trend: 'up', percent: '+12%', subtext: 'Total Users' },
+        refunds: { value: '1,203', trend: 'up', percent: '+2%', subtext: 'Total Lifetime' },
+        chart: [
+            { name: 'Jan', B2B: 4000, B2C: 2400 },
+            { name: 'Feb', B2B: 3000, B2C: 1398 },
+            { name: 'Mar', B2B: 2000, B2C: 9800 },
+            { name: 'Apr', B2B: 2780, B2C: 3908 },
+            { name: 'May', B2B: 1890, B2C: 4800 },
+            { name: 'Jun', B2B: 2390, B2C: 3800 },
+            { name: 'Jul', B2B: 3490, B2C: 4300 },
+        ],
+        porter: [
+            { name: 'On Time', value: 85, color: '#10B981' },
+            { name: 'Late', value: 15, color: '#EF4444' },
+        ],
+        bestSellers: [
+            { id: 1, name: 'Ultra HD 4K Smart TV 55"', category: 'Electronics', sales: 1420, revenue: '₹6,39,00,000', growth: '+120%' },
+            { id: 2, name: '5G Smartphone 256GB', category: 'Mobile', sales: 2340, revenue: '₹15,20,97,660', growth: '+240%' },
+        ]
+    }
+};
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 // Updated Card Component: Rupee symbol updated, decorative line/trend removed
 const Card = ({ title, value, icon: Icon, iconBg }: any) => (
@@ -199,4 +301,8 @@ export const DashboardView: React.FC<{ onNavigate: (view: string) => void }> = (
             </div>
         </div>
     );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

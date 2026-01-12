@@ -29,7 +29,12 @@ class DelhiveryClient:
         
         print(f"[DEBUG] Phone number being sent: {phone}")
         
+<<<<<<< HEAD
         # Note: Reverse pickup is handled via payment_mode="Pickup" (not is_return flag)
+=======
+        # Check if this is a return shipment
+        is_return = order_data.get("is_return", False)
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
         shipment_payload = {
             "name": order_data["customer_name"],
@@ -42,11 +47,17 @@ class DelhiveryClient:
             "mobile": str(phone), # Add mobile field as well
             "email": order_data.get("email", "noreply@sevenxt.com"),  # Add email field
             "order": str(order_data["order_id"]),  # Ensure string
+<<<<<<< HEAD
             "payment_mode": (
                 "Pickup" if order_data.get("payment_status") == "Pickup"
                 else "Prepaid" if order_data.get("payment_status") in ["Paid", "Prepaid"]
                 else "COD"
             ),
+=======
+            "payment_mode": "Prepaid"
+            if order_data.get("payment_status") in ["Paid", "Prepaid"]
+            else "COD",
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             "products_desc": order_data.get("item_name", "Product"),
             "hsn_code": "",
             "cod_amount": (
@@ -67,8 +78,23 @@ class DelhiveryClient:
             "service": order_data.get("service_type", "E"),
         }
         
+<<<<<<< HEAD
         # For reverse pickup: payment_mode="Pickup" + customer address in main fields
         # pickup_location.name specifies the warehouse (destination)
+=======
+        # Add return/pickup details if this is a return shipment
+        if is_return and "pickup_name" in order_data:
+            shipment_payload.update({
+                "return_name": order_data.get("pickup_name"),
+                "return_add": order_data.get("pickup_address"),
+                "return_pin": str(order_data.get("pickup_pincode", "")),
+                "return_city": order_data.get("pickup_city"),
+                "return_state": order_data.get("pickup_state"),
+                "return_phone": str(order_data.get("pickup_phone", "")),
+                "return_country": "India",
+            })
+            print(f"[DEBUG] Return shipment - Pickup from: {order_data.get('pickup_name')}, {order_data.get('pickup_city')}")
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
         payload_data = {
             "shipments": [shipment_payload],

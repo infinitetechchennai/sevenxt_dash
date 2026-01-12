@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 export const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
+=======
+const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 
 export interface LoginRequest {
@@ -54,7 +58,11 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+<<<<<<< HEAD
     const response = await fetch(url, {
+=======
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
       ...options,
       headers,
     });
@@ -294,6 +302,23 @@ class ApiService {
     return this.request<any[]>("/api/v1/orders/deliveries");
   }
 
+  /**
+   * Schedule pickup with Delhivery API
+   * This calls the Delhivery pickup request API and updates the database
+   */
+  async schedulePickup(orderId: string, pickupDatetime: string): Promise<any> {
+    if (!orderId) throw new Error("Order ID is required");
+    if (!pickupDatetime) throw new Error("Pickup datetime is required");
+
+    return this.request<any>(`/api/v1/delivery/schedule-pickup/${orderId}`, {
+      method: "POST",
+      body: JSON.stringify({ pickup_datetime: pickupDatetime }),
+    });
+  }
+
+  /**
+   * @deprecated Use schedulePickup instead - this only updates DB, doesn't call Delhivery
+   */
   async updateDeliverySchedule(deliveryId: number, schedulePickup: string): Promise<any> {
     // Ensure deliveryId is a number
     if (!deliveryId) throw new Error("Delivery ID is required");
@@ -701,9 +726,13 @@ export const updateB2BStatus = (id: number, d: { status: string }) => apiService
 
 // FINANCE & PAYMENTS
 export const getTransactions = () => apiService.getTransactions();
+<<<<<<< HEAD
 export const verifyPayment = (d: any) => apiService.verifyPayment(d);
 
 // REVIEWS
 export const fetchReviews = (productId: string) => apiService.fetchReviews(productId);
 export const createReview = (reviewData: any) => apiService.createReview(reviewData);
 export const deleteReview = (reviewId: string) => apiService.deleteReview(reviewId);
+=======
+export const verifyPayment = (d: any) => apiService.verifyPayment(d);
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

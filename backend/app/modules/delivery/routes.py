@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.orders.models import Delivery, Order
@@ -10,13 +10,70 @@ import logging
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
 
+# Add delivery router for pickup scheduling
+delivery_router = APIRouter(prefix="/delivery", tags=["Delivery"])
+
 @router.post("/delhivery")
 async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Production-safe Delhivery Webhook Handler
     Handles Pickup → In-Transit → Delivered updates
+    
+    Security Features:
+    - Signature verification (configurable)
+    - IP whitelisting (configurable)
+    - Request logging
     """
-    payload = await request.json()
+    from app.config import settings
+    import hmac
+    import hashlib
+    
+    # ========================================
+    # SECURITY LAYER 1: IP Whitelisting
+    # ========================================
+    client_ip = request.client.host if request.client else "unknown"
+    logger.info(f"[WEBHOOK] Request from IP: {client_ip}")
+    
+    if settings.WEBHOOK_ALLOWED_IPS and client_ip not in settings.WEBHOOK_ALLOWED_IPS:
+        logger.warning(f"[WEBHOOK] ❌ Blocked request from unauthorized IP: {client_ip}")
+        raise HTTPException(status_code=403, detail="Unauthorized IP address")
+    
+    # ========================================
+    # SECURITY LAYER 2: Signature Verification
+    # ========================================
+    if settings.WEBHOOK_SIGNATURE_VERIFICATION_ENABLED:
+        # Get signature from header
+        signature = request.headers.get("X-Delhivery-Signature") or request.headers.get("X-Webhook-Signature")
+        
+        if not signature:
+            logger.warning("[WEBHOOK] ❌ Missing webhook signature")
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+        
+        # Get raw body for signature verification
+        body = await request.body()
+        
+        # Calculate expected signature
+        expected_signature = hmac.new(
+            settings.DELHIVERY_WEBHOOK_SECRET.encode(),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        # Verify signature
+        if not hmac.compare_digest(signature, expected_signature):
+            logger.warning(f"[WEBHOOK] ❌ Invalid signature. Expected: {expected_signature[:10]}..., Got: {signature[:10]}...")
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        
+        logger.info("[WEBHOOK] ✅ Signature verified successfully")
+        
+        # Parse JSON from body
+        import json
+        payload = json.loads(body.decode())
+    else:
+        # Testing mode - no signature verification
+        logger.warning("[WEBHOOK] ⚠️ TESTING MODE - Signature verification disabled")
+        payload = await request.json()
+    
     logger.info(f"[WEBHOOK] Payload received: {payload}")
 
     # -------------------------
@@ -297,3 +354,97 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
 
     return {"ok": True}
 
+<<<<<<< HEAD
+=======
+
+# ========================================
+# PICKUP SCHEDULING ENDPOINT
+# ========================================
+
+@delivery_router.post("/schedule-pickup/{order_id}")
+async def schedule_pickup(
+    order_id: str,
+    pickup_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Schedule pickup with Delhivery API
+    Integrates with Delhivery's pickup request API
+    """
+    from app.modules.delivery.delhivery_client import delhivery_client
+    from datetime import datetime
+    
+    logger.info(f"[PICKUP] Scheduling pickup for order {order_id}")
+    
+    # Get order
+    order = db.query(Order).filter(Order.order_id == order_id).first()
+    if not order:
+        logger.error(f"[PICKUP] Order not found: {order_id}")
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Check if AWB is generated
+    if not order.awb_number:
+        logger.error(f"[PICKUP] AWB not generated for order {order_id}")
+        raise HTTPException(
+            status_code=400, 
+            detail="AWB must be generated before scheduling pickup"
+        )
+    
+    # Extract pickup time and date
+    pickup_datetime_str = pickup_data.get("pickup_datetime")
+    if not pickup_datetime_str:
+        raise HTTPException(status_code=400, detail="pickup_datetime is required")
+    
+    try:
+        # Parse datetime
+        pickup_datetime = datetime.fromisoformat(pickup_datetime_str.replace('Z', '+00:00'))
+        pickup_date = pickup_datetime.strftime("%Y-%m-%d")
+        pickup_time = pickup_datetime.strftime("%H:%M")
+        
+        logger.info(f"[PICKUP] Parsed date: {pickup_date}, time: {pickup_time}")
+        
+        # Call Delhivery API
+        delhivery_payload = {
+            "pickup_time": pickup_time,
+            "pickup_date": pickup_date,
+            "pickup_location": "sevenxt",  # Must match warehouse name in Delhivery
+            "expected_package_count": 1
+        }
+        
+        logger.info(f"[PICKUP] Calling Delhivery API with payload: {delhivery_payload}")
+        response = delhivery_client.pickup_request(delhivery_payload)
+        logger.info(f"[PICKUP] Delhivery response: {response}")
+        
+        # Update database
+        delivery = db.query(Delivery).filter(Delivery.order_id == order.id).first()
+        if delivery:
+            delivery.schedule_pickup = pickup_datetime
+            delivery.delivery_status = "PICKUP_REQUESTED"
+            logger.info(f"[PICKUP] Updated delivery record for order {order_id}")
+        
+        order.status = "PICKUP_REQUESTED"
+        db.commit()
+        
+        logger.info(f"[PICKUP] ✅ Pickup scheduled successfully for order {order_id}")
+        
+        return {
+            "success": True,
+            "message": "Pickup scheduled successfully",
+            "order_id": order_id,
+            "pickup_date": pickup_date,
+            "pickup_time": pickup_time,
+            "delhivery_response": response
+        }
+        
+    except ValueError as e:
+        logger.error(f"[PICKUP] Invalid datetime format: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid datetime format: {str(e)}")
+    except Exception as e:
+        logger.exception(f"[PICKUP] Failed to schedule pickup: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to schedule pickup: {str(e)}"
+        )
+
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

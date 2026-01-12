@@ -60,7 +60,11 @@ class ProductBase(BaseModel):
     stock: int = 0
     image: Optional[str] = None
     rating: float = 0.0
+<<<<<<< HEAD
     # reviews: int = 0
+=======
+    reviews: int = 0
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     
     # Tax and Compliance
     sgst: float = 0.0

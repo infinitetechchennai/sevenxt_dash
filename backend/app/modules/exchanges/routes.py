@@ -4,6 +4,7 @@ from typing import List, Optional
 from app.database import get_db
 from . import schemas, service
 from app.modules.activity_logs.service import log_activity
+from app.modules.auth.routes import get_current_employee
 import logging
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,8 @@ def get_exchanges_by_order(
 def update_exchange_status(
     exchange_id: int,
     status_update: schemas.ExchangeStatusUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Update exchange status"""
     exchange = service.update_exchange_status(
@@ -99,8 +101,9 @@ def update_exchange_status(
         db=db,
         action="Updated Exchange Status",
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Changed exchange {exchange_id} status to '{status_update.status}'",
         status="Success",
         affected_entity_type="Exchange",
@@ -113,7 +116,8 @@ def update_exchange_status(
 @router.post("/{exchange_id}/approve", response_model=schemas.ExchangeResponse)
 def approve_exchange(
     exchange_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Admin approves exchange request"""
     exchange = service.approve_exchange(db, exchange_id)
@@ -126,8 +130,9 @@ def approve_exchange(
         db=db,
         action="Approved Exchange",
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Approved exchange {exchange_id}",
         status="Success",
         affected_entity_type="Exchange",
@@ -141,7 +146,12 @@ def approve_exchange(
 def reject_exchange(
     exchange_id: int,
     reject_data: schemas.ExchangeRejectRequest,
+<<<<<<< HEAD
     db: Session = Depends(get_db)
+=======
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 ):
     """Admin rejects exchange request and sends rejection email to customer"""
     exchange = service.reject_exchange(db, exchange_id, reject_data.rejection_reason)
@@ -154,8 +164,14 @@ def reject_exchange(
         db=db,
         action="Rejected Exchange",
         module="Exchanges",
+<<<<<<< HEAD
         user_name="Admin",
         user_type="Admin",
+=======
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Rejected exchange {exchange_id}. Reason: {reject_data.rejection_reason}",
         status="Rejected",
         affected_entity_type="Exchange",
@@ -170,7 +186,8 @@ def reject_exchange(
 def quality_check(
     exchange_id: int,
     quality_data: schemas.QualityCheckRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Admin performs quality check on returned product"""
     exchange = service.quality_check_exchange(
@@ -189,8 +206,9 @@ def quality_check(
         db=db,
         action=action,
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Exchange {exchange_id} quality {'approved' if quality_data.approved else 'rejected'}",
         status="Success" if quality_data.approved else "Failed",
         affected_entity_type="Exchange",
@@ -203,7 +221,8 @@ def quality_check(
 @router.post("/{exchange_id}/process-replacement", response_model=schemas.ExchangeResponse)
 def process_replacement(
     exchange_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Process exchange replacement (Generate new AWB)"""
     exchange = service.process_exchange_replacement(db, exchange_id)
@@ -216,8 +235,9 @@ def process_replacement(
         db=db,
         action="Processed Exchange Replacement",
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Generated new AWB {exchange.new_awb_number} for exchange {exchange_id}",
         status="Success",
         affected_entity_type="Exchange",
@@ -230,7 +250,8 @@ def process_replacement(
 @router.post("/{exchange_id}/refund", response_model=schemas.ExchangeResponse)
 def refund_exchange_endpoint(
     exchange_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Process refund for exchange (if out of stock)"""
     exchange = service.refund_exchange(db, exchange_id)
@@ -243,8 +264,9 @@ def refund_exchange_endpoint(
         db=db,
         action="Refunded Exchange",
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Refunded exchange {exchange_id} (Out of Stock)",
         status="Success",
         affected_entity_type="Exchange",
@@ -257,7 +279,8 @@ def refund_exchange_endpoint(
 @router.delete("/{exchange_id}")
 def delete_exchange(
     exchange_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
 ):
     """Delete an exchange"""
     success = service.delete_exchange(db, exchange_id)
@@ -270,8 +293,9 @@ def delete_exchange(
         db=db,
         action="Deleted Exchange",
         module="Exchanges",
-        user_name="Admin",
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Deleted exchange {exchange_id}",
         status="Success",
         affected_entity_type="Exchange",

@@ -77,7 +77,11 @@ export const UsersView: React.FC = () => {
     const actionMenuRef = useRef<HTMLDivElement>(null);
 
     const tabs = ['Admin Users', 'Staff Users', 'B2B Users', 'B2C Users', 'Activity Logs'];
+<<<<<<< HEAD
     const AVAILABLE_PERMISSIONS = ['Dashboard', 'Orders', 'Products', 'Users', 'B2B', 'Finance', 'Reports', 'Delivery', 'Refunds', 'Exchanges', 'CMS', 'Settings'];
+=======
+    const AVAILABLE_PERMISSIONS = ['Orders', 'Products', 'Users', 'B2B', 'Finance', 'Delivery', 'Refunds', 'CMS', 'Settings'];
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
     // Click outside to close action menu
     useEffect(() => {
@@ -348,7 +352,11 @@ export const UsersView: React.FC = () => {
                                 className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:placeholder-gray-500 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 sm:text-sm text-gray-900"
                             />
                         </div>
+<<<<<<< HEAD
                         {(activeTab !== 'Activity Logs' && activeTab !== 'B2B Users' && activeTab !== 'B2C Users') && (
+=======
+                        {(activeTab !== 'Activity Logs') && (
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                             <button
                                 onClick={openCreateModal}
                                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"

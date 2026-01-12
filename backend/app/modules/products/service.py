@@ -32,9 +32,15 @@ def calculate_offer_prices(product: models.Product):
         end_date = ensure_datetime(product.b2c_offer_end_date)
         
         if start_date and end_date:
+<<<<<<< HEAD
             # Check if offer has expired (past end date)
             if now > end_date:
                 # Offer expired - clear it
+=======
+            if start_date <= now <= end_date:
+                is_b2c_offer_active = True
+            else:
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 product.b2c_active_offer = 0.0
                 product.b2c_offer_price = 0.0
                 product.b2c_offer_start_date = None
@@ -47,7 +53,10 @@ def calculate_offer_prices(product: models.Product):
             else:
                 is_b2c_offer_active = False
         else:
+<<<<<<< HEAD
             # No dates specified - offer is always active
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             is_b2c_offer_active = True
     
     if is_b2c_offer_active and discount_pct > 0:
@@ -69,9 +78,15 @@ def calculate_offer_prices(product: models.Product):
         end_date_b2b = ensure_datetime(product.b2b_offer_end_date)
         
         if start_date_b2b and end_date_b2b:
+<<<<<<< HEAD
             # Check if offer has expired (past end date)
             if now > end_date_b2b:
                 # Offer expired - clear it
+=======
+            if start_date_b2b <= now <= end_date_b2b:
+                is_b2b_offer_active = True
+            else:
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 product.b2b_active_offer = 0.0
                 product.b2b_offer_price = 0.0
                 product.b2b_offer_start_date = None
@@ -84,7 +99,10 @@ def calculate_offer_prices(product: models.Product):
             else:
                 is_b2b_offer_active = False
         else:
+<<<<<<< HEAD
             # No dates specified - offer is always active
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             is_b2b_offer_active = True
     
     if is_b2b_offer_active and discount_pct_b2b > 0:
@@ -105,19 +123,28 @@ def get_products(db: Session, skip: int = 0, limit: int = 6000):
                 original_b2b_offer_price = product.b2b_offer_price
                 
                 calculate_offer_prices(product)
+<<<<<<< HEAD
                 
                 # Check if offer prices changed (offer activated or deactivated)
                 b2c_price_changed = original_b2c_offer_price != product.b2c_offer_price
                 b2b_price_changed = original_b2b_offer_price != product.b2b_offer_price
                 
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 b2c_end = ensure_datetime(product.b2c_offer_end_date)
                 b2b_end = ensure_datetime(product.b2b_offer_end_date)
                 
                 # Commit if: offer expired OR offer prices changed (activated/deactivated)
                 if (b2c_end and b2c_end < datetime.now()) or \
+<<<<<<< HEAD
                    (b2b_end and b2b_end < datetime.now()) or \
                    b2c_price_changed or b2b_price_changed:
                     products_to_update.append(product)
+=======
+                   (b2b_end and b2b_end < datetime.now()):
+                    db.add(product)
+                    db.commit()
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             except Exception:
                 continue
         

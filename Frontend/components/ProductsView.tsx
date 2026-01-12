@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+<<<<<<< HEAD
 import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar, Check } from 'lucide-react';
+=======
+import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar } from 'lucide-react';
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import { Product, ProductAttribute, ProductVariant } from '../types';
 import { generateProductDescription } from '../services/geminiService';
 import { fetchProducts, createProduct, updateProduct, deleteProduct, importProducts, fetchReviews, createReview } from '../services/api';
@@ -1374,6 +1378,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium text-gray-700">Category</label>
+<<<<<<< HEAD
                   <div className="flex gap-2 relative">
                     <select
                       value={formData.category}
@@ -1384,6 +1389,18 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         <option key={cat.value} value={cat.value}>{cat.label}</option>
                       ))}
                     </select>
+=======
+                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900">
+                    <option value="Computers">Computers & Laptops</option>
+                    <option value="Mobile">Smartphones & Accessories</option>
+                    <option value="Audio">Audio & Sound</option>
+                    <option value="Home Appliances">Home Appliances</option>
+                    <option value="Smart Home">Smart Home & IoT</option>
+                    <option value="Cameras">Cameras & Photography</option>
+                    <option value="Wearables">Wearable Technology</option>
+                  </select>
+                </div>
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
                     <div className="flex gap-1 items-center">
                       <button

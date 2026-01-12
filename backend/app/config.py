@@ -8,7 +8,11 @@ class Settings(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432  # PostgreSQL default port
     DB_USER: str = "postgres"  # PostgreSQL default user
+<<<<<<< HEAD
     DB_PASSWORD: str = "12345"  # Set your PostgreSQL password
+=======
+    DB_PASSWORD: str = "1234"  # Set your PostgreSQL password
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     DB_NAME: str = "sevenext"  # PostgreSQL database name
 
 
@@ -33,7 +37,11 @@ class Settings(BaseSettings):
 
     # Password Reset Configuration
     RESET_TOKEN_EXPIRE_MINUTES: int = 30  # Reset link valid for 30 minutes
+<<<<<<< HEAD
     FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for reset link
+=======
+    FRONTEND_URL: str = "http://localhost:5173"  # Frontend URL for reset link
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     TWILIO_ACCOUNT_SID: str = "ACd0cb471ec5ff7efa0b36e9b602ee05d5"
     TWILIO_AUTH_TOKEN: str = "bdd0d73e5a28e94f75d62e2991b3401f"
     TWILIO_PHONE_NUMBER: str = "+17578632685"
@@ -43,7 +51,11 @@ class Settings(BaseSettings):
     
     
     # SendGrid configuration
+<<<<<<< HEAD
     SENDGRID_API_KEY: str = "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"
+=======
+    SENDGRID_API_KEY: str = "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"
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     SENDGRID_FROM_EMAIL: str = "musicmagician92@outlook.com"  # Change to your verified sender email
     SENDGRID_FROM_NAME: str = "sdrarunvarshan"
 
@@ -59,11 +71,24 @@ class Settings(BaseSettings):
     # -----------------------
     # IMPORTANT: Get this secret from Delhivery support or generate a strong random string
     # This is used to verify webhook signatures and prevent unauthorized requests
+<<<<<<< HEAD
     DELHIVERY_WEBHOOK_SECRET: str = "your-delhivery-webhook-secret-change-in-production"
     
     # Optional: Enable/disable webhook signature verification
     # Set to False only for testing, MUST be True in production
     WEBHOOK_SIGNATURE_VERIFICATION_ENABLED: bool = True
+=======
+    DELHIVERY_WEBHOOK_SECRET: str = "test-webhook-secret-12345"  # Change in production
+    
+    # Webhook signature verification
+    # ⚠️ TESTING MODE: Set to False to allow testing without signature
+    # 🔒 PRODUCTION: MUST set to True for security
+    WEBHOOK_SIGNATURE_VERIFICATION_ENABLED: bool = False  # Set True in production
+    
+    # Allowed IPs for webhook (Delhivery's IPs)
+    # Leave empty to allow all IPs (only safe if signature verification is enabled)
+    WEBHOOK_ALLOWED_IPS: list = []  # Add Delhivery IPs in production
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 
     

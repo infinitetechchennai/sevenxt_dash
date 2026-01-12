@@ -6,13 +6,21 @@ import {
 import Barcode from 'react-barcode';
 
 import logo from '../assets/logo.jpg';
+<<<<<<< HEAD
 import { apiService, API_BASE_URL } from '../services/api';
+=======
+import { apiService } from '../services/api';
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 const STATUS_TABS = [
   'All Orders',
   'Confirmed',
   'Processing',
   'Ready to Pickup',
+<<<<<<< HEAD
+=======
+  'On the way',
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
   'Delivered',
   'Cancelled'
 ];
@@ -44,6 +52,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
 
+<<<<<<< HEAD
   // Count State
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
     'All Orders': 0, 'Confirmed': 0, 'Processing': 0, 'Ready to Pickup': 0, 'Delivered': 0, 'Cancelled': 0
@@ -86,6 +95,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     updateCounts();
   }, [orders, activeStatus]);
 
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
   // Fetch Orders
   useEffect(() => {
     if (activeStatus === 'Ready to Pickup') {
@@ -175,6 +186,9 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
       setLoading(true);
       const data = await apiService.fetchOrders();
 
+      // Debug: Check what the API is returning
+      console.log('Raw API Response - First Order:', data[0]);
+
       // Map API data to UI format
       const mappedOrders = data.map(order => {
         let parsedProducts = [];
@@ -230,13 +244,24 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
           breadth: order.breadth,
           length: order.length,
           awb_number: order.awb_number, // AWB number for barcode
+<<<<<<< HEAD
           sgst_percentage: order.sgst_percentage,
           cgst_percentage: order.cgst_percentage,
+=======
+          // GST fields
+          original_price: order.original_price,
+          sgst_percentage: order.sgst_percentage,
+          cgst_percentage: order.cgst_percentage,
+          hsn: order.hsn,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
           rawDate: order.created_at // Keep raw date for sorting
 
         };
       });
+
+      // Debug: Check what the mapped order looks like
+      console.log('Mapped Order - First Order:', mappedOrders[0]);
 
       setOrders(mappedOrders);
     } catch (error) {
@@ -500,7 +525,70 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     }
   };
 
+  // Bulk Processing Functions
+  const bulkConfirmOrders = async () => {
+    if (selectedOrders.size === 0) {
+      alert('Please select orders to confirm');
+      return;
+    }
 
+    try {
+      const orderIds = Array.from(selectedOrders);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const orderId of orderIds) {
+        try {
+          // Move confirmed orders to Processing status
+          await apiService.updateOrderStatus(orderId, 'Processing');
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to process order ${orderId}:`, error);
+          failCount++;
+        }
+      }
+
+      alert(`✅ Moved ${successCount} orders to Processing${failCount > 0 ? `\n❌ Failed: ${failCount}` : ''}`);
+      setSelectedOrders(new Set());
+      fetchOrders();
+    } catch (error) {
+      console.error('Bulk process failed:', error);
+      alert('Failed to process orders. Please try again.');
+    }
+  };
+
+  const bulkProcessOrders = async () => {
+    if (selectedOrders.size === 0) {
+      alert('Please select orders to process');
+      return;
+    }
+
+    try {
+      const orderIds = Array.from(selectedOrders);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const orderId of orderIds) {
+        try {
+          await apiService.updateOrderStatus(orderId, 'Ready to Pickup');
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to process order ${orderId}:`, error);
+          failCount++;
+        }
+      }
+
+      alert(`✅ Processed ${successCount} orders${failCount > 0 ? `\n❌ Failed: ${failCount}` : ''}`);
+      setSelectedOrders(new Set());
+      fetchOrders();
+    } catch (error) {
+      console.error('Bulk process failed:', error);
+      alert('Failed to process orders. Please try again.');
+    }
+  };
+
+
+<<<<<<< HEAD
   // Determine available bulk action
   const activeBulkAction = useMemo(() => {
     if (selectedOrders.size === 0) return null;
@@ -557,6 +645,8 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     }
   };
 
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
   return (
     <div className="flex flex-col h-full bg-slate-50 -m-4 sm:-m-6 lg:-m-8 font-sans overflow-hidden relative">
       {/* Header */}
@@ -582,7 +672,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               {status}
               {status !== 'All Orders' && (
                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${activeStatus === status ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+<<<<<<< HEAD
                   {statusCounts[status] || 0}
+=======
+                  {status === 'Ready to Pickup'
+                    ? orders.filter(o => o.status === 'Ready to Pickup' || o.status === 'AWB Generated' || o.status === 'Pickup Time Scheduled' || o.status === 'AWB_GENERATED').length
+                    : orders.filter(o => o.status === status).length
+                  }
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 </span>
               )}
             </button>
@@ -604,6 +701,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
             />
           </div>
           <div className="flex items-center gap-2">
+<<<<<<< HEAD
             {activeBulkAction && (
               <button
                 onClick={handleBulkMove}
@@ -621,6 +719,39 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                 <Download size={16} />
                 Download AWB Labels ({selectedOrders.size})
               </button>
+=======
+            {/* Bulk Actions based on active tab */}
+            {selectedOrders.size > 0 && (
+              <>
+                {activeStatus === 'Ready to Pickup' && (
+                  <button
+                    onClick={downloadBulkAWBLabels}
+                    className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white border border-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    <Download size={16} />
+                    Download AWB Labels ({selectedOrders.size})
+                  </button>
+                )}
+                {(activeStatus === 'All Orders' || activeStatus === 'Confirmed') && (
+                  <button
+                    onClick={bulkConfirmOrders}
+                    className="flex items-center gap-2 px-3 py-2 bg-violet-600 text-white border border-violet-600 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
+                  >
+                    <PlayCircle size={16} />
+                    Move to Processing ({selectedOrders.size})
+                  </button>
+                )}
+                {activeStatus === 'Processing' && (
+                  <button
+                    onClick={bulkProcessOrders}
+                    className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white border border-amber-600 rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                  >
+                    <Package size={16} />
+                    Move to Pickup ({selectedOrders.size})
+                  </button>
+                )}
+              </>
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             )}
             <button
               onClick={downloadCSV}
@@ -697,6 +828,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
           <table className="w-full text-left border-collapse min-w-max">
             <thead>
               <tr className="bg-slate-50/50 border-b border-slate-200">
+<<<<<<< HEAD
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">
                   <input
                     type="checkbox"
@@ -705,6 +837,19 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                   />
                 </th>
+=======
+                {/* Show checkbox in tabs where bulk actions are available */}
+                {(activeStatus === 'All Orders' || activeStatus === 'Confirmed' || activeStatus === 'Processing' || activeStatus === 'Ready to Pickup') && (
+                  <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
+                )}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Order ID</th>
                 <th className="py-4 px-6 text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
                 {activeStatus !== 'Ready to Pickup' && (
@@ -737,15 +882,21 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
               {sortedDates.map(date => (
                 <React.Fragment key={date}>
                   <tr className="bg-gray-50 border-b border-gray-100">
+<<<<<<< HEAD
                     <td colSpan={10} className="py-2.5 px-4 text-xs font-bold text-slate-700 bg-slate-100 border-y border-slate-200 uppercase tracking-wider pl-4">
                       <div className="flex items-center gap-2">
                         <Calendar size={14} className="text-slate-500" />
                         <span>{date}</span>
                       </div>
+=======
+                    <td colSpan={10} className="py-2 px-6 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                      <Calendar size={12} /> {date}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                     </td>
                   </tr>
                   {groupedOrders[date].map((order) => (
                     <tr key={order.id} className="hover:bg-slate-50/80 transition-colors group">
+<<<<<<< HEAD
                       <td className="py-4 px-6">
                         <input
                           type="checkbox"
@@ -754,6 +905,19 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                           className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
                         />
                       </td>
+=======
+                      {/* Show checkbox in tabs where bulk actions are available */}
+                      {(activeStatus === 'All Orders' || activeStatus === 'Confirmed' || activeStatus === 'Processing' || activeStatus === 'Ready to Pickup') && (
+                        <td className="py-4 px-6">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrders.has(order.id)}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                          />
+                        </td>
+                      )}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                       <td className="py-4 px-6 font-medium text-indigo-600 text-sm">{order.id}</td>
                       <td className="py-4 px-6 text-sm text-slate-900">
                         <div className="flex items-center gap-2">
@@ -948,10 +1112,17 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                                 <button
                                   onClick={async () => {
                                     const time = pickupTimes[order.id];
-                                    if (!time) return;
+                                    if (!time) {
+                                      alert('Please select a pickup time');
+                                      return;
+                                    }
                                     try {
-                                      console.log('Scheduling pickup for delivery ID:', order.deliveryId, 'Time:', time);
-                                      await apiService.updateDeliverySchedule(order.deliveryId, time);
+                                      console.log('Scheduling pickup for order:', order.id, 'Time:', time);
+
+                                      // Call new Delhivery-integrated API
+                                      const response = await apiService.schedulePickup(order.id, time);
+
+                                      console.log('Pickup scheduled successfully:', response);
 
                                       // Optimistic update
                                       setOrders(prev => prev.map(o =>
@@ -960,11 +1131,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                                           : o
                                       ));
 
-                                      alert('Pickup scheduled successfully!');
+                                      alert(`Pickup scheduled successfully!\nDate: ${response.pickup_date}\nTime: ${response.pickup_time}`);
                                       fetchDeliveries();
-                                    } catch (error) {
+                                    } catch (error: any) {
                                       console.error("Failed to schedule pickup:", error);
-                                      alert('Failed to schedule pickup');
+                                      alert(`Failed to schedule pickup: ${error.message || 'Unknown error'}`);
                                     }
                                   }}
                                   className="w-full flex items-center justify-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
@@ -1109,6 +1280,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
 };
 
 const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) => {
+<<<<<<< HEAD
   // Robust amount handling: parse string if needed, or use number directly
   const amountValue = typeof order.amount === 'string'
     ? parseFloat(order.amount.replace(/[^0-9.-]+/g, ""))
@@ -1135,23 +1307,58 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
   const parsePrice = (p: any) => {
     if (typeof p === 'number') return p;
     if (typeof p === 'string') return parseFloat(p.replace(/[^0-9.-]+/g, ""));
+=======
+  // Helper to safely parse numbers
+  const parseNumber = (value: any) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') return parseFloat(value.replace(/[^0-9.-]+/g, ""));
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     return 0;
   };
+
+  // Get values from database columns
+  const originalPrice = parseNumber(order.original_price || 0);
+  const sgstPercentage = parseNumber(order.sgst_percentage || 0);
+  const cgstPercentage = parseNumber(order.cgst_percentage || 0);
+  const amountValue = parseNumber(order.amount || 0);
+
+  // Debug: Log the values
+  console.log('Invoice Data:', {
+    order_id: order.order_id,
+    original_price: order.original_price,
+    sgst_percentage: order.sgst_percentage,
+    cgst_percentage: order.cgst_percentage,
+    hsn: order.hsn,
+    amount: order.amount,
+    parsed: { originalPrice, sgstPercentage, cgstPercentage, amountValue }
+  });
+
+  // Calculate SGST and CGST amounts from original price and percentages
+  const sgstAmount = (originalPrice * sgstPercentage) / 100;
+  const cgstAmount = (originalPrice * cgstPercentage) / 100;
+
+  // Subtotal is the original price (before tax)
+  const subtotal = originalPrice;
+
+  // For backward compatibility: if original_price is not set, calculate from amount
+  const finalSubtotal = originalPrice > 0 ? subtotal : amountValue / (1 + ((sgstPercentage + cgstPercentage) / 100));
+  const finalSgst = originalPrice > 0 ? sgstAmount : (amountValue - finalSubtotal) / 2;
+  const finalCgst = originalPrice > 0 ? cgstAmount : (amountValue - finalSubtotal) / 2;
 
   const invoiceItems = (order.productList && order.productList.length > 0)
     ? order.productList.map((item: any, i: number) => ({
       id: i + 1,
       desc: (typeof item === 'string' ? item : (item.name || item.product_name || item.product || item.title || item.description || `Product #${item.id || item.product_id || i + 1}`)),
-      hsn: item.hsn || item.hsn_code || item.hsnCode || '',
+      hsn: order.hsn || item.hsn || item.hsn_code || item.hsnCode || '',
       qty: parseInt(item.quantity || item.qty || item.count || '1'),
-      price: parsePrice(item.price || item.unit_price || item.amount || item.selling_price) || (subtotal / (order.productList.length || 1))
+      price: parseNumber(item.price || item.unit_price || item.amount || item.selling_price) || (finalSubtotal / (order.productList.length || 1))
     }))
     : Array.from({ length: order.items || 1 }).map((_, i) => ({
       id: i + 1,
       desc: i === 0 ? `Main Product - ${order.type} SKU` : `Accessory / Component Part #${1000 + i}`,
-      hsn: '',
+      hsn: order.hsn || '',
       qty: 1,
-      price: (subtotal / (order.items || 1))
+      price: (finalSubtotal / (order.items || 1))
     }));
 
   return (
@@ -1279,6 +1486,7 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
         <div className="flex justify-end">
           <div className="w-64 space-y-3">
             <div className="flex justify-between text-sm text-gray-600">
+<<<<<<< HEAD
               <span>Subtotal</span>
               <span className="font-medium">₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
@@ -1289,9 +1497,21 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
             <div className="flex justify-between text-sm text-gray-600">
               <span>CGST ({cgstPercent}%)</span>
               <span className="font-medium">₹{cgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+=======
+              <span>Subtotal (Original Price)</span>
+              <span className="font-medium">₹{finalSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>SGST ({sgstPercentage}%)</span>
+              <span className="font-medium">₹{finalSgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>CGST ({cgstPercentage}%)</span>
+              <span className="font-medium">₹{finalCgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             </div>
             <div className="flex justify-between text-lg font-bold text-gray-900 border-t border-gray-200 pt-3">
-              <span>Total</span>
+              <span>Total Amount</span>
               <span className="text-blue-600">₹{amountValue.toLocaleString()}</span>
             </div>
           </div>

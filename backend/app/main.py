@@ -13,7 +13,10 @@ import os
 from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog
 from app.modules.exchanges.models import Exchange
+<<<<<<< HEAD
 from app.modules.reviews.models import ProductReview
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 # --- IMPORT ALL ROUTERS (Verified) ---
 from app.modules.auth import routes as auth_routes
@@ -22,10 +25,13 @@ from app.modules.cms.routes import router as cms_router
 from app.modules.campaigns.routes import router as campaigns_router
 from app.modules.b2b.routes import router as b2b_router # B2B Router
 from app.modules.finance.routes import router as finance_router 
+<<<<<<< HEAD
 from app.modules.reports.routes import router as reports_router
 from app.modules.dashboard import routes as dashboard_routes
 from app.modules.notifications.routes import router as notifications_router
 from app.modules.reviews import routes as reviews_routes
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,12 +48,15 @@ app = FastAPI(
     version="2.0.0"
 )
 
+<<<<<<< HEAD
 # Mount uploads directory for serving profile pictures
 from pathlib import Path
 uploads_dir = Path("uploads")
 uploads_dir.mkdir(exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 @app.on_event("startup")
 async def startup_event():
@@ -67,6 +76,17 @@ async def startup_event():
         logger.error(f"Failed to connect to database: {e}")
         logger.warning("Application started but database is not available. Please ensure MySQL is running.")
 
+<<<<<<< HEAD
+=======
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",   # React
+        "http://localhost:5173",   # Vite (just in case)
+    ],
+)
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 # 3. DIRECTORY SETUP
 # Automatically creates folders for your CMS and B2B uploads
 upload_dirs = ["uploads", "uploads/banners", "uploads/categories", "uploads/campaigns"]
@@ -80,11 +100,16 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # 5. CORS MIDDLEWARE
 app.add_middleware(
     CORSMiddleware,
+<<<<<<< HEAD
     allow_origins=settings.CORS_ORIGINS or [
         "http://13.233.199.134", 
         "http://localhost:3001",  # Added for frontend on port 3001
         "http://localhost:5173"
     ],
+=======
+    allow_origins=settings.CORS_ORIGINS or ["http://localhost:3000", "http://localhost:5173"],
+
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,13 +129,17 @@ app.include_router(product_routes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(order_routes.router, prefix=settings.API_V1_PREFIX)
 
 from app.modules.delivery import routes as delivery_routes
-app.include_router(delivery_routes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(delivery_routes.router, prefix=settings.API_V1_PREFIX)  # Webhook router
+app.include_router(delivery_routes.delivery_router, prefix=settings.API_V1_PREFIX)  # Delivery operations router
 
 from app.modules.refunds import routes as refund_routes
 app.include_router(refund_routes.router, prefix=settings.API_V1_PREFIX)
 
 from app.modules.activity_logs import routes as activity_log_routes
 app.include_router(activity_log_routes.router, prefix=settings.API_V1_PREFIX)
+
+from app.modules.settings import routes as settings_routes
+app.include_router(settings_routes.router, prefix=settings.API_V1_PREFIX)
 
 from app.modules.exchanges import routes as exchange_routes
 app.include_router(exchange_routes.router, prefix=settings.API_V1_PREFIX)
@@ -122,6 +151,9 @@ app.include_router(refund_webhooks.router)
 
 from app.modules.exchanges import webhooks as exchange_webhooks
 app.include_router(exchange_webhooks.router)
+
+from app.modules.notifications import routes as notification_routes
+app.include_router(notification_routes.router, prefix=settings.API_V1_PREFIX + "/notifications")
 
 from fastapi.staticfiles import StaticFiles
 import os

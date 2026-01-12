@@ -71,6 +71,12 @@ class Order(Base):
     sgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
     cgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
 
+    # GST and Pricing fields
+    original_price = Column(DECIMAL(10, 2), nullable=True)  # Price before tax
+    sgst_percentage = Column(DECIMAL(5, 2), nullable=True)  # SGST percentage (e.g., 9.00 for 9%)
+    cgst_percentage = Column(DECIMAL(5, 2), nullable=True)  # CGST percentage (e.g., 9.00 for 9%)
+    hsn = Column(String(20), nullable=True)  # HSN code
+
     #return AWb number annd label
     # return_awb_number = Column(String(255), nullable=True)
     # return_label_path = Column(String(500), nullable=True)

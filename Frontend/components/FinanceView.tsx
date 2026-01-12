@@ -1,9 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   CreditCard, FileText, RefreshCcw, Percent, DollarSign,
+<<<<<<< HEAD
   Search, Filter, TrendingUp, MoreVertical, X, RotateCcw, User, ArrowDownLeft, ShieldCheck
 } from 'lucide-react';
 import { getTransactions, API_BASE_URL } from '../services/api';
+=======
+  Search, Filter, TrendingUp, MoreVertical, X, RotateCcw, User
+} from 'lucide-react';
+import { getTransactions } from '../services/api';
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import Swal from 'sweetalert2';
 
 export const FinanceView: React.FC = () => {
@@ -48,14 +54,24 @@ export const FinanceView: React.FC = () => {
       confirmButtonColor: '#e11d48',
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Yes, Refund it!',
+<<<<<<< HEAD
       customClass: { popup: 'rounded-3xl' }
+=======
+      customClass: {
+        popup: 'rounded-3xl',
+      }
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     });
 
     if (!result.isConfirmed) return;
 
     setRefundingId(paymentId);
     try {
+<<<<<<< HEAD
       const response = await fetch(`${API_BASE_URL}/api/v1/finance/refund/${paymentId}`, {
+=======
+      const response = await fetch(`http://localhost:8001/api/v1/finance/refund/${paymentId}`, {
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -127,9 +143,12 @@ export const FinanceView: React.FC = () => {
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(txn => {
+<<<<<<< HEAD
       if (activeTab === 'Refunds' && txn.status !== 'REFUNDED') return false;
       if (activeTab === 'Payments' && txn.status === 'REFUNDED') return false;
 
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
       if (appliedFilters.status !== 'All') {
         if (appliedFilters.status === 'Success' && txn.status !== 'SUCCESS') return false;
         if (appliedFilters.status === 'Refunded' && txn.status !== 'REFUNDED') return false;
@@ -150,7 +169,11 @@ export const FinanceView: React.FC = () => {
       }
       return true;
     });
+<<<<<<< HEAD
   }, [appliedFilters, searchTerm, transactions, activeTab]);
+=======
+  }, [appliedFilters, searchTerm, transactions]);
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -168,6 +191,7 @@ export const FinanceView: React.FC = () => {
     { id: 'Taxes', label: 'Taxes', icon: <Percent size={18} /> },
   ];
 
+<<<<<<< HEAD
   const renderTableContent = () => (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
@@ -224,6 +248,92 @@ export const FinanceView: React.FC = () => {
           )}
         </tbody>
       </table>
+=======
+  const renderPayments = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500 font-medium">Total Volume (Real-time)</p>
+          <div className="flex items-end justify-between mt-2">
+            <h3 className="text-2xl font-bold text-slate-900">₹{stats.totalVolume.toLocaleString()}</h3>
+            <span className="flex items-center text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+              <TrendingUp size={14} className="mr-1" /> Live
+            </span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500 font-medium">Success Rate</p>
+          <div className="flex items-end justify-between mt-2">
+            <h3 className="text-2xl font-bold text-slate-900">{stats.successRate.toFixed(1)}%</h3>
+            <span className="text-xs font-medium text-slate-400">All Time</span>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-sm text-slate-500 font-medium">Failed Transactions</p>
+          <div className="flex items-end justify-between mt-2">
+            <h3 className="text-2xl font-bold text-rose-600">{stats.failedCount}</h3>
+            <span className="flex items-center text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">
+              Action Req.
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Transaction List</h3>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-slate-50/50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Payment ID</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Date</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Order Ref</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Amount</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Customer</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase">Status</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredTransactions.map(txn => (
+              <tr key={txn.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4 text-sm font-mono font-medium text-indigo-600">{txn.razorpay_payment_id || 'N/A'}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{new Date(txn.created_at).toLocaleDateString()}</td>
+                <td className="px-6 py-4 text-sm text-slate-900 font-medium">{txn.internal_order_id}</td>
+                <td className="px-6 py-4 text-sm font-bold text-slate-900">₹{Number(txn.amount).toFixed(2)}</td>
+                <td className="px-6 py-4">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-900">{txn.user_email || 'No Email'}</span>
+                    <span className="text-[11px] text-slate-400 font-medium">{txn.customer_contact || 'No Contact'}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusColor(txn.status)}`}>
+                    {txn.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    {txn.status === 'SUCCESS' && (
+                      <button
+                        onClick={() => handleRefund(txn.razorpay_payment_id)}
+                        disabled={refundingId === txn.razorpay_payment_id}
+                        className="flex items-center gap-1 text-xs font-bold text-rose-600 hover:bg-rose-50 px-2 py-1 rounded-lg border border-rose-100 transition-all"
+                      >
+                        <RotateCcw size={12} className={refundingId === txn.razorpay_payment_id ? 'animate-spin' : ''} />
+                        {refundingId === txn.razorpay_payment_id ? 'Wait...' : 'Refund'}
+                      </button>
+                    )}
+                    <button className="text-slate-400 hover:text-slate-600"><MoreVertical size={16} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     </div>
   );
 
@@ -261,7 +371,11 @@ export const FinanceView: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
             type="text"
+<<<<<<< HEAD
             placeholder={`Search ${activeTab.toLowerCase()}...`}
+=======
+            placeholder={`Search payments, email, or contact...`}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none shadow-sm text-gray-900"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -274,6 +388,7 @@ export const FinanceView: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+<<<<<<< HEAD
         {activeTab === 'Payments' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -379,6 +494,14 @@ export const FinanceView: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+=======
+        {activeTab === 'Payments' && renderPayments()}
+        {activeTab !== 'Payments' && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-slate-400 text-lg font-medium">Coming Soon</p>
+              <p className="text-slate-300 text-sm mt-2">This section is under development</p>
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             </div>
           </div>
         )}
@@ -415,4 +538,9 @@ export const FinanceView: React.FC = () => {
       )}
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

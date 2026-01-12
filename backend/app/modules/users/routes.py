@@ -47,7 +47,8 @@ def read_users(
 def delete_user(
     user_id: int, 
     type: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Union[EmployeeUser, AdminUser] = Depends(get_current_employee)
 ):
     """Delete a user (soft delete)"""
     if type:
@@ -58,8 +59,9 @@ def delete_user(
                 db=db,
                 action="Deleted User",
                 module="Users",
-                user_name="Admin",  # TODO: Get from current user
-                user_type="Admin",
+                user_id=str(current_user.id),
+                user_name=current_user.name,
+                user_type=current_user.role.capitalize(),
                 details=f"Deleted {type} user with ID: {user_id}",
                 status="Success",
                 affected_entity_type="User",
@@ -84,9 +86,10 @@ def delete_user(
             db=db,
             action="Deleted Employee",
             module="Users",
-            user_name="Admin",
-            user_type="Admin",
-            details=f"Deleted employee: {employee.full_name} ({employee.email})",
+            user_id=str(current_user.id),
+            user_name=current_user.name,
+            user_type=current_user.role.capitalize(),
+            details=f"Deleted employee: {employee.name} ({employee.email})",
             status="Success",
             affected_entity_type="Employee",
             affected_entity_id=str(user_id)
@@ -109,8 +112,9 @@ def delete_user(
             db=db,
             action="Deleted User",
             module="Users",
-            user_name="Admin",
-            user_type="Admin",
+            user_id=str(current_user.id),
+            user_name=current_user.name,
+            user_type=current_user.role.capitalize(),
             details=f"Deleted user: {user.email}",
             status="Success",
             affected_entity_type="User",
@@ -125,6 +129,7 @@ def delete_user(
 def update_user(
     user_id: int,
     user_data: schemas.UserUpdate,
+<<<<<<< HEAD
     user_type: str = Query(..., alias="type"), # Use alias to match frontend query param 'type'
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_employee)
@@ -183,6 +188,32 @@ def update_user(
     except Exception as e:
         logger.error(f"Error updating user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+=======
+    type: str,
+    db: Session = Depends(get_db),
+    current_user: Union[EmployeeUser, AdminUser] = Depends(get_current_employee)
+):
+    """Update a user/employee"""
+    updated_user = service.update_user(db, user_id, type, user_data.dict(exclude_unset=True))
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Log activity
+    log_activity(
+        db=db,
+        action="Updated User",
+        module="Users",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
+        details=f"Updated {type} user with ID: {user_id}",
+        status="Success",
+        affected_entity_type="User",
+        affected_entity_id=str(user_id)
+    )
+    
+    return {"message": "User updated successfully", "user": updated_user}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 # ========== EMPLOYEES ROUTER ==========
 
@@ -197,7 +228,8 @@ def get_employees(
 @employees_router.post("/create", response_model=schemas.EmployeeResponse)
 def create_employee(
     employee_data: schemas.EmployeeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Union[EmployeeUser, AdminUser] = Depends(get_current_employee)
 ):
     """Create a new employee (admin/staff)"""
     try:
@@ -218,8 +250,9 @@ def create_employee(
             db=db,
             action="Created Employee",
             module="Users",
-            user_name="Admin",
-            user_type="Admin",
+            user_id=str(current_user.id),
+            user_name=current_user.name,
+            user_type=current_user.role.capitalize(),
             details=f"Created new {employee_data.role} employee: {employee_data.name} ({employee_data.email})",
             status="Success",
             affected_entity_type="Employee",
@@ -239,8 +272,9 @@ def create_employee(
             db=db,
             action="Failed to Create Employee",
             module="Users",
-            user_name="Admin",
-            user_type="Admin",
+            user_id=str(current_user.id),
+            user_name=current_user.name,
+            user_type=current_user.role.capitalize(),
             details=f"Failed to create employee: {employee_data.email}. Error: {str(e)}",
             status="Failed"
         )

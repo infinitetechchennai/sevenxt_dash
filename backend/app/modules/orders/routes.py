@@ -11,6 +11,7 @@ from PyPDF2 import PdfWriter as PdfMerger
 import os
 from datetime import datetime
 from app.modules.activity_logs.service import log_activity
+from app.modules.auth.routes import get_current_employee
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -73,12 +74,23 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "weight": order.weight,
             "breadth": order.breadth,
             "length": order.length,
+<<<<<<< HEAD
             "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
             "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
+=======
+            "original_price": float(order.original_price) if hasattr(order, 'original_price') and order.original_price else None,
+            "sgst_percentage": float(order.sgst_percentage) if hasattr(order, 'sgst_percentage') and order.sgst_percentage else None,
+            "cgst_percentage": float(order.cgst_percentage) if hasattr(order, 'cgst_percentage') and order.cgst_percentage else None,
+            "hsn": order.hsn if hasattr(order, 'hsn') else None,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             "created_at": order.created_at,
             "updated_at": order.updated_at,
         }
         
+<<<<<<< HEAD
+=======
+        logger.info(f"Order {order.order_id} - Phone: {order.phone}, Name: {order.customer_name}, GST: original_price={order.original_price}, sgst={order.sgst_percentage}%, cgst={order.cgst_percentage}%, hsn={order.hsn}")
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         result.append(order_dict)
     
     return result
@@ -382,8 +394,15 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         "weight": order.weight,
         "breadth": order.breadth,
         "length": order.length,
+<<<<<<< HEAD
         "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
+=======
+        "original_price": float(order.original_price) if hasattr(order, 'original_price') and order.original_price else None,
+        "sgst_percentage": float(order.sgst_percentage) if hasattr(order, 'sgst_percentage') and order.sgst_percentage else None,
+        "cgst_percentage": float(order.cgst_percentage) if hasattr(order, 'cgst_percentage') and order.cgst_percentage else None,
+        "hsn": order.hsn if hasattr(order, 'hsn') else None,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": order.created_at,
         "updated_at": order.updated_at,
     }
@@ -391,7 +410,12 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
     return order_dict
 
 @router.put("/{order_id}/status", response_model=schemas.OrderResponse)
-def update_order_status(order_id: str, status_update: schemas.OrderStatusUpdate, db: Session = Depends(get_db)):
+def update_order_status(
+    order_id: str, 
+    status_update: schemas.OrderStatusUpdate, 
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_employee)
+):
     """Update order status"""
     try:
         order = service.update_order_status(db, order_id, status_update.status)
@@ -411,8 +435,9 @@ def update_order_status(order_id: str, status_update: schemas.OrderStatusUpdate,
         db=db,
         action="Updated Order Status",
         module="Orders",
-        user_name="Admin",  # TODO: Get from current_user
-        user_type="Admin",
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
         details=f"Changed order {order_id} status to '{status_update.status}'",
         status="Success",
         affected_entity_type="Order",
@@ -440,8 +465,15 @@ def update_order_status(order_id: str, status_update: schemas.OrderStatusUpdate,
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
+<<<<<<< HEAD
         "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
+=======
+        "original_price": float(updated_order.original_price) if hasattr(updated_order, 'original_price') and updated_order.original_price else None,
+        "sgst_percentage": float(updated_order.sgst_percentage) if hasattr(updated_order, 'sgst_percentage') and updated_order.sgst_percentage else None,
+        "cgst_percentage": float(updated_order.cgst_percentage) if hasattr(updated_order, 'cgst_percentage') and updated_order.cgst_percentage else None,
+        "hsn": updated_order.hsn if hasattr(updated_order, 'hsn') else None,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": updated_order.created_at,
         "updated_at": updated_order.updated_at,
     }
@@ -487,10 +519,17 @@ def update_order_dimensions(order_id: str, dimensions: schemas.OrderDimensionsUp
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
+<<<<<<< HEAD
         "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
+=======
+        "original_price": float(updated_order.original_price) if hasattr(updated_order, 'original_price') and updated_order.original_price else None,
+        "sgst_percentage": float(updated_order.sgst_percentage) if hasattr(updated_order, 'sgst_percentage') and updated_order.sgst_percentage else None,
+        "cgst_percentage": float(updated_order.cgst_percentage) if hasattr(updated_order, 'cgst_percentage') and updated_order.cgst_percentage else None,
+        "hsn": updated_order.hsn if hasattr(updated_order, 'hsn') else None,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": updated_order.created_at,
-        "updated_order": updated_order.updated_at,
+        "updated_at": updated_order.updated_at,
     }
             
     return order_dict

@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, Check, X, Phone, Mail, XCircle, Activity, FileText, FileCheck, Maximize2, Download, Clock, CheckCircle2, Ban, AlertCircle, ShieldCheck } from 'lucide-react';
+<<<<<<< HEAD
 import { getB2BUsers, updateB2BStatus, API_BASE_URL } from '../services/api';
+=======
+import { getB2BUsers, updateB2BStatus } from '../services/api';
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import Swal from 'sweetalert2';
 
 export const B2BView: React.FC = () => {
@@ -46,7 +50,11 @@ export const B2BView: React.FC = () => {
 
     try {
       // API call to your backend which talks to Razorpay Identity
+<<<<<<< HEAD
       const response = await fetch(`${API_BASE_URL}/api/v1/b2b/verify-${type.toLowerCase()}`, {
+=======
+      const response = await fetch(`http://localhost:8001/api/v1/b2b/verify-${type.toLowerCase()}`, {
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ number: value })

@@ -134,6 +134,7 @@ def reset_password_otp(
         )
     
     return {"message": "Password has been reset successfully"}
+<<<<<<< HEAD
 
 # ========== PROFILE PICTURE UPLOAD ==========
 
@@ -252,3 +253,5 @@ def update_profile(
             detail=f"Failed to update profile: {str(e)}"
         )
 # Trigger reload
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

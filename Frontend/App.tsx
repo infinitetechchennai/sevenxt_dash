@@ -34,7 +34,11 @@ import { DeliveryView } from "./components/DeliveryView";
 import { PorterView } from "./components/LocalDelivery";
 import { RefundsView } from "./components/RefundsView";
 import ExchangesView from "./components/ExchangesView";
+<<<<<<< HEAD
 
+=======
+import { CategoriesView } from "./components/CategoriesView";
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import { SettingsView } from "./components/SettingsView";
 import { FinanceView } from "./components/FinanceView";
 import { CampaignsView } from "./components/CampaignsView";
@@ -181,6 +185,7 @@ const App: React.FC = () => {
     return routeMap[id] || '/dashboard';
   };
 
+<<<<<<< HEAD
   // Sidebar Menu Items configuration
   const menuItems = [
     { id: ViewState.DASHBOARD, label: "Dashboard", icon: LayoutDashboard },
@@ -224,6 +229,65 @@ const App: React.FC = () => {
       default: return false;
     }
   });
+=======
+  // Get current user from localStorage
+  const getCurrentUser = () => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        return JSON.parse(userStr);
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const currentUser = getCurrentUser();
+
+  // Sidebar Menu Items configuration (all available modules)
+  const allMenuItems = [
+    { id: ViewState.DASHBOARD, label: "Dashboard", icon: LayoutDashboard, permission: "Dashboard" },
+    { id: "USERS", label: "Users", icon: Users, permission: "Users" },
+    { id: "B2B", label: "B2B Management", icon: Briefcase, permission: "B2B" },
+    { id: ViewState.ORDERS, label: "Orders", icon: ShoppingCart, permission: "Orders" },
+    { id: "FINANCE", label: "Payments & Finance", icon: DollarSign, permission: "Finance" },
+    { id: "REPORTS", label: "Reports", icon: BarChart3, permission: "Reports" },
+    { id: "DELIVERY", label: "Delivery (Outstation)", icon: Truck, permission: "Delivery" },
+    { id: "PORTER", label: "Local Delivery (Chennai)", icon: MapPin, permission: "Porter" },
+    { id: "REFUNDS", label: "Refunds", icon: RotateCcw, permission: "Refunds" },
+    { id: "EXCHANGES", label: "Exchanges", icon: RefreshCw, permission: "Exchanges" },
+    { id: ViewState.PRODUCTS, label: "Products", icon: Package, permission: "Products" },
+    { id: "CATEGORIES", label: "Categories", icon: FolderTree, permission: "Categories" },
+    { id: "PRICING", label: "Campaigns", icon: CreditCard, permission: "Campaigns" },
+    { id: "CMS", label: "CMS", icon: Layout, permission: "CMS" },
+    { id: ViewState.SETTINGS, label: "Settings", icon: Settings, permission: "Settings" },
+  ];
+
+  // Filter menu items based on user role and permissions
+  const menuItems = React.useMemo(() => {
+    if (!currentUser) return allMenuItems;
+
+    // Admin users see all modules
+    if (currentUser.role === "admin") {
+      return allMenuItems;
+    }
+
+    // Staff users see only modules they have permission for
+    if (currentUser.role === "staff") {
+      const userPermissions = currentUser.permissions || [];
+
+      // Always show Dashboard for all users
+      return allMenuItems.filter(item =>
+        item.permission === "Dashboard" || userPermissions.includes(item.permission)
+      );
+    }
+
+    // Default: show all items (fallback)
+    return allMenuItems;
+  }, [currentUser]);
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -237,10 +301,59 @@ const App: React.FC = () => {
     }
   };
 
+<<<<<<< HEAD
   // Protected Route Component
   const ProtectedRoute: React.FC<{ children: React.ReactElement; permission: string }> = ({ children, permission }) => {
     if (!userProfile) {
       return <div className="p-8">Loading profile...</div>;
+=======
+  const renderContent = () => {
+    switch (activeView) {
+      case ViewState.DASHBOARD:
+        return <DashboardView onNavigate={setActiveView} />;
+      case ViewState.PRODUCTS:
+        return <ProductsView />;
+      case "USERS":
+        return <UsersView />;
+      case "B2B":
+        return <B2BView />;
+      case ViewState.ORDERS:
+        return <OrdersView />;
+      case "FINANCE":
+        return <FinanceView />;
+      case "REPORTS":
+        return <ReportsView />;
+      case "DELIVERY":
+        return <DeliveryView />;
+      case "PORTER":
+        return <PorterView />;
+      case "REFUNDS":
+        return <RefundsView />;
+      case "EXCHANGES":
+        return <ExchangesView />;
+      case "CATEGORIES":
+        return <CategoriesView />;
+      case "PRICING":
+        return <CampaignsView />;
+      case "CMS":
+        return <CMSView activeView={activeView} />;
+      case ViewState.SETTINGS:
+        return <SettingsView activeView={activeView} />;
+      default:
+        return (
+          <div className="flex flex-col items-center justify-center h-[60vh] bg-white rounded-lg border border-dashed border-gray-300 m-4">
+            <div className="p-4 rounded-full bg-gray-50 mb-4">
+              <Package size={32} className="text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900">
+              Work in Progress
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              This module is currently under development.
+            </p>
+          </div>
+        );
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     }
 
     if (permission && !hasPermission(permission)) {
@@ -298,6 +411,7 @@ const App: React.FC = () => {
         </div >
 
         {/* Navigation - Dark Ace */}
+<<<<<<< HEAD
         <nav className="flex-1 px-3 space-y-1 py-4 bg-[#000000] overflow-y-auto no-scrollbar">
           {filteredMenuItems.map((item) => (
             <button
@@ -317,6 +431,28 @@ const App: React.FC = () => {
             </button>
           ))}
         </nav>
+=======
+        < nav className="flex-1 px-3 space-y-1 py-4 bg-[#000000] overflow-y-auto no-scrollbar" >
+          {
+            menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveView(item.id);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${activeView === item.id
+                  ? "bg-[#DC2626] text-white shadow-sm ring-1 ring-white/10" /* Active Red */
+                  : "text-gray-300 hover:bg-white/5 hover:text-white"
+                  }`}
+              >
+                <item.icon size={20} />
+                <span>{item.label}</span>
+              </button>
+            ))
+          }
+        </nav >
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
         {/* User Profile Footer */}
         < div className="p-4 border-t border-white/10 mt-auto bg-[#222a2d] " >
@@ -325,6 +461,7 @@ const App: React.FC = () => {
               className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
               onClick={() => navigate('/settings')}
             >
+<<<<<<< HEAD
               {userProfile?.profile_picture ? (
                 <img
                   src={`${API_BASE_URL}${userProfile.profile_picture}`}
@@ -342,6 +479,17 @@ const App: React.FC = () => {
                 </p>
                 <p className="text-xs text-gray-400 truncate">
                   {userProfile?.email || 'admin@ecommerce.com'}
+=======
+              <div className="h-9 w-9 rounded-full bg-[#DC2626] flex items-center justify-center text-white font-semibold border-2 border-white/20">
+                {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'SA'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {currentUser?.name || 'Super Admin'}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {currentUser?.email || 'admin@ecommerce.com'}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 </p>
               </div>
             </div>
@@ -408,7 +556,11 @@ const App: React.FC = () => {
                 <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#DC2626] to-red-600"></div>
               )}
               <span className="text-sm font-medium text-gray-700 hidden sm:block group-hover:text-gray-900">
+<<<<<<< HEAD
                 {userProfile?.name || 'Super Admin'}
+=======
+                {currentUser?.name || 'Super Admin'}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
               </span>
               <ChevronDown
                 size={16}
@@ -420,6 +572,7 @@ const App: React.FC = () => {
 
         {/* Dashboard Content Area */}
         < div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8" >
+<<<<<<< HEAD
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={
@@ -441,6 +594,9 @@ const App: React.FC = () => {
             <Route path="/cms" element={<ProtectedRoute permission="CMS"><CMSView activeView={location.pathname.substring(1)} /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute permission="Settings"><SettingsView activeView={location.pathname.substring(1)} /></ProtectedRoute>} />
           </Routes>
+=======
+          {renderContent()}
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         </div >
       </main >
     </div >

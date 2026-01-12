@@ -8,16 +8,58 @@ from app.modules.auth.models import EmployeeUser
 from . import schemas, service
 from datetime import datetime
 from app.modules.activity_logs.service import log_activity
+<<<<<<< HEAD
 from app.modules.reviews.models import ProductReview
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 # ... (keep existing imports and code) ...
+=======
+
+router = APIRouter(prefix="/products", tags=["Products"])
+
+@router.post("/import")
+async def import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    # current_user: EmployeeUser = Depends(get_current_employee)
+):
+    """
+    Bulk import products from Excel or CSV file.
+    """
+    print(f"\n{'='*60}")
+    print(f"📥 IMPORT REQUEST RECEIVED")
+    print(f"Filename: {file.filename}")
+    print(f"Content-Type: {file.content_type}")
+    print(f"{'='*60}\n")
+    
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        error_msg = f"Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file. Received: {file.filename}"
+        print(f"❌ {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+    
+    try:
+        contents = await file.read()
+        print(f"✅ File read successfully. Size: {len(contents)} bytes")
+        
+        result = service.process_bulk_import(db, contents, verbose=False)
+        
+        return result
+    except Exception as e:
+        print(f"\n❌ Import failed with error: {str(e)}\n")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 @router.get("")
 def read_products(
     skip: int = 0, 
+<<<<<<< HEAD
     limit: int = 10000,
+=======
+    limit: int = 10000,  # Increased to fetch all products (was 100)
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     db: Session = Depends(get_db),
     # current_user: EmployeeUser = Depends(get_current_employee) 
 ):
@@ -70,8 +112,12 @@ def read_products(
                 "stock": product.stock,
                 "image": product.image,
                 "rating": product.rating if product.rating is not None else 0.0,
+<<<<<<< HEAD
                 # "reviews": product.reviews if product.reviews is not None else 0,
                 "latestReview": latest_review.comment if latest_review else None,
+=======
+                "reviews": product.reviews if product.reviews is not None else 0,
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 
                 # Tax and Compliance
                 "sgst": product.sgst if product.sgst is not None else 0.0,
@@ -123,8 +169,14 @@ def create_product(
         db=db,
         action="Created Product",
         module="Products",
+<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
+=======
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Created new product: {product.name} (ID: {new_product.id})",
         status="Success",
         affected_entity_type="Product",
@@ -149,8 +201,14 @@ def update_product(
         db=db,
         action="Updated Product",
         module="Products",
+<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
+=======
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Updated product: {db_product.name} (ID: {product_id})",
         status="Success",
         affected_entity_type="Product",
@@ -174,8 +232,14 @@ def delete_product(
         db=db,
         action="Deleted Product",
         module="Products",
+<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
+=======
+        user_id=str(current_user.id),
+        user_name=current_user.name,
+        user_type=current_user.role.capitalize(),
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Deleted product with ID: {product_id}",
         status="Success",
         affected_entity_type="Product",
@@ -183,6 +247,7 @@ def delete_product(
     )
     
     return {"status": "success"}
+<<<<<<< HEAD
 
 @router.post("/import")
 async def import_products(
@@ -221,3 +286,5 @@ async def import_products(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+=======
+>>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
