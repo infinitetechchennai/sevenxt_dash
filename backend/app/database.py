@@ -3,24 +3,27 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.config import settings
 
-# Use DATABASE_URL directly (Render compatible)
+# Fix for Render PostgreSQL URL
+DATABASE_URL = settings.DATABASE_URL.replace("postgres://", "postgresql://")
+
+# Create engine
 engine = create_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     pool_pre_ping=True
 )
 
-# Create SessionLocal class
+# Session
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
 )
 
-# Base class for models
+# Base
 Base = declarative_base()
 
 
-# Dependency to get DB session
+# Dependency
 def get_db():
     db = SessionLocal()
     try:
