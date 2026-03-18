@@ -18,6 +18,7 @@ from fastapi.responses import StreamingResponse
 router = APIRouter(prefix="/activity-logs", tags=["Activity Logs"])
 
 
+@router.get("", response_model=List[ActivityLogResponse], include_in_schema=False)
 @router.get("/", response_model=List[ActivityLogResponse])
 def list_activity_logs(
     skip: int = Query(0, ge=0),
@@ -28,7 +29,8 @@ def list_activity_logs(
     search: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_employee)
 ):
     """
     Get activity logs with optional filters.

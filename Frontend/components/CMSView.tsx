@@ -11,7 +11,9 @@ import {
   Smartphone,
   Globe,
   X,
+  Download
 } from "lucide-react";
+import { exportToExcel } from "../utils/excelExport";
 
 import {
   getCMSBanners,
@@ -22,10 +24,14 @@ import {
   updateCMSCategoryBanner,
   getCMSNotifications,
   sendCMSNotification,
+  getAppNotifications,
+  createAppNotification,
   getCMSPages,
   updateCMSPage,
   API_BASE_URL
 } from "../services/api";
+
+
 
 /* =======================
    TABS 
@@ -205,14 +211,25 @@ const CMSView: React.FC = () => {
   };
 
   /* =======================
-      NOTIFICATIONS (Updated with Validation)
-  ======================= */
+    NOTIFICATIONS (Updated with Validation)
+======================= */
 
+  const [activeNotifTab, setActiveNotifTab] = useState<"sms" | "app">("sms");
+
+  // SMS / TWILIO
   const [notifHistory, setNotifHistory] = useState<any[]>([]);
   const [notifForm, setNotifForm] = useState({
     title: "",
     message: "",
     audience: "All Users",
+  });
+
+  // APP NOTIFICATIONS
+  const [appNotifHistory, setAppNotifHistory] = useState<any[]>([]);
+  const [appNotifForm, setAppNotifForm] = useState({
+    title: "",
+    message: "",
+    audience: "all",
   });
 
   const sendNotification = async () => {
@@ -226,16 +243,42 @@ const CMSView: React.FC = () => {
       await sendCMSNotification(notifForm);
       setNotifForm({ title: "", message: "", audience: "All Users" });
       loadNotifications();
-      alert("Notification sent successfully!");
+      alert("SMS Notification sent successfully!");
     } catch (error) {
       console.error("Failed to send notification:", error);
     }
   };
 
+  const saveAppNotification = async () => {
+    if (!appNotifForm.title.trim() || !appNotifForm.message.trim()) {
+      alert("Please fill in all required details (Title and Message).");
+      return;
+    }
+
+    try {
+      await createAppNotification(appNotifForm);
+      setAppNotifForm({ title: "", message: "", audience: "all" });
+      loadAppNotifications();
+      alert("App Notification created successfully!");
+    } catch (error) {
+      console.error("Failed to create app notification:", error);
+      alert("Failed to create app notification");
+    }
+  }
+
   const loadNotifications = async () => {
     const data = await getCMSNotifications();
     setNotifHistory(data);
   };
+
+  const loadAppNotifications = async () => {
+    try {
+      const data = await getAppNotifications();
+      setAppNotifHistory(data);
+    } catch (e) {
+      console.error("Failed to load app notifications", e);
+    }
+  }
 
   /* =======================
       STATIC PAGES
@@ -272,8 +315,10 @@ const CMSView: React.FC = () => {
     fetchBanners();
     loadCategoryBanners();
     loadNotifications();
+    loadAppNotifications();
     loadPages();
   }, []);
+
 
   /* =======================
       RENDER FUNCTIONS
@@ -488,73 +533,165 @@ const CMSView: React.FC = () => {
   );
 
   const renderNotifications = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-2">
-      <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-          <Smartphone size={20} className="text-gray-900" />
-          <h3 className="text-lg font-bold text-slate-900">Compose Push Notification</h3>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
-            <input
-              type="text"
-              placeholder="e.g. Flash Sale Alert! ⚡"
-              className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
-              value={notifForm.title}
-              onChange={e => setNotifForm({ ...notifForm, title: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Message Body</label>
-            <textarea
-              rows={3}
-              placeholder="Get 50% off on all electronics today only..."
-              className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
-              value={notifForm.message}
-              onChange={e => setNotifForm({ ...notifForm, message: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Target Audience</label>
-            <select
-              className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
-              value={notifForm.audience}
-              onChange={e => setNotifForm({ ...notifForm, audience: e.target.value })}
-            >
-              <option>All Users</option>
-              <option>B2B Customers Only</option>
-              <option>B2C Customers Only</option>
-              <option>Inactive Users (30+ Days)</option>
-            </select>
-          </div>
-          <div className="pt-4 flex justify-end">
-            <button
-              onClick={sendNotification}
-              className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all flex items-center gap-2"
-            >
-              <Bell size={18} /> Send Notification
-            </button>
-          </div>
-        </div>
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+      {/* Notification Type Tabs */}
+      <div className="flex space-x-4 border-b border-slate-200 pb-2">
+        <button
+          onClick={() => setActiveNotifTab("sms")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeNotifTab === "sms" ? "bg-gray-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+        >
+          SMS / Push (Twilio)
+        </button>
+        <button
+          onClick={() => setActiveNotifTab("app")}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeNotifTab === "app" ? "bg-gray-900 text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+        >
+          In-App Notifications
+        </button>
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
-        <h3 className="text-lg font-bold text-slate-900 mb-4">Recent History</h3>
-        <div className="space-y-4">
-          {notifHistory.map(notif => (
-            <div key={notif.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 animate-in slide-in-from-right-4">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-bold text-slate-500">{notif.time}</span>
-                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{notif.status}</span>
-              </div>
-              <p className="font-bold text-slate-800 text-sm">{notif.title}</p>
-              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{notif.message}</p>
+      {activeNotifTab === "sms" ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <Smartphone size={20} className="text-gray-900" />
+              <h3 className="text-lg font-bold text-slate-900">Compose Push Notification</h3>
             </div>
-          ))}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Flash Sale Alert! ⚡"
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={notifForm.title}
+                  onChange={e => setNotifForm({ ...notifForm, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Message Body</label>
+                <textarea
+                  rows={3}
+                  placeholder="Get 50% off on all electronics today only..."
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={notifForm.message}
+                  onChange={e => setNotifForm({ ...notifForm, message: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Target Audience</label>
+                <select
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={notifForm.audience}
+                  onChange={e => setNotifForm({ ...notifForm, audience: e.target.value })}
+                >
+                  <option>All Users</option>
+                  <option>B2B Customers Only</option>
+                  <option>B2C Customers Only</option>
+                  <option>Inactive Users (30+ Days)</option>
+                </select>
+              </div>
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={sendNotification}
+                  className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Bell size={18} /> Send Notification
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Recent History</h3>
+            <div className="space-y-4">
+              {notifHistory.map(notif => (
+                <div key={notif.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 animate-in slide-in-from-right-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-bold text-slate-500">{notif.time || new Date().toLocaleDateString()}</span>
+                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">{notif.status}</span>
+                  </div>
+                  <p className="font-bold text-slate-800 text-sm">{notif.title}</p>
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{notif.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <Bell size={20} className="text-gray-900" />
+              <h3 className="text-lg font-bold text-slate-900">Compose In-App Notification</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. System Maintenance"
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={appNotifForm.title}
+                  onChange={e => setAppNotifForm({ ...appNotifForm, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Message Body</label>
+                <textarea
+                  rows={3}
+                  placeholder="We will be performing scheduled maintenance..."
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={appNotifForm.message}
+                  onChange={e => setAppNotifForm({ ...appNotifForm, message: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Target Audience</label>
+                <select
+                  className="w-full px-4 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-gray-900"
+                  value={appNotifForm.audience}
+                  onChange={e => setAppNotifForm({ ...appNotifForm, audience: e.target.value })}
+                >
+                  <option value="all">All Users</option>
+                  <option value="b2b">B2B Customers</option>
+                  <option value="b2c">B2C Customers</option>
+                </select>
+              </div>
+              <div className="pt-4 flex justify-end">
+                <button
+                  onClick={saveAppNotification}
+                  className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all flex items-center gap-2"
+                >
+                  <Bell size={18} /> Send to App
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">App Notification History</h3>
+            <div className="space-y-4">
+              {appNotifHistory.map(notif => (
+                <div key={notif.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 animate-in slide-in-from-right-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-bold text-slate-500">
+                      {new Date(notif.created_at).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">{notif.audience}</span>
+                  </div>
+                  <p className="font-bold text-slate-800 text-sm">{notif.title}</p>
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{notif.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -657,11 +794,65 @@ const CMSView: React.FC = () => {
     </div>
   );
 
+  const handleExport = () => {
+    let data: any[] = [];
+    let fileName = 'cms_export';
+
+    if (activeTab === 'cms-home') {
+      data = banners.map(b => ({
+        'ID': b.id,
+        'Title': b.title,
+        'Position': b.position,
+        'Status': b.status,
+        'Image': b.image
+      }));
+      fileName = 'cms_banners';
+    } else if (activeTab === 'cms-category') {
+      // Since categoryImages is just images, we export Categories + Images
+      data = CATEGORIES.map(cat => {
+        const img = categoryImages.find((i: any) => i.id === cat.id);
+        return {
+          'Category ID': cat.id,
+          'Category Name': cat.name,
+          'Banner URL': img ? img.image_url : 'None'
+        };
+      });
+      fileName = 'cms_category_banners';
+    } else if (activeTab === 'cms-notif') {
+      data = notifHistory.map(n => ({
+        'Title': n.title,
+        'Message': n.message,
+        'Audience': n.audience,
+        'Status': n.status,
+        'Time': n.time
+      }));
+      fileName = 'cms_notifications';
+    } else if (activeTab === 'cms-pages') {
+      data = pages.map(p => ({
+        'Page Title': p.title,
+        'Slug': p.slug,
+        'Status': p.status,
+        'Last Updated': p.updated_at
+      }));
+      fileName = 'cms_pages';
+    }
+
+    exportToExcel(data, fileName, activeTab);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden font-sans">
-      <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0">
-        <h1 className="text-2xl font-bold text-slate-900">Content Management</h1>
-        <p className="text-slate-500 text-sm">Manage app banners, notifications, and static content.</p>
+      <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Content Management</h1>
+          <p className="text-slate-500 text-sm">Manage app banners, notifications, and static content.</p>
+        </div>
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
+        >
+          <Download size={16} /> Export
+        </button>
       </div>
 
       <div className="bg-white border-b border-slate-200 px-6 pt-2">

@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, Check, X, Phone, Mail, XCircle, Activity, FileText, FileCheck, Maximize2, Download, Clock, CheckCircle2, Ban, AlertCircle, ShieldCheck } from 'lucide-react';
-<<<<<<< HEAD
 import { getB2BUsers, updateB2BStatus, API_BASE_URL } from '../services/api';
-=======
-import { getB2BUsers, updateB2BStatus } from '../services/api';
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
+import { exportToExcel } from '../utils/excelExport';
 import Swal from 'sweetalert2';
 
 export const B2BView: React.FC = () => {
@@ -50,11 +47,7 @@ export const B2BView: React.FC = () => {
 
     try {
       // API call to your backend which talks to Razorpay Identity
-<<<<<<< HEAD
       const response = await fetch(`${API_BASE_URL}/api/v1/b2b/verify-${type.toLowerCase()}`, {
-=======
-      const response = await fetch(`http://localhost:8001/api/v1/b2b/verify-${type.toLowerCase()}`, {
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ number: value })
@@ -127,6 +120,19 @@ export const B2BView: React.FC = () => {
     );
   };
 
+  const handleExport = () => {
+    const data = filteredUsers.map(user => ({
+      'Business Name': user.bussiness_name,
+      'ID': user.id,
+      'GSTIN': user.gstin,
+      'PAN': user.pan,
+      'Email': user.email,
+      'Phone': user.phone_number,
+      'Status': user.status
+    }));
+    exportToExcel(data, `b2b_users_${activeSubTab}`, activeSubTab);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center">
@@ -134,9 +140,17 @@ export const B2BView: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">B2B Management</h2>
           <p className="text-gray-500 mt-1">Manage business approvals and compliance docs</p>
         </div>
-        <button onClick={loadData} className="p-2 text-gray-400 hover:text-gray-900 border rounded-full hover:bg-gray-50 transition-all">
-          <Activity size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            <Download size={16} /> Export
+          </button>
+          <button onClick={loadData} className="p-2 text-gray-400 hover:text-gray-900 border rounded-full hover:bg-gray-50 transition-all">
+            <Activity size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="flex space-x-1 border-b border-gray-200">

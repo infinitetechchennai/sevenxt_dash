@@ -8,58 +8,19 @@ from app.modules.auth.models import EmployeeUser
 from . import schemas, service
 from datetime import datetime
 from app.modules.activity_logs.service import log_activity
-<<<<<<< HEAD
 from app.modules.reviews.models import ProductReview
+import os
+import uuid
+from pathlib import Path
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 # ... (keep existing imports and code) ...
-=======
-
-router = APIRouter(prefix="/products", tags=["Products"])
-
-@router.post("/import")
-async def import_products(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    # current_user: EmployeeUser = Depends(get_current_employee)
-):
-    """
-    Bulk import products from Excel or CSV file.
-    """
-    print(f"\n{'='*60}")
-    print(f"📥 IMPORT REQUEST RECEIVED")
-    print(f"Filename: {file.filename}")
-    print(f"Content-Type: {file.content_type}")
-    print(f"{'='*60}\n")
-    
-    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
-        error_msg = f"Invalid file format. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file. Received: {file.filename}"
-        print(f"❌ {error_msg}")
-        raise HTTPException(status_code=400, detail=error_msg)
-    
-    try:
-        contents = await file.read()
-        print(f"✅ File read successfully. Size: {len(contents)} bytes")
-        
-        result = service.process_bulk_import(db, contents, verbose=False)
-        
-        return result
-    except Exception as e:
-        print(f"\n❌ Import failed with error: {str(e)}\n")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 @router.get("")
 def read_products(
     skip: int = 0, 
-<<<<<<< HEAD
     limit: int = 10000,
-=======
-    limit: int = 10000,  # Increased to fetch all products (was 100)
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     db: Session = Depends(get_db),
     # current_user: EmployeeUser = Depends(get_current_employee) 
 ):
@@ -77,22 +38,34 @@ def read_products(
                 review_count = db.query(ProductReview).filter(ProductReview.product_id == p_id_str).count()
                 print(f"DEBUG: Product {p_id_str} has {review_count} reviews in DB. Fetching latest...")
                 
+                # Calculate average rating from reviews
                 if review_count > 0:
+                    from sqlalchemy import func
+                    avg_rating_result = db.query(func.avg(ProductReview.rating)).filter(
+                        ProductReview.product_id == p_id_str
+                    ).scalar()
+                    avg_rating = float(avg_rating_result) if avg_rating_result else 0.0
+                    
                     latest_review = db.query(ProductReview).filter(
                         ProductReview.product_id == p_id_str
                     ).order_by(desc(ProductReview.created_at)).first()
-                    print(f"DEBUG: Latest review for {p_id_str}: {latest_review.comment if latest_review else 'None'}")
+                    print(f"DEBUG: Latest review for {p_id_str}: {latest_review.comment if latest_review else 'None'}, Avg Rating: {avg_rating}")
                 else:
+                    avg_rating = 0.0
                     latest_review = None
                     
             except Exception as e:
                 print(f"DEBUG: Error fetching review for product {product.id}: {e}")
+                avg_rating = 0.0
                 latest_review = None
+                review_count = 0
             
             product_dict = {
                 "id": product.id,
                 "name": product.name,
                 "category": product.category,
+                "colors": product.colors,
+                "brandName": product.brand_name,
                 
                 "b2cPrice": product.b2c_price,
                 "compareAtPrice": product.compare_at_price,
@@ -107,17 +80,14 @@ def read_products(
                 "b2bOfferPrice": product.b2b_offer_price if product.b2b_offer_price is not None else 0.0,
                 "b2bOfferStartDate": (product.b2b_offer_start_date.isoformat() if hasattr(product.b2b_offer_start_date, 'isoformat') else str(product.b2b_offer_start_date)) if product.b2b_offer_start_date else None,
                 "b2bOfferEndDate": (product.b2b_offer_end_date.isoformat() if hasattr(product.b2b_offer_end_date, 'isoformat') else str(product.b2b_offer_end_date)) if product.b2b_offer_end_date else None,
+                "info": product.info,
                 "description": product.description,
                 "status": product.status,
                 "stock": product.stock,
                 "image": product.image,
-                "rating": product.rating if product.rating is not None else 0.0,
-<<<<<<< HEAD
-                # "reviews": product.reviews if product.reviews is not None else 0,
+                "rating": avg_rating,  # Use calculated average rating from reviews
+                "reviews": review_count,  # Use the count we already calculated above
                 "latestReview": latest_review.comment if latest_review else None,
-=======
-                "reviews": product.reviews if product.reviews is not None else 0,
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
                 
                 # Tax and Compliance
                 "sgst": product.sgst if product.sgst is not None else 0.0,
@@ -169,14 +139,8 @@ def create_product(
         db=db,
         action="Created Product",
         module="Products",
-<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
-=======
-        user_id=str(current_user.id),
-        user_name=current_user.name,
-        user_type=current_user.role.capitalize(),
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Created new product: {product.name} (ID: {new_product.id})",
         status="Success",
         affected_entity_type="Product",
@@ -201,14 +165,8 @@ def update_product(
         db=db,
         action="Updated Product",
         module="Products",
-<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
-=======
-        user_id=str(current_user.id),
-        user_name=current_user.name,
-        user_type=current_user.role.capitalize(),
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Updated product: {db_product.name} (ID: {product_id})",
         status="Success",
         affected_entity_type="Product",
@@ -232,14 +190,8 @@ def delete_product(
         db=db,
         action="Deleted Product",
         module="Products",
-<<<<<<< HEAD
         user_name=current_user.name if current_user else "System",
         user_type=current_user.role if current_user else "System",
-=======
-        user_id=str(current_user.id),
-        user_name=current_user.name,
-        user_type=current_user.role.capitalize(),
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Deleted product with ID: {product_id}",
         status="Success",
         affected_entity_type="Product",
@@ -247,7 +199,80 @@ def delete_product(
     )
     
     return {"status": "success"}
-<<<<<<< HEAD
+
+@router.post("/upload-image")
+async def upload_product_image(
+    file: UploadFile = File(...)
+):
+    """
+    Upload a product image and return the URL.
+    Resizes image to max width 420px and saves to uploads/products/ directory.
+    """
+    try:
+        # Validate file type
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+        file_extension = Path(file.filename).suffix.lower()
+        
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}"
+            )
+        
+        # Create uploads directory if it doesn't exist
+        upload_dir = Path("uploads/products")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Read file contents
+        contents = await file.read()
+        
+        # Resize image to max width 420px
+        from PIL import Image
+        import io
+        
+        # Open image
+        image = Image.open(io.BytesIO(contents))
+        
+        # Calculate new dimensions (max width 420px, maintain aspect ratio)
+        max_width = 420
+        if image.width > max_width:
+            # Calculate new height maintaining aspect ratio
+            aspect_ratio = image.height / image.width
+            new_width = max_width
+            new_height = int(max_width * aspect_ratio)
+            
+            # Resize image
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = upload_dir / unique_filename
+        
+        # Save resized image
+        # Convert to RGB if PNG with transparency (for JPEG compatibility)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', image.size, (255, 255, 255))
+            if image.mode == 'P':
+                image = image.convert('RGBA')
+            background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
+            image = background
+        
+        # Save with optimization
+        image.save(file_path, quality=85, optimize=True)
+        
+        # Return URL (relative path that will be served by FastAPI static files)
+        image_url = f"/uploads/products/{unique_filename}"
+        
+        return {
+            "status": "success",
+            "url": image_url,
+            "filename": unique_filename
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
 @router.post("/import")
 async def import_products(
@@ -286,5 +311,3 @@ async def import_products(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
-=======
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

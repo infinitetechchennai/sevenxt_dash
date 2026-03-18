@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Request
+from PIL import Image, ImageOps
+import io
 from sqlalchemy.orm import Session
 import logging
 import os
@@ -18,15 +20,37 @@ def get_banners(db: Session = Depends(get_db)):
     return service.get_banners(db)
 
 @router.post("/banners/upload")
-def upload_banner_image(file: UploadFile = File(...)):
+def upload_banner_image(request: Request, file: UploadFile = File(...)):
     UPLOAD_DIR = "uploads/cms/banners"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     ext = file.filename.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
-    with open(file_path, "wb") as f:
-        f.write(file.file.read())
-    return {"url": f"http://13.233.199.134:8000/{file_path}"}
+    
+    # Resize Image to 1.87 aspect ratio (approx 1000x535)
+    try:
+        content = file.file.read()
+        image = Image.open(io.BytesIO(content))
+        
+        target_width = 1000
+        target_height = int(target_width / 1.87) # ~534
+        
+        # Use ImageOps.fit to crop/resize maintaining aspect ratio
+        processed_image = ImageOps.fit(image, (target_width, target_height), Image.Resampling.LANCZOS)
+        
+        processed_image.save(file_path, quality=90, optimize=True)
+    except Exception as e:
+        logger.error(f"Image processing failed: {e}")
+        # Fallback to saving original
+        file.file.seek(0)
+        with open(file_path, "wb") as f:
+             f.write(file.file.read())
+
+    base_url = str(request.base_url).rstrip("/")
+    if base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
+    url_path = file_path.replace("\\", "/")
+    return {"url": f"{base_url}/{url_path}"}
 
 @router.post("/banners", response_model=schemas.BannerResponse)
 def create_banner(banner: schemas.BannerCreate, db: Session = Depends(get_db)):
@@ -51,7 +75,7 @@ def get_all_category_banners(db: Session = Depends(get_db)):
     return service.get_category_banners(db)
 
 @router.post("/category-banners/{category_id}/upload")
-def upload_category_banner(category_id: int, file: UploadFile = File(...)):
+def upload_category_banner(category_id: int, request: Request, file: UploadFile = File(...)):
     UPLOAD_DIR = "uploads/cms/categories"
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     ext = file.filename.split(".")[-1]
@@ -59,7 +83,12 @@ def upload_category_banner(category_id: int, file: UploadFile = File(...)):
     file_path = os.path.join(UPLOAD_DIR, filename)
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    return {"url": f"http://13.233.199.134:8000/uploads/cms/categories/{filename}"}
+    
+    base_url = str(request.base_url).rstrip("/")
+    if base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
+    url_path = file_path.replace("\\", "/")
+    return {"url": f"{base_url}/{url_path}"}
 
 @router.put("/category-banners/{category_id}")
 def update_category_banner(category_id: int, data: dict, db: Session = Depends(get_db)):
@@ -76,6 +105,15 @@ def get_notifications(db: Session = Depends(get_db)):
 @router.post("/notifications", response_model=schemas.NotificationResponse)
 def send_notification(notif: schemas.NotificationCreate, db: Session = Depends(get_db)):
     return service.create_notification(db, notif.dict())
+
+@router.get("/app-notifications", response_model=List[schemas.AppNotificationResponse])
+def get_app_notifications(db: Session = Depends(get_db)):
+    return service.get_app_notifications(db)
+
+@router.post("/app-notifications", response_model=schemas.AppNotificationResponse)
+def create_app_notification(notif: schemas.AppNotificationCreate, db: Session = Depends(get_db)):
+    return service.create_app_notification(db, notif.dict())
+
 
 @router.get("/pages", response_model=List[schemas.PageResponse])
 def get_pages(db: Session = Depends(get_db)):

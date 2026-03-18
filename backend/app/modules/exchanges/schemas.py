@@ -5,10 +5,17 @@ from datetime import datetime
 
 class ExchangeCreate(BaseModel):
     order_id: str  # Changed from int - now references orders.order_id (e.g., "ORD-B2C-123")
+    
+    # New Fields
+    order_item_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    type: Optional[str] = None
+
     reason: str
     description: Optional[str] = None
     proof_image_path: Optional[str] = None
-    product_id: str
+    product_id: Optional[str] = None
     product_name: str
     variant_color: Optional[str] = None
     quantity: int = 1
@@ -18,11 +25,18 @@ class ExchangeCreate(BaseModel):
 class ExchangeResponse(BaseModel):
     id: int
     order_id: str  # String like "ORD-B2C-123"
+    
+    # New Fields
+    order_item_id: Optional[int] = None
+    customer: Optional[str] = None
+    email: Optional[str] = None
+    type: Optional[str] = None
+    
     customer_name: Optional[str]
     reason: str
     description: Optional[str]
     proof_image_path: Optional[str]
-    product_id: str
+    product_id: Optional[str] = None
     product_name: str
     variant_color: Optional[str]
     quantity: Optional[int]

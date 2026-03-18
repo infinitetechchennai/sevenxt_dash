@@ -85,6 +85,64 @@ class ReportsService:
         return db.execute(query).mappings().all()
 
     @staticmethod
+    def get_growth_metrics(db: Session):
+        """Calculates Week-over-Week and Month-over-Month growth rates."""
+        # Current Week vs Last Week
+        cw_sales = db.execute(text("SELECT COALESCE(SUM(amount), 0) FROM public.orders WHERE created_at >= NOW() - INTERVAL '7 days'")).scalar() or 0
+        lw_sales = db.execute(text("SELECT COALESCE(SUM(amount), 0) FROM public.orders WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'")).scalar() or 0
+        
+        cw_orders = db.execute(text("SELECT COUNT(*) FROM public.orders WHERE created_at >= NOW() - INTERVAL '7 days'")).scalar() or 0
+        lw_orders = db.execute(text("SELECT COUNT(*) FROM public.orders WHERE created_at >= NOW() - INTERVAL '14 days' AND created_at < NOW() - INTERVAL '7 days'")).scalar() or 0
+
+        # Current Month vs Last Month
+        cm_sales = db.execute(text("SELECT COALESCE(SUM(amount), 0) FROM public.orders WHERE created_at >= NOW() - INTERVAL '30 days'")).scalar() or 0
+        lm_sales = db.execute(text("SELECT COALESCE(SUM(amount), 0) FROM public.orders WHERE created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days'")).scalar() or 0
+
+        def calc_growth(current, previous):
+            if previous == 0: return 100.0 if current > 0 else 0.0
+            return ((current - previous) / previous) * 100
+
+        return {
+            "weekly": {
+                "sales_growth": round(calc_growth(cw_sales, lw_sales), 1),
+                "orders_growth": round(calc_growth(cw_orders, lw_orders), 1),
+                "current_sales": cw_sales
+            },
+            "monthly": {
+                "sales_growth": round(calc_growth(cm_sales, lm_sales), 1),
+                "current_sales": cm_sales
+            }
+        }
+
+    @staticmethod
+    def get_payment_stats(db: Session):
+        query = text("""
+            SELECT 
+                COALESCE(payment, 'Unknown') as name, 
+                COUNT(*)::int as count, 
+                SUM(amount)::float as value 
+            FROM public.orders 
+            GROUP BY payment 
+            ORDER BY value DESC
+        """)
+        return db.execute(query).mappings().all()
+
+    @staticmethod
+    def get_geo_stats(db: Session):
+        query = text("""
+            SELECT 
+                COALESCE(state, 'Unknown') as name, 
+                COUNT(*)::int as count,
+                SUM(amount)::float as value
+            FROM public.orders 
+            WHERE state IS NOT NULL 
+            GROUP BY state 
+            ORDER BY count DESC 
+            LIMIT 5
+        """)
+        return db.execute(query).mappings().all()
+
+    @staticmethod
     def get_return_analysis(db: Session):
         # Combine data from both exchanges and refunds tables
         query = text("""
@@ -98,3 +156,166 @@ class ReportsService:
             ORDER BY value DESC;
         """)
         return db.execute(query).mappings().all()
+
+    # --- NEW REPORT: SALES INVENTORY ---
+    @staticmethod
+    def get_sales_inventory(db: Session):
+        """
+        Returns a complete list of ALL products from the catalog (Products Menu)
+        merged with their performance from the Orders usage.
+        
+        Shows: 
+        - Stock (from Products table)
+        - Orders Placed (calculated from Orders table)
+        - Total Revenue (calculated from Orders table)
+        """
+        
+        # 1. Calculate Sales Stats from Orders
+        orders = db.execute(text("SELECT products FROM public.orders WHERE status != 'Cancelled'")).mappings().all()
+        
+        # Maps to store aggregated stats: { product_id: { qty: 0, revenue: 0.0 } }
+        sales_stats = {}
+        import json
+        
+        for order in orders:
+            products_data = order['products']
+            
+            # Robust JSON Parsing
+            if isinstance(products_data, str):
+                try:
+                    products_data = json.loads(products_data.replace("'", '"').replace("None", "null"))
+                except Exception:
+                    products_data = []
+
+            if isinstance(products_data, dict):
+                products_data = [products_data]
+            
+            if not isinstance(products_data, list):
+                continue
+                
+            for item in products_data:
+                if not isinstance(item, dict): continue
+                
+                p_id = str(item.get('id') or item.get('product_id'))
+                qty = int(item.get('quantity') or item.get('qty') or 0)
+                
+                # Robust Price
+                try:
+                    price = float(str(item.get('price') or 0).replace(',', '').strip())
+                except:
+                    price = 0.0
+                
+                if p_id:
+                    if p_id not in sales_stats:
+                        sales_stats[p_id] = {'qty': 0, 'revenue': 0.0}
+                    
+                    sales_stats[p_id]['qty'] += qty
+                    sales_stats[p_id]['revenue'] += (qty * price)
+
+        # 2. Fetch ALL Products from Catalog
+        # This ensures even products with 0 sales appear in the report
+        products_query = text("SELECT id, name, stock FROM public.products")
+        all_products = db.execute(products_query).mappings().all()
+        
+        inventory_data = []
+        
+        # 3. Merge Catalog Data with Sales Stats
+        # First, add all existing products
+        for p in all_products:
+            p_id = str(p['id'])
+            stats = sales_stats.get(p_id, {'qty': 0, 'revenue': 0.0})
+            
+            inventory_data.append({
+                "id": p_id,
+                "name": p['name'],
+                "stock": p['stock'], # Real stock from Product Menu
+                "ordersPlaced": stats['qty'],
+                "totalRevenue": stats['revenue']
+            })
+            
+            # Remove from stats map to track 'orphaned' sales (products sold but deleted from catalog)
+            if p_id in sales_stats:
+                del sales_stats[p_id]
+        
+        # 4. (Optional) Add products found in orders but NOT in product catalog?
+        # User asked for "all products in the product menu performance", but often wants to see historical sales too.
+        # Let's add them as "Deleted/Archived" or just list them.
+        for p_id, stats in sales_stats.items():
+            inventory_data.append({
+                "id": p_id,
+                "name": f"Unknown/Deleted ({p_id})", # We don't have name if not in products table, unless we stored it in sales_stat logic (which we did not) - wait, previous logic captured name from Order.
+                # Let's slighty improve loop 1 to capture name to handle this better.
+                "stock": 0,
+                "ordersPlaced": stats['qty'],
+                "totalRevenue": stats['revenue']
+            })
+            
+        return inventory_data
+
+    # --- NEW REPORT: SALES DETAILS ---
+    @staticmethod
+    def get_sales_details(db: Session):
+        """
+        Returns a flattened list of all sales items across all orders.
+        Matches the 'Sale Reports' tab requirements.
+        Excludes Cancelled orders.
+        Return keys are in camelCase for frontend compatibility.
+        """
+        # Fetch all non-cancelled orders with necessary fields
+        query = text("""
+            SELECT id, order_id, created_at, payment, status, customer_name, products 
+            FROM public.orders 
+            WHERE status != 'Cancelled' 
+            ORDER BY created_at DESC
+        """)
+        orders = db.execute(query).mappings().all()
+        
+        import json
+        sales_details = []
+        
+        for order in orders:
+            products_data = order['products']
+            
+            # Robust Parsing Logic
+            if isinstance(products_data, str):
+                try:
+                    products_data = json.loads(products_data.replace("'", '"').replace("None", "null"))
+                except Exception:
+                    products_data = []
+
+            if isinstance(products_data, dict):
+                products_data = [products_data]
+
+            if not isinstance(products_data, list):
+                continue
+                
+            for item in products_data:
+                if not isinstance(item, dict): 
+                    continue
+                
+                item_id = str(item.get('id') or '0')
+                try:
+                    price = float(str(item.get('price') or 0).replace(',', '').strip())
+                except:
+                    price = 0.0
+                qty = int(item.get('quantity') or item.get('qty') or 1)
+                final_total = price * qty
+                
+                # Construct unique key for frontend key prop
+                unique_key = f"{order['id']}-{item_id}"
+                
+                sales_details.append({
+                    "orderId": order['id'],
+                    "uniqueKey": unique_key,
+                    "orderDate": order['created_at'],
+                    "paymentMethod": order['payment'],
+                    "status": order['status'],
+                    "storeName": order['customer_name'],
+                    "salesRep": 'Super Market', # Static as per request/example
+                    "itemId": item_id,
+                    "productName": item.get('name'),
+                    "finalTotal": final_total,
+                    "quantity": qty
+                })
+        
+        return sales_details

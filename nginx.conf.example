@@ -1,0 +1,32 @@
+server {
+    listen 80;
+    server_name sevenxt.in;
+
+    # 1. API - Forward to Python Backend
+    location /api {
+        proxy_pass http://localhost:8000; # Adjust port if needed
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # 2. Main "Other Website" - Served STRICTLY at the root
+    # Adjust /var/www/your-other-website to the actual path of your other site
+    location = / {
+        root /var/www/your-other-website;
+        try_files /index.html =404; 
+    }
+    
+    # Optional: If the other website has assets (css/js) that don't conflict, add locations for them
+    # location /assets-other-site/ { ... }
+
+    # 3. Dashboard App - Served for /login, /dashboard, and other app routes
+    # This block handles all other requests by serving the React App
+    location / {
+        root /var/www/sevennxt-dash/Frontend/dist; # Path to your React build
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}

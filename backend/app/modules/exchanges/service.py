@@ -13,6 +13,13 @@ def create_exchange(db: Session, exchange_data: schemas.ExchangeCreate) -> model
     
     new_exchange = models.Exchange(
         order_id=exchange_data.order_id,
+        
+        # New Fields
+        order_item_id=exchange_data.order_item_id,
+        customer=exchange_data.customer,
+        email=exchange_data.email,
+        type=exchange_data.type,
+        
         reason=exchange_data.reason,
         description=exchange_data.description,
         proof_image_path=exchange_data.proof_image_path,

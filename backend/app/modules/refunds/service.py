@@ -22,10 +22,25 @@ def get_refund_by_id(db: Session, refund_id: int) -> Optional[Refund]:
     return db.query(Refund).options(joinedload(Refund.order)).filter(Refund.id == refund_id).first()
 
 
-def create_refund(db: Session, order_id: int, reason: str, amount: float, proof_image_path: Optional[str] = None) -> Refund:
+def create_refund(
+    db: Session, 
+    order_id: str, 
+    reason: str, 
+    amount: float, 
+    proof_image_path: Optional[str] = None,
+    # New optional fields
+    order_item_id: Optional[int] = None,
+    email: Optional[str] = None,
+    description: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    type: Optional[str] = None,
+    product_name: Optional[str] = None,
+    quantity: Optional[int] = None,
+    customer: Optional[str] = None
+) -> Refund:
     """Create a new refund request"""
     # Verify order exists
-    order = db.query(Order).filter(Order.id == order_id).first()
+    order = db.query(Order).filter(Order.order_id == order_id).first()
     if not order:
         raise ValueError(f"Order with id {order_id} not found")
     
@@ -34,7 +49,16 @@ def create_refund(db: Session, order_id: int, reason: str, amount: float, proof_
         reason=reason,
         amount=amount,
         status='Pending',
-        proof_image_path=proof_image_path
+        proof_image_path=proof_image_path,
+        # New fields
+        order_item_id=order_item_id,
+        email=email,
+        description=description,
+        payment_method=payment_method,
+        type=type,
+        product_name=product_name,
+        quantity=quantity,
+        customer=customer
     )
     
     db.add(refund)

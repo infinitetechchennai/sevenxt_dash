@@ -45,3 +45,13 @@ class CMSNotification(Base):
     audience = Column(String(100), nullable=False)
     status = Column(Enum("SENT", "FAILED", name="notification_status"), default="SENT")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# --- WORKFLOW: APP NOTIFICATIONS ---
+class AppNotification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False) # Changed to String (TEXT in SQL is usually String in SQLAlchemy)
+    message = Column(Text, nullable=False)
+    audience = Column(String(10), nullable=False) # Check constraint handled in logic or DB migration, here we just define column
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

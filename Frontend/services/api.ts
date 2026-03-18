@@ -1,15 +1,9 @@
-<<<<<<< HEAD
-export const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
-=======
-const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
-
-
+// export const API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || "http://localhost:8001";
+export const API_BASE_URL = "http://localhost:8001";
 export interface LoginRequest {
   email: string;
   password: string;
 }
-
 export interface UserData {
   id: number;
   email: string;
@@ -58,11 +52,7 @@ class ApiService {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-<<<<<<< HEAD
     const response = await fetch(url, {
-=======
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
       ...options,
       headers,
     });
@@ -87,6 +77,14 @@ class ApiService {
         statusText: response.statusText,
         data: data
       });
+
+      // Handle 401 Global Logout
+      if (response.status === 401) {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("user");
+        window.dispatchEvent(new Event('auth-error'));
+      }
+
       const error: ApiError = data as ApiError;
       throw new Error(error.detail || `HTTP error: ${response.status} ${response.statusText}`);
     }
@@ -446,6 +444,28 @@ class ApiService {
     return response.blob();
   }
 
+  async bulkDownloadInvoiceLabels(orderIds: string[]): Promise<Blob> {
+    const token = this.getAuthToken();
+    const base = API_BASE_URL.replace(/\/+$/g, "");
+    const url = `${base}/api/v1/orders/bulk-download-invoice`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(orderIds),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: "Download failed" }));
+      throw new Error(error.detail || `Download failed: ${response.status}`);
+    }
+
+    return response.blob();
+  }
+
   // -------------- ACTIVITY LOGS APIs ----------------
 
   async getActivityLogs(params?: {
@@ -564,6 +584,19 @@ class ApiService {
     });
   }
 
+
+  async getAppNotifications(): Promise<any[]> {
+    return this.request("/api/v1/cms/app-notifications");
+  }
+
+  async createAppNotification(data: any): Promise<any> {
+    return this.request("/api/v1/cms/app-notifications", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+
   async getCMSPages(): Promise<any[]> {
     return this.request("/api/v1/cms/pages");
   }
@@ -573,6 +606,18 @@ class ApiService {
       method: "PUT",
       body: JSON.stringify(data),
     });
+  }
+
+  /* =======================
+      REPORTS (NEW)
+  ======================= */
+
+  async getSalesInventory(): Promise<any[]> {
+    return this.request("/api/v1/reports/sales-inventory");
+  }
+
+  async getSalesDetails(): Promise<any[]> {
+    return this.request("/api/v1/reports/sales-details");
   }
 
   /* =======================
@@ -680,6 +725,11 @@ class ApiService {
       method: "DELETE",
     });
   }
+  async generateInvoiceLabel(orderId: string): Promise<{ url: string }> {
+    return this.request<{ url: string }>(`/api/v1/orders/${orderId}/generate-invoice-label`, {
+      method: "POST",
+    });
+  }
 }
 
 
@@ -708,6 +758,9 @@ export const getCMSCategoryBanners = () => apiService.getCMSCategoryBanners();
 export const updateCMSCategoryBanner = (category: string, data: { image: string }) => apiService.updateCMSCategoryBanner(category, data);
 export const getCMSNotifications = () => apiService.getCMSNotifications();
 export const sendCMSNotification = (d: any) => apiService.sendCMSNotification(d);
+export const getAppNotifications = () => apiService.getAppNotifications();
+export const createAppNotification = (d: any) => apiService.createAppNotification(d);
+
 export const getCMSPages = () => apiService.getCMSPages();
 export const updateCMSPage = (id: number, d: any) => apiService.updateCMSPage(id, d);
 
@@ -726,13 +779,9 @@ export const updateB2BStatus = (id: number, d: { status: string }) => apiService
 
 // FINANCE & PAYMENTS
 export const getTransactions = () => apiService.getTransactions();
-<<<<<<< HEAD
 export const verifyPayment = (d: any) => apiService.verifyPayment(d);
 
 // REVIEWS
 export const fetchReviews = (productId: string) => apiService.fetchReviews(productId);
 export const createReview = (reviewData: any) => apiService.createReview(reviewData);
 export const deleteReview = (reviewId: string) => apiService.deleteReview(reviewId);
-=======
-export const verifyPayment = (d: any) => apiService.verifyPayment(d);
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7

@@ -3,6 +3,7 @@ import { apiService } from '../services/api';
 import { Search, MoreVertical, Plus, Activity, CheckCircle, XCircle, AlertTriangle, X, ShieldAlert, Lock, Eye, Package, Edit, Trash2, UserX, UserCheck, MapPin, ShoppingCart, Heart, RotateCcw, FileText } from 'lucide-react';
 import { MOCK_PRODUCTS } from '../constants';
 import { User } from '../types';
+import { exportToExcel } from '../utils/excelExport';
 
 export const UsersView: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'B2B Users' | 'B2C Users' | 'Admin Users' | 'Staff Users' | 'Activity Logs'>('Admin Users');
@@ -77,11 +78,7 @@ export const UsersView: React.FC = () => {
     const actionMenuRef = useRef<HTMLDivElement>(null);
 
     const tabs = ['Admin Users', 'Staff Users', 'B2B Users', 'B2C Users', 'Activity Logs'];
-<<<<<<< HEAD
     const AVAILABLE_PERMISSIONS = ['Dashboard', 'Orders', 'Products', 'Users', 'B2B', 'Finance', 'Reports', 'Delivery', 'Refunds', 'Exchanges', 'CMS', 'Settings'];
-=======
-    const AVAILABLE_PERMISSIONS = ['Orders', 'Products', 'Users', 'B2B', 'Finance', 'Delivery', 'Refunds', 'CMS', 'Settings'];
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
     // Click outside to close action menu
     useEffect(() => {
@@ -130,6 +127,24 @@ export const UsersView: React.FC = () => {
             case 'Warning': return <AlertTriangle size={14} className="text-amber-500" />;
             default: return <Activity size={14} className="text-gray-500" />;
         }
+    };
+
+    const handleExport = () => {
+        // Exclude internal fields or format data if necessary
+        const dataToExport = filteredUsers.map(user => ({
+            Name: user.name,
+            Email: user.email,
+            Phone: user.phone,
+            Type: user.type,
+            Status: user.status,
+            'Join Date': user.joinDate,
+            Address: user.address,
+            City: user.city,
+            State: user.state,
+            Pincode: user.pincode,
+            Permissions: (user.permissions || []).join(', ')
+        }));
+        exportToExcel(dataToExport, `${activeTab.replace(' ', '_')}_Export`, activeTab);
     };
 
     const handleSaveUser = async () => {
@@ -352,19 +367,24 @@ export const UsersView: React.FC = () => {
                                 className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:placeholder-gray-500 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 sm:text-sm text-gray-900"
                             />
                         </div>
-<<<<<<< HEAD
-                        {(activeTab !== 'Activity Logs' && activeTab !== 'B2B Users' && activeTab !== 'B2C Users') && (
-=======
-                        {(activeTab !== 'Activity Logs') && (
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
+                        <div className="flex gap-2">
                             <button
-                                onClick={openCreateModal}
-                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                                onClick={handleExport}
+                                className="inline-flex items-center justify-center px-4 py-2 border border-slate-200 text-sm font-medium rounded-lg shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
                             >
-                                <Plus size={16} className="mr-2" />
-                                Add New {activeTab.split(' ')[0]} User
+                                <FileText size={16} className="mr-2" />
+                                Export
                             </button>
-                        )}
+                            {(activeTab !== 'Activity Logs' && activeTab !== 'B2B Users' && activeTab !== 'B2C Users') && (
+                                <button
+                                    onClick={openCreateModal}
+                                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-gray-900 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+                                >
+                                    <Plus size={16} className="mr-2" />
+                                    Add New {activeTab.split(' ')[0]} User
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Table Card */}

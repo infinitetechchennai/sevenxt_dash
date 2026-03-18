@@ -146,12 +146,7 @@ def approve_exchange(
 def reject_exchange(
     exchange_id: int,
     reject_data: schemas.ExchangeRejectRequest,
-<<<<<<< HEAD
     db: Session = Depends(get_db)
-=======
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_employee)
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 ):
     """Admin rejects exchange request and sends rejection email to customer"""
     exchange = service.reject_exchange(db, exchange_id, reject_data.rejection_reason)
@@ -164,14 +159,8 @@ def reject_exchange(
         db=db,
         action="Rejected Exchange",
         module="Exchanges",
-<<<<<<< HEAD
         user_name="Admin",
         user_type="Admin",
-=======
-        user_id=str(current_user.id),
-        user_name=current_user.name,
-        user_type=current_user.role.capitalize(),
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         details=f"Rejected exchange {exchange_id}. Reason: {reject_data.rejection_reason}",
         status="Rejected",
         affected_entity_type="Exchange",

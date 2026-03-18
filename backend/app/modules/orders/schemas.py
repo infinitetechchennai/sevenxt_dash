@@ -69,6 +69,7 @@ class DeliveryResponse(BaseModel):
     customer_name: str
     phone: str
     full_address: str
+    email: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
     pincode: Optional[str] = None

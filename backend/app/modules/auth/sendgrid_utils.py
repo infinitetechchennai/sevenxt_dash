@@ -1,6 +1,6 @@
 # SendGrid Email Utility for sending OTP emails
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content, HtmlContent
+from sendgrid.helpers.mail import Mail, Email, To, Content, HtmlContent, Attachment, FileContent, FileName, FileType, Disposition
 from app.config import settings
 import logging
 
@@ -239,6 +239,56 @@ class SendGridService:
                 
         except Exception as e:
             logger.error(f"Error sending refund approval email: {e}")
+            return False
+
+    def send_invoice_email(self, to_email: str, order_id: str, invoice_path: str) -> bool:
+        """Send Commercial Invoice PDF via Email"""
+        if not self.client:
+            logger.warning("SendGrid Client not initialized.")
+            return False
+            
+        try:
+            import base64
+            import os
+            
+            # Read PDF
+            if not os.path.exists(invoice_path):
+                logger.error(f"Invoice file not found: {invoice_path}")
+                return False
+
+            with open(invoice_path, "rb") as f:
+                pdf_data = f.read()
+                pdf_encoded = base64.b64encode(pdf_data).decode()
+                
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2>Invoice for Order #{order_id}</h2>
+                <p>Hello,</p>
+                <p>Please find attached the commercial invoice for your recent order.</p>
+                <p>Thank you for shopping with SevenNXT!</p>
+            </div>
+            """
+            
+            message = Mail(
+                from_email=(self.from_email, self.from_name),
+                to_emails=to_email,
+                subject=f"Invoice for Order #{order_id}",
+                html_content=html_content
+            )
+            
+            attachment = Attachment()
+            attachment.file_content = FileContent(pdf_encoded)
+            attachment.file_type = FileType('application/pdf')
+            attachment.file_name = FileName(os.path.basename(invoice_path))
+            attachment.disposition = Disposition('attachment')
+            message.attachment = attachment
+            
+            self.client.send(message)
+            logger.info(f"Invoice email sent to {to_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending invoice email: {e}")
             return False
 
     def send_email(self, to_email: str, subject: str, html_content: str) -> bool:

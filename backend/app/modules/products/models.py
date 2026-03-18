@@ -9,6 +9,8 @@ class Product(Base):
     id = Column(String(50), primary_key=True, index=True) # Using String ID to match frontend "prod_" generation or UUID
     name = Column(String(255), nullable=False)
     category = Column(String(100))
+    colors = Column(String(255), nullable=True)  # Store product colors
+    brand_name = Column(String(100), nullable=True)  # Store product brand name
     
     # Pricing
     b2c_price = Column(Float, default=0.0)
@@ -28,7 +30,8 @@ class Product(Base):
     b2b_offer_start_date = Column(DateTime, nullable=True)
     b2b_offer_end_date = Column(DateTime, nullable=True)
     
-    description = Column(Text(length=4294967295), nullable=True)
+    info = Column(Text(length=4294967295), nullable=True)
+    description = Column(Text(length=4294967295), nullable=True)  # Detailed product description
     status = Column(String(50), default="Draft") # Active, Draft, Archived
     stock = Column(Integer, default=0)
     image = Column(Text(length=4294967295), nullable=True) # LONGTEXT

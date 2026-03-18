@@ -29,3 +29,23 @@ def get_segments(db: Session = Depends(get_db)):
 @router.get("/returns")
 def get_returns(db: Session = Depends(get_db)):
     return ReportsService.get_return_analysis(db)
+
+@router.get("/growth")
+def get_growth(db: Session = Depends(get_db)):
+    return ReportsService.get_growth_metrics(db)
+
+@router.get("/payment-mix")
+def get_payment_mix(db: Session = Depends(get_db)):
+    return ReportsService.get_payment_stats(db)
+
+@router.get("/geo")
+def get_geo(db: Session = Depends(get_db)):
+    return ReportsService.get_geo_stats(db)
+
+@router.get("/sales-inventory")
+def get_inventory(db: Session = Depends(get_db)):
+    return ReportsService.get_sales_inventory(db)
+
+@router.get("/sales-details")
+def get_sales_details_route(db: Session = Depends(get_db)):
+    return ReportsService.get_sales_details(db)

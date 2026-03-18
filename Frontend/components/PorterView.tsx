@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import {
     Truck, MapPin, Key, Shield, Activity,
-    Save, RefreshCw, Eye, Search, User, Phone, FileText, DollarSign, FileClock, BarChart3, X, Plus, Clock, Navigation
+    Save, RefreshCw, Eye, Search, User, Phone, FileText, DollarSign, FileClock, BarChart3, X, Plus, Clock, Navigation, Download
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
@@ -12,6 +12,7 @@ import {
     MOCK_PORTER_ZONES, MOCK_PORTER_PERFORMANCE
 } from '../constants';
 import { PorterRateRule, PorterZone } from '../types';
+import { exportToExcel } from '../utils/excelExport';
 
 export const PorterView: React.FC = () => {
     // Tabs focused on Local Operations
@@ -85,6 +86,49 @@ export const PorterView: React.FC = () => {
         }
     };
 
+    const handleExport = () => {
+        let data: any[] = [];
+        let fileName = 'porter_export';
+
+        switch (activeTab) {
+            case 'Live Ops':
+                data = MOCK_LOCAL_TRIPS.slice(0, 3).map(trip => ({
+                    'Trip ID': trip.id,
+                    'Driver': trip.driverName,
+                    'Status': trip.status,
+                    'Drop Location': trip.dropLocation
+                }));
+                fileName = 'porter_live_ops';
+                break;
+            case 'History':
+                data = filteredLogs.map(log => ({
+                    'Date': log.date,
+                    'Trip ID': log.id,
+                    'Customer': log.customerName,
+                    'Type': log.type,
+                    'Drop Location': log.dropLocation,
+                    'Vehicle': log.vehicleType,
+                    'Status': log.status,
+                    'Cost': log.cost
+                }));
+                fileName = 'porter_history';
+                break;
+            case 'Settings':
+                data = rules.map(rule => ({
+                    'Vehicle Type': rule.vehicleType,
+                    'Base Fare': rule.baseFare,
+                    'Per Km Rate': rule.perKmRate,
+                    'Weight Limit': rule.weightLimit
+                }));
+                fileName = 'porter_rules';
+                break;
+            default:
+                alert("Export not available for this tab");
+                return;
+        }
+        exportToExcel(data, fileName, activeTab);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans">
             {/* Top Header & Navigation */}
@@ -96,9 +140,18 @@ export const PorterView: React.FC = () => {
                         </h2>
                         <p className="text-gray-500 mt-1">Manage intra-city logistics for B2B & B2C orders via Porter.</p>
                     </div>
-                    <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-xs font-bold text-indigo-700">Porter API Connected</span>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleExport}
+                            className="bg-white p-2 border border-gray-200 rounded-full hover:bg-gray-50 text-gray-600 transition-colors"
+                            title="Export Data"
+                        >
+                            <Download size={20} />
+                        </button>
+                        <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs font-bold text-indigo-700">Porter API Connected</span>
+                        </div>
                     </div>
                 </div>
 

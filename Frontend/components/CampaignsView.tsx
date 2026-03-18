@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Tag, Zap, Plus, Search, X } from "lucide-react";
+import { Tag, Zap, Plus, Search, X, Download } from "lucide-react";
 import { getCampaignCoupons, createCampaignCoupon, updateCampaignCoupon, deleteCampaignCoupon, getCampaignFlashDeals } from "../services/api";
+import { exportToExcel } from "../utils/excelExport";
 
 export const CampaignsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"Promos" | "Flash Deals">("Promos");
@@ -42,6 +43,35 @@ export const CampaignsView: React.FC = () => {
     loadCoupons();
   };
 
+  const handleExport = () => {
+    let data: any[] = [];
+    let fileName = 'campaigns_export';
+
+    if (activeTab === "Promos") {
+      data = coupons.filter(c => c.code.toLowerCase().includes(searchTerm.toLowerCase())).map(c => ({
+        'Code': c.code,
+        'Value': c.value,
+        'Type': c.type,
+        'Min Order': c.min_order_value,
+        'Usage Limit': c.usage_limit,
+        'Expiry': c.expiry || '-'
+      }));
+      fileName = 'campaigns_promos';
+    } else {
+      data = flashDeals.filter(d => d.product.toLowerCase().includes(searchTerm.toLowerCase())).map(d => ({
+        'Product': d.product,
+        'Original Price': d.original_price,
+        'Deal Price': d.deal_price,
+        'Discount': d.discount,
+        'Ends In': d.ends_in ? new Date(d.ends_in).toLocaleDateString() : '-',
+        'Status': 'Active'
+      }));
+      fileName = 'campaigns_flash_deals';
+    }
+
+    exportToExcel(data, fileName, activeTab);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       <div className="bg-white border-b px-6 py-5">
@@ -64,7 +94,10 @@ export const CampaignsView: React.FC = () => {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
-              <button onClick={() => { setEditingCoupon(null); setShowPromoModal(true); }} className="bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Create Coupon</button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleExport} className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"><Download size={16} /> Export</button>
+                <button onClick={() => { setEditingCoupon(null); setShowPromoModal(true); }} className="bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Create Coupon</button>
+              </div>
             </div>
             <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
               <table className="w-full text-sm text-left">
@@ -90,25 +123,36 @@ export const CampaignsView: React.FC = () => {
 
         {/* ================= FLASH DEALS (RESTORED ORIGINAL) ================= */}
         {activeTab === "Flash Deals" && (
-          <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                <tr><th className="px-6 py-3">Product</th><th className="px-6 py-3">Original</th><th className="px-6 py-3">Deal Price</th><th className="px-6 py-3">Discount</th><th className="px-6 py-3">Ends</th><th className="px-6 py-3">Status</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {flashDeals.filter(d => d.product.toLowerCase().includes(searchTerm.toLowerCase())).map(deal => (
-                  <tr key={deal.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-900">{deal.product}</td>
-                    <td className="px-6 py-4 text-gray-500 line-through">₹{deal.original_price}</td>
-                    <td className="px-6 py-4 text-green-600 font-bold">₹{deal.deal_price}</td>
-                    <td className="px-6 py-4"><span className="text-orange-600 font-medium bg-orange-50 px-2 py-0.5 rounded">{deal.discount}</span></td>
-                    <td className="px-6 py-4 text-gray-600">{deal.ends_in ? new Date(deal.ends_in).toLocaleDateString() : "—"}</td>
-                    <td className="px-6 py-4"><span className="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded-full">Active</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="flex justify-between mb-4">
+              <div className="relative w-64">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm outline-none" placeholder="Search products..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleExport} className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50"><Download size={16} /> Export</button>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                  <tr><th className="px-6 py-3">Product</th><th className="px-6 py-3">Original</th><th className="px-6 py-3">Deal Price</th><th className="px-6 py-3">Discount</th><th className="px-6 py-3">Ends</th><th className="px-6 py-3">Status</th></tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {flashDeals.filter(d => d.product.toLowerCase().includes(searchTerm.toLowerCase())).map(deal => (
+                    <tr key={deal.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 font-medium text-gray-900">{deal.product}</td>
+                      <td className="px-6 py-4 text-gray-500 line-through">₹{deal.original_price}</td>
+                      <td className="px-6 py-4 text-green-600 font-bold">₹{deal.deal_price}</td>
+                      <td className="px-6 py-4"><span className="text-orange-600 font-medium bg-orange-50 px-2 py-0.5 rounded">{deal.discount}</span></td>
+                      <td className="px-6 py-4 text-gray-600">{deal.ends_in ? new Date(deal.ends_in).toLocaleDateString() : "—"}</td>
+                      <td className="px-6 py-4"><span className="bg-green-100 text-green-700 text-[10px] font-bold uppercase px-2 py-1 rounded-full">Active</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

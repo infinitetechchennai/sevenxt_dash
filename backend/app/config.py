@@ -8,11 +8,7 @@ class Settings(BaseSettings):
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432  # PostgreSQL default port
     DB_USER: str = "postgres"  # PostgreSQL default user
-<<<<<<< HEAD
     DB_PASSWORD: str = "12345"  # Set your PostgreSQL password
-=======
-    DB_PASSWORD: str = "1234"  # Set your PostgreSQL password
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     DB_NAME: str = "sevenext"  # PostgreSQL database name
 
 
@@ -21,7 +17,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     SECRET_KEY: str = "z-q20QXTmbrGNE5F1JJqW9RjBY5iTUiqNJ2sCoicTOY"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 #for token expiry
     
     # CORS Configuration
     
@@ -31,17 +27,16 @@ class Settings(BaseSettings):
     "https://www.13.233.199.134",       # With www
     "http://13.233.199.134",        # Keep for local development
     "http://localhost:5173",
-    "http://localhost:8001",         # Keep for local development
-    "http://localhost:3000",         # Frontend dev server
+    "http://192.168.1.2:3000",
+    "http://localhost:3000", 
+    "http://localhost:8001",        # Frontend dev server
+    "https://sevenxt.in",           # New Production Domain
+    "https://www.sevenxt.in"        # New Production Domain WWW
 ]
 
     # Password Reset Configuration
     RESET_TOKEN_EXPIRE_MINUTES: int = 30  # Reset link valid for 30 minutes
-<<<<<<< HEAD
-    FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for reset link
-=======
-    FRONTEND_URL: str = "http://localhost:5173"  # Frontend URL for reset link
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
+    FRONTEND_URL: str = "https://localhost:3000"  # Frontend URL for reset link
     TWILIO_ACCOUNT_SID: str = "ACd0cb471ec5ff7efa0b36e9b602ee05d5"
     TWILIO_AUTH_TOKEN: str = "bdd0d73e5a28e94f75d62e2991b3401f"
     TWILIO_PHONE_NUMBER: str = "+17578632685"
@@ -51,11 +46,7 @@ class Settings(BaseSettings):
     
     
     # SendGrid configuration
-<<<<<<< HEAD
     SENDGRID_API_KEY: str = "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"
-=======
-    SENDGRID_API_KEY: str = "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"
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     SENDGRID_FROM_EMAIL: str = "musicmagician92@outlook.com"  # Change to your verified sender email
     SENDGRID_FROM_NAME: str = "sdrarunvarshan"
 
@@ -71,24 +62,24 @@ class Settings(BaseSettings):
     # -----------------------
     # IMPORTANT: Get this secret from Delhivery support or generate a strong random string
     # This is used to verify webhook signatures and prevent unauthorized requests
-<<<<<<< HEAD
     DELHIVERY_WEBHOOK_SECRET: str = "your-delhivery-webhook-secret-change-in-production"
     
     # Optional: Enable/disable webhook signature verification
     # Set to False only for testing, MUST be True in production
-    WEBHOOK_SIGNATURE_VERIFICATION_ENABLED: bool = True
-=======
-    DELHIVERY_WEBHOOK_SECRET: str = "test-webhook-secret-12345"  # Change in production
+    WEBHOOK_SIGNATURE_VERIFICATION_ENABLED: bool = False  # ⚠️ TESTING MODE - Set to True in production
     
-    # Webhook signature verification
-    # ⚠️ TESTING MODE: Set to False to allow testing without signature
-    # 🔒 PRODUCTION: MUST set to True for security
-    WEBHOOK_SIGNATURE_VERIFICATION_ENABLED: bool = False  # Set True in production
-    
-    # Allowed IPs for webhook (Delhivery's IPs)
-    # Leave empty to allow all IPs (only safe if signature verification is enabled)
-    WEBHOOK_ALLOWED_IPS: list = []  # Add Delhivery IPs in production
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
+    # Optional: List of allowed IP addresses for webhooks (leave empty to allow all)
+    # Example: ["203.192.229.0/24", "52.66.0.0/16"] for Delhivery IPs
+    WEBHOOK_ALLOWED_IPS: list = [
+        # Production IPs
+        # "13.229.195.68", "18.139.238.62", "52.76.70.1", "3.108.106.65",
+        # "13.127.20.101", "13.126.12.240", "35.154.161.83", "3.6.106.39", "18.61.175.16",
+        # # Staging/Dev IPs
+        # "18.136.12.154", "13.250.167.49", "52.220.126.238", "3.109.19.228",
+        # "3.7.116.186", "3.6.106.39",
+        # # Localhost (for testing)
+        # "127.0.0.1", "localhost"
+    ]
 
 
     

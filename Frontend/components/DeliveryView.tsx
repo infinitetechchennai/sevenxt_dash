@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, Search, ExternalLink, Truck, MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { Package, Search, ExternalLink, Truck, MapPin, Loader2, AlertCircle, Download } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
+import { exportToExcel } from '../utils/excelExport';
 
 const TABS = [
     { id: 'all', label: 'All Shipments', icon: <Package size={18} /> },
-    { id: 'partners', label: 'Courier Partner', icon: <Search size={18} /> },
 ];
 
 export const DeliveryView: React.FC = () => {
@@ -76,6 +76,19 @@ export const DeliveryView: React.FC = () => {
     //     return isPickedUp && isOutstation && matchesSearch;
     // });
 
+    const handleExport = () => {
+        const data = filteredDeliveries.map(item => ({
+            'Order ID': item.order_number,
+            'Customer': item.customer_name,
+            'City': item.city,
+            'State': item.state,
+            'AWB Number': item.awb_number,
+            'Status': item.delivery_status,
+            'Last Updated': item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A'
+        }));
+        exportToExcel(data, 'delivery_outstation_export', 'Outstation Ships');
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50 -m-4 sm:-m-6 lg:-m-8 font-sans">
             {/* Header */}
@@ -128,8 +141,16 @@ export const DeliveryView: React.FC = () => {
                                     onChange={e => setSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
-                                {filteredDeliveries.length} Shipments Found
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleExport}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    <Download size={14} /> Export
+                                </button>
+                                <div className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
+                                    {filteredDeliveries.length} Shipments Found
+                                </div>
                             </div>
                         </div>
 

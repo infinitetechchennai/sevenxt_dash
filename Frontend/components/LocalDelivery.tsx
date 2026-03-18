@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     Truck, MapPin, Key, Shield, Activity,
-    Save, RefreshCw, Eye, Search, User, Phone, FileText, DollarSign, FileClock, BarChart3, X, Plus, Clock, Navigation
+    Save, RefreshCw, Eye, Search, User, Phone, FileText, DollarSign, FileClock, BarChart3, X, Plus, Clock, Navigation, Download
 } from 'lucide-react';
+import { exportToExcel } from '../utils/excelExport';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
@@ -129,7 +130,20 @@ export const PorterView: React.FC = () => {
                         </h2>
                         <p className="text-gray-500 mt-1">Manage intra-city logistics for B2B & B2C orders via Delivery.</p>
                     </div>
-
+                    <button
+                        onClick={() => {
+                            const data = outstationDeliveries.map(d => ({
+                                'Order ID': d.order_number || d.order_id || d.awb_number,
+                                'Customer': d.customer_name || d.phone,
+                                'Address': d.full_address,
+                                'Status': (d.delivery_status || '').replace(/_/g, ' ')
+                            }));
+                            exportToExcel(data, 'local_delivery_export', 'Live Ops');
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
+                    >
+                        <Download size={16} /> Export
+                    </button>
                 </div>
 
                 {/* Navigation Tabs - Only Live Operations */}

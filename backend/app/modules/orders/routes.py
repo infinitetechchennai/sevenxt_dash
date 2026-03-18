@@ -10,11 +10,15 @@ import logging
 from PyPDF2 import PdfWriter as PdfMerger
 import os
 from datetime import datetime
+from pathlib import Path
 from app.modules.activity_logs.service import log_activity
 from app.modules.auth.routes import get_current_employee
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Define base directory (absolute path to backend folder)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -53,6 +57,24 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
                     product['hsn_code'] = order.hsn
                     product['hsnCode'] = order.hsn
         
+        # Resolve missing email
+        resolve_email = order.email
+        if not resolve_email or 'example.com' in resolve_email:
+            try:
+                from app.modules.orders.models import B2CApplication
+                if order.phone:
+                    # Flexible phone search
+                    clean_phone = order.phone.replace('+91', '').replace(' ', '').strip()[-10:]
+                    b2c = db.query(B2CApplication).filter(
+                        (B2CApplication.phone_number == clean_phone) |
+                        (B2CApplication.phone_number == f"+91{clean_phone}") |
+                        (B2CApplication.phone_number == order.phone)
+                    ).first()
+                    if b2c and b2c.email:
+                        resolve_email = b2c.email
+            except Exception:
+                pass
+
         order_dict = {
             "id": order.id,
             "order_id": order.order_id,
@@ -65,7 +87,7 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "status": order.status,
             "awb_number": order.awb_number,
             "address": order.address,
-            "email": order.email,
+            "email": resolve_email,
             "phone": order.phone,
             "city": order.city,
             "state": order.state,
@@ -74,23 +96,12 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "weight": order.weight,
             "breadth": order.breadth,
             "length": order.length,
-<<<<<<< HEAD
             "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
             "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
-=======
-            "original_price": float(order.original_price) if hasattr(order, 'original_price') and order.original_price else None,
-            "sgst_percentage": float(order.sgst_percentage) if hasattr(order, 'sgst_percentage') and order.sgst_percentage else None,
-            "cgst_percentage": float(order.cgst_percentage) if hasattr(order, 'cgst_percentage') and order.cgst_percentage else None,
-            "hsn": order.hsn if hasattr(order, 'hsn') else None,
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             "created_at": order.created_at,
             "updated_at": order.updated_at,
         }
         
-<<<<<<< HEAD
-=======
-        logger.info(f"Order {order.order_id} - Phone: {order.phone}, Name: {order.customer_name}, GST: original_price={order.original_price}, sgst={order.sgst_percentage}%, cgst={order.cgst_percentage}%, hsn={order.hsn}")
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         result.append(order_dict)
     
     return result
@@ -135,6 +146,18 @@ def read_deliveries(
 
         # 1. Add original deliveries first
         for d in deliveries:
+            # # Resolve email for delivery
+            # d_email = d.order.email if d.order else None
+            # if not d_email or 'example.com' in d_email:
+            #     try:
+            #          from app.modules.orders.models import B2CApplication
+            #          if d.phone:
+            #              clean = d.phone.replace("+91", "").strip()[-10:]
+            #              b2c = db.query(B2CApplication).filter((B2CApplication.phone_number == clean) | (B2CApplication.phone_number == f"+91{clean}")).first()
+            #              if b2c and b2c.email: d_email = b2c.email
+            #     except: pass
+            # d.email = d_email
+
             # Use order_id as key if available, otherwise use delivery id (unique)
             key = d.order_id if d.order_id else f"del_{d.id}"
             delivery_map[key] = d
@@ -159,6 +182,7 @@ def read_deliveries(
                     payment="Prepaid",
                     amount=0,
                     customer_name=ex.customer_name,
+                    # email=ex.order.email if ex.order else None,
                     phone=ex.order.phone if ex.order else "",
                     full_address=ex.order.address if ex.order else "",
                     city=ex.order.city if ex.order else "",
@@ -187,6 +211,7 @@ def read_deliveries(
                     payment="Prepaid",
                     amount=0,
                     customer_name=ex.customer_name,
+                    # email=ex.order.email if ex.order else None,
                     phone=ex.order.phone if ex.order else "",
                     full_address=ex.order.address if ex.order else "",
                     city=ex.order.city if ex.order else "",
@@ -373,6 +398,24 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Order not found")
     
     # Prepare response with customer_name
+    # Resolve missing email
+    resolve_email = order.email
+    if not resolve_email or 'example.com' in resolve_email:
+        try:
+            from app.modules.orders.models import B2CApplication
+            if order.phone:
+                # Flexible phone search
+                clean_phone = order.phone.replace('+91', '').replace(' ', '').strip()[-10:]
+                b2c = db.query(B2CApplication).filter(
+                    (B2CApplication.phone_number == clean_phone) |
+                    (B2CApplication.phone_number == f"+91{clean_phone}") |
+                    (B2CApplication.phone_number == order.phone)
+                ).first()
+                if b2c and b2c.email:
+                    resolve_email = b2c.email
+        except Exception:
+            pass
+
     order_dict = {
         "id": order.id,
         "order_id": order.order_id,
@@ -385,7 +428,7 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         "status": order.status,
         "awb_number": order.awb_number,
         "address": order.address,
-        "email": order.email,
+        "email": resolve_email,
         "phone": order.phone,
         "city": order.city,
         "state": order.state,
@@ -394,15 +437,8 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         "weight": order.weight,
         "breadth": order.breadth,
         "length": order.length,
-<<<<<<< HEAD
         "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
-=======
-        "original_price": float(order.original_price) if hasattr(order, 'original_price') and order.original_price else None,
-        "sgst_percentage": float(order.sgst_percentage) if hasattr(order, 'sgst_percentage') and order.sgst_percentage else None,
-        "cgst_percentage": float(order.cgst_percentage) if hasattr(order, 'cgst_percentage') and order.cgst_percentage else None,
-        "hsn": order.hsn if hasattr(order, 'hsn') else None,
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": order.created_at,
         "updated_at": order.updated_at,
     }
@@ -465,15 +501,8 @@ def update_order_status(
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
-<<<<<<< HEAD
         "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
-=======
-        "original_price": float(updated_order.original_price) if hasattr(updated_order, 'original_price') and updated_order.original_price else None,
-        "sgst_percentage": float(updated_order.sgst_percentage) if hasattr(updated_order, 'sgst_percentage') and updated_order.sgst_percentage else None,
-        "cgst_percentage": float(updated_order.cgst_percentage) if hasattr(updated_order, 'cgst_percentage') and updated_order.cgst_percentage else None,
-        "hsn": updated_order.hsn if hasattr(updated_order, 'hsn') else None,
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": updated_order.created_at,
         "updated_at": updated_order.updated_at,
     }
@@ -519,20 +548,57 @@ def update_order_dimensions(order_id: str, dimensions: schemas.OrderDimensionsUp
         "weight": updated_order.weight,
         "breadth": updated_order.breadth,
         "length": updated_order.length,
-<<<<<<< HEAD
         "sgst_percentage": float(updated_order.sgst_percentage) if updated_order.sgst_percentage is not None else 0.0,
         "cgst_percentage": float(updated_order.cgst_percentage) if updated_order.cgst_percentage is not None else 0.0,
-=======
-        "original_price": float(updated_order.original_price) if hasattr(updated_order, 'original_price') and updated_order.original_price else None,
-        "sgst_percentage": float(updated_order.sgst_percentage) if hasattr(updated_order, 'sgst_percentage') and updated_order.sgst_percentage else None,
-        "cgst_percentage": float(updated_order.cgst_percentage) if hasattr(updated_order, 'cgst_percentage') and updated_order.cgst_percentage else None,
-        "hsn": updated_order.hsn if hasattr(updated_order, 'hsn') else None,
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
         "created_at": updated_order.created_at,
         "updated_at": updated_order.updated_at,
     }
             
     return order_dict
+
+
+@router.post("/bulk-generate-awb")
+def bulk_generate_awb(order_ids: List[str], db: Session = Depends(get_db)):
+    """
+    Generate AWB labels for multiple orders in ONE Delhivery API call.
+    Accepts a list of order_ids (string order_id, e.g. "ORD_123").
+    Returns success/failed summary.
+    """
+    try:
+        from app.modules.delivery.shipment_service import create_bulk_shipments_for_orders
+        from app.modules.orders.models import Order
+
+        if not order_ids:
+            raise HTTPException(status_code=400, detail="No order IDs provided")
+
+        if len(order_ids) > 100:
+            raise HTTPException(status_code=400, detail="Maximum 100 orders per bulk request")
+
+        # Fetch all orders from DB
+        orders = db.query(Order).filter(Order.order_id.in_(order_ids)).all()
+
+        if not orders:
+            raise HTTPException(status_code=404, detail="No orders found for given IDs")
+
+        logger.info(f"[BULK AWB] Generating AWB for {len(orders)} orders: {order_ids}")
+
+        # Run bulk shipment creation
+        results = create_bulk_shipments_for_orders(db, orders)
+
+        return {
+            "message": f"Bulk AWB generation complete",
+            "total_requested": len(order_ids),
+            "success_count": len(results["success"]),
+            "failed_count": len(results["failed"]),
+            "success": results["success"],
+            "failed": results["failed"],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("[BULK AWB] Error during bulk AWB generation")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/bulk-download-awb")
@@ -541,6 +607,7 @@ def bulk_download_awb_labels(order_ids: List[str], db: Session = Depends(get_db)
     Merge multiple AWB label PDFs into a single file for bulk download
     """
     try:
+
         from app.modules.orders.models import Delivery
         
         # Get deliveries with AWB labels for the selected orders
@@ -575,7 +642,10 @@ def bulk_download_awb_labels(order_ids: List[str], db: Session = Depends(get_db)
             if label_path.startswith('/'):
                 label_path = label_path[1:]  # Remove leading slash
             
-            full_path = os.path.join(os.getcwd(), label_path)
+            # Use BASE_DIR instead of os.getcwd() for production compatibility
+            full_path = os.path.join(BASE_DIR, label_path)
+            
+            logger.info(f"Checking for AWB label at: {full_path}")
             
             if os.path.exists(full_path):
                 try:
@@ -615,4 +685,194 @@ def bulk_download_awb_labels(order_ids: List[str], db: Session = Depends(get_db)
         raise
     except Exception as e:
         logger.exception("Error creating bulk AWB download")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/bulk-download-invoice")
+def bulk_download_invoice_labels(order_ids: List[str], db: Session = Depends(get_db)):
+    """
+    Merge multiple invoice label PDFs into a single file for bulk download
+    """
+    try:
+        from app.modules.orders.label_generator import generate_invoice_label_pdf
+        
+        # Get orders with invoice labels for the selected orders
+        orders_with_labels = []
+        temp_files = []  # Track temporary files for cleanup
+        
+        for order_id in order_ids:
+            order = service.get_order_by_id(db, order_id)
+            if not order:
+                continue
+            
+            # Prepare order data for label generation
+            order_data = {
+                "id": order.order_id,
+                "awb_number": order.awb_number,
+                "customer": order.customer_name,
+                "address": order.address,
+                "city": order.city,
+                "state": order.state,
+                "pincode": order.pincode,
+                "phone": order.phone,
+                "date": order.created_at.strftime('%Y-%m-%d') if order.created_at else "",
+            }
+            
+            # Generate invoice label PDF
+            # BASE_DIR is app/, go up to backend/
+            output_dir = os.path.join(BASE_DIR.parent, "uploads", "invoice_labels")
+            os.makedirs(output_dir, exist_ok=True)
+            
+            try:
+                filename = generate_invoice_label_pdf(order_data, output_dir)
+                label_path = os.path.join(output_dir, filename)
+                
+                if os.path.exists(label_path):
+                    orders_with_labels.append({
+                        'order_id': order.order_id,
+                        'label_path': label_path
+                    })
+                    temp_files.append(label_path)
+            except Exception as e:
+                logger.error(f"Error generating invoice label for {order_id}: {e}")
+                continue
+        
+        if not orders_with_labels:
+            logger.warning(f"No invoice labels generated for order IDs: {order_ids}")
+            raise HTTPException(status_code=404, detail="No invoice labels could be generated for selected orders")
+        
+        # Create merger
+        merger = PdfMerger()
+        added_count = 0
+        
+        # Add each PDF to the merger
+        for item in orders_with_labels:
+            label_path = item['label_path']
+            
+            if os.path.exists(label_path):
+                try:
+                    merger.append(label_path)
+                    added_count += 1
+                    logger.info(f"Added {item['order_id']} invoice label to merge")
+                except Exception as e:
+                    logger.error(f"Error adding {item['order_id']} to merger: {e}")
+            else:
+                logger.warning(f"Invoice label file not found: {label_path}")
+        
+        if added_count == 0:
+            raise HTTPException(status_code=404, detail="No valid invoice label files found")
+        
+        # Create output filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"Invoice_Labels_Bulk_{timestamp}.pdf"
+        output_path = os.path.join("static", "temp", output_filename)
+        
+        # Ensure temp directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        # Write merged PDF
+        merger.write(output_path)
+        merger.close()
+        
+        logger.info(f"Created merged invoice PDF with {added_count} labels: {output_path}")
+        
+        # Return the file
+        return FileResponse(
+            path=output_path,
+            filename=output_filename,
+            media_type="application/pdf"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creating bulk invoice download")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{order_id}/generate-invoice-label")
+def generate_label(order_id: str, db: Session = Depends(get_db)):
+    """Generate and return invoice label PDF"""
+    order = service.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    from app.modules.orders.label_generator import generate_invoice_label_pdf
+    
+    # Prepare data dictionary for generator
+    order_data = {
+        "id": order.order_id,
+        "order_id": order.order_id,  # Add this for label_generator compatibility
+        "awb_number": order.awb_number,
+        "customer": order.customer_name,
+        "address": order.address,
+        "city": order.city,
+        "state": order.state,
+        "pincode": order.pincode,
+        "phone": order.phone,
+        "date": order.created_at.strftime('%Y-%m-%d') if order.created_at else "",
+    }
+    
+    # Define output directory with absolute path
+    # BASE_DIR is app/, we need to go up one level to backend/ to store in backend/uploads/
+    output_dir = os.path.join(BASE_DIR.parent, "uploads", "invoice_labels")
+    
+    logger.info(f"[INVOICE_LABEL] Generating label for order: {order_id}")
+    logger.info(f"[INVOICE_LABEL] Output directory: {output_dir}")
+    logger.info(f"[INVOICE_LABEL] Order data: {order_data}")
+    
+    try:
+        filename = generate_invoice_label_pdf(order_data, output_dir)
+        full_path = os.path.join(output_dir, filename)
+        
+        logger.info(f"[INVOICE_LABEL] Generated filename: {filename}")
+        logger.info(f"[INVOICE_LABEL] Full path: {full_path}")
+        logger.info(f"[INVOICE_LABEL] File exists: {os.path.exists(full_path)}")
+        
+        # Return URL handled by StaticFiles mount
+        return {"url": f"/uploads/invoice_labels/{filename}"}
+    except Exception as e:
+        logger.exception(f"[INVOICE_LABEL] Failed to generate label for {order_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{order_id}/email-invoice")
+def email_invoice_endpoint(order_id: str, db: Session = Depends(get_db)):
+    """Manually generate and email commercial invoice"""
+    order = service.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    try:
+        from app.modules.orders.invoice_generator import generate_invoice_pdf
+        from app.modules.auth.sendgrid_utils import sendgrid_service
+        import os
+
+        # FIX: Resolve placeholder email from B2C Records
+        if not order.email or 'example.com' in order.email or not order.email.strip():
+            try:
+                from app.modules.orders.models import B2CApplication
+                if order.phone:
+                    # Search by phone in B2C App
+                    b2c_user = db.query(B2CApplication).filter(B2CApplication.phone_number == order.phone).first()
+                    if b2c_user and b2c_user.email:
+                        logger.info(f"Fixed missing email for Order {order.order_id}: {order.email} -> {b2c_user.email}")
+                        order.email = b2c_user.email
+                        db.commit() # Persist the fix
+            except Exception as e:
+                logger.warning(f"Email resolution failed: {e}")
+        
+        inv_dir = os.path.join("uploads", "invoices")
+        # Generate
+        filename = generate_invoice_pdf(order, inv_dir)
+        filepath = os.path.join(inv_dir, filename)
+        
+        if order.email:
+             sent = sendgrid_service.send_invoice_email(order.email, order.order_id, filepath)
+             if sent:
+                 return {"message": f"Invoice emailed to {order.email}", "url": f"/uploads/invoices/{filename}"}
+             else:
+                 raise HTTPException(status_code=500, detail="Failed to send email via SendGrid")
+        else:
+             return {"message": "Invoice generated but order has no email", "url": f"/uploads/invoices/{filename}"}
+             
+    except Exception as e:
+        logger.exception("Failed to email invoice")
         raise HTTPException(status_code=500, detail=str(e))

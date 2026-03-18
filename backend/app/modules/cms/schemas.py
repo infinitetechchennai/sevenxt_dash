@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -18,6 +18,13 @@ class BannerResponse(BannerBase):
     class Config:
         from_attributes = True
 
+    @field_validator('image')
+    @classmethod
+    def force_https_image(cls, v: str | None) -> str | None:
+        if v and v.startswith("http://"):
+            return v.replace("http://", "https://")
+        return v
+
 # --- 2. CATEGORY BANNERS ---
 class CategoryBannerResponse(BaseModel):
     id: int
@@ -26,6 +33,13 @@ class CategoryBannerResponse(BaseModel):
     status: bool
     class Config:
         from_attributes = True
+
+    @field_validator('image_url')
+    @classmethod
+    def force_https_image_url(cls, v: str | None) -> str | None:
+        if v and v.startswith("http://"):
+            return v.replace("http://", "https://")
+        return v
 
 # --- 3. NOTIFICATIONS ---
 class NotificationCreate(BaseModel):
@@ -43,7 +57,22 @@ class NotificationResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- 4. STATIC PAGES ---
+# --- 4. APP NOTIFICATIONS ---
+class AppNotificationCreate(BaseModel):
+    title: str
+    message: str
+    audience: str # 'all', 'b2b', 'b2c'
+
+class AppNotificationResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    audience: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+# --- 5. STATIC PAGES ---
 class PageUpdate(BaseModel):
     title: str
     content: str

@@ -11,13 +11,19 @@ class Exchange(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(String(50), ForeignKey("orders.order_id", ondelete="CASCADE"), nullable=False, index=True)
     
+    # New Columns
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    customer = Column(String(50), nullable=True)
+    email = Column(String(100), nullable=True)
+    type = Column(String(20), nullable=True)
+    
     # Exchange Request Details
     reason = Column(String(100), nullable=False)  # 'Damaged', 'Defective', 'Wrong Product', 'Size Issue'
     description = Column(Text, nullable=True)
     proof_image_path = Column(String(500), nullable=True)
     
     # Product Information (from the order - same product being exchanged)
-    product_id = Column(String(50), nullable=False)
+    product_id = Column(String(50), nullable=True)
     product_name = Column(String(255), nullable=False)
     variant_color = Column(String(50), nullable=True)
     quantity = Column(Integer, default=1)
@@ -63,6 +69,10 @@ class Exchange(Base):
         return {
             "id": self.id,
             "order_id": self.order_id,
+            "order_item_id": self.order_item_id,
+            "customer": self.customer,
+            "email": self.email,
+            "type": self.type,
             "customer_name": self.order.customer_name if self.order else "Unknown",
             "reason": self.reason,
             "description": self.description,

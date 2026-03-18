@@ -7,13 +7,23 @@ class Refund(Base):
     __tablename__ = "refunds"
     
     id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    order_id = Column(String(50), ForeignKey("orders.order_id"), nullable=False)
     
     # Refund request details
     reason = Column(Text, nullable=False)
     amount = Column(DECIMAL(10, 2), nullable=False)
     status = Column(String(50), default='Pending')  # Pending, Approved, Rejected, Completed
     proof_image_path = Column(Text, nullable=True)
+    
+    # New columns added
+    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    email = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    payment_method = Column(String(50), nullable=True)
+    type = Column(String(20), nullable=True)
+    product_name = Column(String(255), nullable=True)
+    quantity = Column(Integer, nullable=True)
+    customer = Column(String(50), nullable=True)
     
     # Return AWB details (for return shipment)
     return_awb_number = Column(String(255), nullable=True)

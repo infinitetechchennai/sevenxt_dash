@@ -12,7 +12,7 @@ export interface ProductVariant {
 export interface Product {
   id: string;
   name: string;
-  description: string;
+  info: string;
   b2cPrice: number;
   compareAtPrice?: number; // MRP/Original price for B2C
   b2bPrice: number;
@@ -21,7 +21,8 @@ export interface Product {
   status: 'Active' | 'Draft' | 'Archived';
   image: string;
   category: string;
-  brand?: string;
+  colors?: string; // Store product colors
+  brandName?: string; // Store product brand name
   attributes?: ProductAttribute[];
   variants?: ProductVariant[];
   rating?: number;

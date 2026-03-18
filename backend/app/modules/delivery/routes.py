@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.modules.orders.models import Delivery, Order
 from app.modules.exchanges.models import Exchange
 from app.modules.refunds.models import Refund
 from datetime import datetime
 import logging
+import json
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
@@ -13,16 +14,242 @@ logger = logging.getLogger(__name__)
 # Add delivery router for pickup scheduling
 delivery_router = APIRouter(prefix="/delivery", tags=["Delivery"])
 
-@router.post("/delhivery")
-async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
+def process_delhivery_update_task(payload: dict):
     """
-    Production-safe Delhivery Webhook Handler
-    Handles Pickup → In-Transit → Delivered updates
-    
-    Security Features:
-    - Signature verification (configurable)
-    - IP whitelisting (configurable)
-    - Request logging
+    Background task to process Delhivery webhook updates.
+    Runs asynchronously after the 200 OK response is sent.
+    """
+    db = SessionLocal()
+    try:
+        # -------------------------
+        # 1️⃣ Extract AWB & Status
+        # -------------------------
+        awb = None
+        raw_status = None
+
+        if "Shipment" in payload:
+            shipment = payload.get("Shipment", {})
+            awb = shipment.get("AWB") or shipment.get("waybill")
+
+            status_block = shipment.get("Status")
+            if isinstance(status_block, dict):
+                raw_status = status_block.get("Status")
+            elif isinstance(status_block, str):
+                raw_status = status_block
+        else:
+            awb = payload.get("AWB") or payload.get("waybill")
+            raw_status = payload.get("status")
+
+        if not awb or not raw_status:
+            logger.warning("[WEBHOOK-BG] Missing AWB or Status in payload, ignoring")
+            return
+
+        # -------------------------
+        # 2️⃣ Normalize Status - COMPLETE DELHIVERY STATUS MAPPING
+        # -------------------------
+        STATUS_MAP = {
+            # Initial Statuses
+            "SHIPMENT CREATED": "AWB_GENERATED",        # Initial status after AWB generation
+            "MANIFESTED": "PICKED_UP",                  # Shipment created and manifested
+            "READY FOR PICKUP": "PICKUP_REQUESTED",     # Shipment ready for courier pickup
+            
+            # Pickup Statuses
+            "OUT FOR PICKUP": "PICKUP_REQUESTED",       # Out to pickup from seller
+            "PICKED UP": "PICKED_UP",                   # Picked from warehouse
+            "PICKUP EXCEPTION": "PICKUP_FAILED",        # Pickup failed
+            "PICKUP RESCHEDULED": "PICKUP_REQUESTED",   # Pickup rescheduled (mapped to requested to keep it active)
+            "PENDING": "PENDING",                       # Shipment pending
+            
+            # Transit Statuses
+            "DISPATCHED": "IN_TRANSIT",                 # Dispatched from warehouse
+            "IN TRANSIT": "IN_TRANSIT",                 # In transit to destination
+            "REACHED AT DESTINATION HUB": "IN_TRANSIT", # Reached destination city
+            "SHIPMENT DELAYED": "IN_TRANSIT",           # Delay in transit
+            "SHIPMENT HELD": "IN_TRANSIT",              # Held at customs/hub
+            
+            # Delivery Statuses
+            "OUT FOR DELIVERY": "OUT_FOR_DELIVERY",     # Out for delivery to customer
+            "DELIVERED": "DELIVERED",                   # Successfully delivered
+            "PARTIAL DELIVERED": "DELIVERED",           # Some items delivered (multi-piece)
+            "DELIVERY EXCEPTION": "FAILED",             # Delivery issue
+            "DELIVERY RESCHEDULED": "OUT_FOR_DELIVERY", # Delivery rescheduled
+            
+            # Failure Statuses
+            "DELIVERY FAILED": "FAILED",                # Delivery attempt failed (NDR)
+            "UNDELIVERED": "FAILED",                    # Could not deliver
+            
+            # RTO (Return to Origin) Statuses
+            "RTO INITIATED": "RTO",                     # Return initiated
+            "RTO IN TRANSIT": "RTO",                    # Return in transit
+            "RTO OUT FOR DELIVERY": "RTO",              # RTO out for delivery to warehouse
+            "RTO DELIVERED": "RTO_DELIVERED",           # Successfully returned to warehouse
+            
+            # Exception Statuses
+            "CANCELLED": "CANCELLED",                   # Shipment cancelled
+            "LOST": "LOST",                             # Package lost in transit
+            "DAMAGED": "DAMAGED",                       # Package damaged
+            "SHIPMENT DESTROYED": "DESTROYED",          # Package destroyed
+        }
+
+        normalized = raw_status.strip().upper().replace("-", " ")
+        internal_status = STATUS_MAP.get(normalized)
+
+        if not internal_status:
+            logger.info(f"[WEBHOOK-BG] Unhandled status '{raw_status}', ignored")
+            return
+
+        # -------------------------
+        # 2.5️⃣ Status Mapping for Refunds & Exchanges
+        # -------------------------
+        REFUND_STATUS_MAP = {
+            'DELIVERED': 'Return Received',
+            'FAILED': 'Pickup Failed',
+            'RTO_DELIVERED': 'Return Failed - RTO',
+            'CANCELLED': 'Cancelled',
+            'LOST': 'Lost in Transit',
+            'DAMAGED': 'Damaged',
+            'PICKED_UP': 'Return In Transit',
+            'IN_TRANSIT': 'Return In Transit',
+            'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
+        }
+        
+        EXCHANGE_RETURN_STATUS_MAP = {
+            'DELIVERED': 'Return Received',
+            'FAILED': 'Pickup Failed',
+            'RTO_DELIVERED': 'Return Failed - RTO',
+            'CANCELLED': 'Cancelled',
+            'LOST': 'Lost in Transit',
+            'DAMAGED': 'Damaged',
+            'PICKED_UP': 'Return In Transit',
+            'IN_TRANSIT': 'Return In Transit',
+            'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
+        }
+        
+        EXCHANGE_NEW_STATUS_MAP = {
+            'DELIVERED': 'Completed',
+            'FAILED': 'Delivery Failed',
+            'RTO': 'RTO In Progress',
+            'RTO_DELIVERED': 'RTO Completed',
+            'CANCELLED': 'Cancelled',
+            'LOST': 'Lost in Transit',
+            'DAMAGED': 'Damaged',
+            'PICKED_UP': 'Out for Delivery',
+            'IN_TRANSIT': 'In Transit',
+            'OUT_FOR_DELIVERY': 'Out for Delivery',
+        }
+
+        # -------------------------
+        # 3️⃣ Find Delivery
+        # -------------------------
+        delivery = db.query(Delivery).filter(Delivery.awb_number == awb).first()
+
+        if delivery:
+            # -------------------------
+            # 4️⃣ Smart Status Progression Validation
+            # -------------------------
+            def should_update_status(current_status: str, new_status: str) -> bool:
+                """Determine if status update should be allowed based on smart category validation"""
+                TERMINAL_STATUSES = ["DELIVERED", "RTO_DELIVERED", "CANCELLED", "LOST"]
+                EXCEPTION_STATUSES = ["FAILED", "DAMAGED", "UNDELIVERED"]
+                
+                # Forward shipment progression
+                FORWARD_STATUS_ORDER = [
+                    "AWB_GENERATED", "PICKUP_REQUESTED", "PICKED_UP", 
+                    "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"
+                ]
+                
+                # RTO progression
+                RTO_STATUS_ORDER = ["RTO", "RTO_DELIVERED"]
+
+                if new_status in TERMINAL_STATUSES or new_status in EXCEPTION_STATUSES:
+                    return True
+                
+                if current_status in TERMINAL_STATUSES:
+                    return False
+                
+                if current_status in FORWARD_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
+                    return True
+                
+                if current_status in FORWARD_STATUS_ORDER and new_status in FORWARD_STATUS_ORDER:
+                    try:
+                        current_index = FORWARD_STATUS_ORDER.index(current_status)
+                        new_index = FORWARD_STATUS_ORDER.index(new_status)
+                        return new_index >= current_index
+                    except ValueError:
+                        return True
+                
+                if current_status in RTO_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
+                    try:
+                        current_index = RTO_STATUS_ORDER.index(current_status)
+                        new_index = RTO_STATUS_ORDER.index(new_status)
+                        return new_index >= current_index
+                    except ValueError:
+                        return True
+                
+                return True
+
+            if not should_update_status(delivery.delivery_status, internal_status):
+                logger.info(f"[WEBHOOK-BG] Ignored invalid transition {delivery.delivery_status} → {internal_status} for AWB {awb}")
+            else:
+                # -------------------------
+                # 5️⃣ Update DB (Delivery)
+                # -------------------------
+                delivery.delivery_status = internal_status
+                if delivery.order:
+                    delivery.order.status = internal_status
+                db.commit()
+                logger.info(f"[WEBHOOK-BG] Updated Delivery AWB {awb} → {internal_status}")
+
+        # -------------------------
+        # 6️⃣ Update Exchange (if applicable)
+        # -------------------------
+        exchange_return = db.query(Exchange).filter(Exchange.return_awb_number == awb).first()
+        if exchange_return:
+            if not delivery: # Only update status if not main delivery (or sync logic)
+                 pass # Logic handled below
+
+            exchange_return.return_delivery_status = internal_status
+            if internal_status in EXCHANGE_RETURN_STATUS_MAP:
+                exchange_return.status = EXCHANGE_RETURN_STATUS_MAP[internal_status]
+            db.commit()
+            logger.info(f"[WEBHOOK-BG] Updated Exchange Return AWB {awb} -> {internal_status}")
+
+        exchange_new = db.query(Exchange).filter(Exchange.new_awb_number == awb).first()
+        if exchange_new:
+            exchange_new.new_delivery_status = internal_status
+            if exchange_new.order:
+                 exchange_new.order.status = internal_status
+            
+            if internal_status in EXCHANGE_NEW_STATUS_MAP:
+                exchange_new.status = EXCHANGE_NEW_STATUS_MAP[internal_status]
+                if internal_status == 'DELIVERED':
+                    exchange_new.completed_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"[WEBHOOK-BG] Updated Exchange New AWB {awb} -> {internal_status}")
+
+        # -------------------------
+        # 7️⃣ Update Refund (if applicable)
+        # -------------------------
+        refund = db.query(Refund).filter(Refund.return_awb_number == awb).first()
+        if refund:
+            refund.return_delivery_status = internal_status
+            if internal_status in REFUND_STATUS_MAP:
+                refund.status = REFUND_STATUS_MAP[internal_status]
+            db.commit()
+            logger.info(f"[WEBHOOK-BG] Updated Refund Return AWB {awb} -> {internal_status}")
+
+    except Exception as e:
+        logger.error(f"[WEBHOOK-BG] Error processing webhook for AWB {payload.get('Shipment', {}).get('AWB')}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+@router.post("/delhivery")
+async def delhivery_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Production-safe Delhivery Webhook Handler.
+    Handles Pickup → In-Transit → Delivered updates asynchronously.
     """
     from app.config import settings
     import hmac
@@ -32,7 +259,6 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
     # SECURITY LAYER 1: IP Whitelisting
     # ========================================
     client_ip = request.client.host if request.client else "unknown"
-    logger.info(f"[WEBHOOK] Request from IP: {client_ip}")
     
     if settings.WEBHOOK_ALLOWED_IPS and client_ip not in settings.WEBHOOK_ALLOWED_IPS:
         logger.warning(f"[WEBHOOK] ❌ Blocked request from unauthorized IP: {client_ip}")
@@ -42,325 +268,46 @@ async def delhivery_webhook(request: Request, db: Session = Depends(get_db)):
     # SECURITY LAYER 2: Signature Verification
     # ========================================
     if settings.WEBHOOK_SIGNATURE_VERIFICATION_ENABLED:
-        # Get signature from header
         signature = request.headers.get("X-Delhivery-Signature") or request.headers.get("X-Webhook-Signature")
-        
         if not signature:
             logger.warning("[WEBHOOK] ❌ Missing webhook signature")
             raise HTTPException(status_code=401, detail="Missing webhook signature")
         
-        # Get raw body for signature verification
         body = await request.body()
-        
-        # Calculate expected signature
         expected_signature = hmac.new(
             settings.DELHIVERY_WEBHOOK_SECRET.encode(),
             body,
             hashlib.sha256
         ).hexdigest()
         
-        # Verify signature
         if not hmac.compare_digest(signature, expected_signature):
-            logger.warning(f"[WEBHOOK] ❌ Invalid signature. Expected: {expected_signature[:10]}..., Got: {signature[:10]}...")
+            logger.warning("[WEBHOOK] ❌ Invalid signature")
             raise HTTPException(status_code=401, detail="Invalid webhook signature")
         
-        logger.info("[WEBHOOK] ✅ Signature verified successfully")
-        
-        # Parse JSON from body
-        import json
         payload = json.loads(body.decode())
     else:
-        # Testing mode - no signature verification
-        logger.warning("[WEBHOOK] ⚠️ TESTING MODE - Signature verification disabled")
         payload = await request.json()
     
-    logger.info(f"[WEBHOOK] Payload received: {payload}")
-
-    # -------------------------
-    # 1️⃣ Extract AWB & Status
-    # -------------------------
-    awb = None
-    raw_status = None
-
-    if "Shipment" in payload:
-        shipment = payload.get("Shipment", {})
-        awb = shipment.get("AWB") or shipment.get("waybill")
-
-        status_block = shipment.get("Status")
-        if isinstance(status_block, dict):
-            raw_status = status_block.get("Status")
-        elif isinstance(status_block, str):
-            raw_status = status_block
-    else:
-        awb = payload.get("AWB") or payload.get("waybill")
-        raw_status = payload.get("status")
-
-    if not awb or not raw_status:
-        logger.warning("[WEBHOOK] Missing AWB or Status, ignoring")
-        return {"ok": True}
-
-    # -------------------------
-    # 2️⃣ Normalize Status - COMPLETE DELHIVERY STATUS MAPPING
-    # -------------------------
-    STATUS_MAP = {
-        # Forward Shipment Statuses
-        "MANIFESTED": "PICKED_UP",              # Shipment created and manifested
-        "PICKED UP": "PICKED_UP",               # Picked from warehouse
-        "DISPATCHED": "IN_TRANSIT",             # Dispatched from warehouse
-        "IN TRANSIT": "IN_TRANSIT",             # In transit to destination
-        "REACHED AT DESTINATION HUB": "IN_TRANSIT",  # Reached destination city
-        "OUT FOR DELIVERY": "OUT_FOR_DELIVERY", # Out for delivery to customer
-        "DELIVERED": "DELIVERED",               # Successfully delivered
-        
-        # Pickup Statuses
-        "OUT FOR PICKUP": "PICKUP_REQUESTED",   # Out to pickup from seller
-        "PENDING": "PENDING",                   # Shipment pending
-        
-        # RTO (Return to Origin) Statuses
-        "RTO INITIATED": "RTO",                 # Return initiated
-        "RTO IN TRANSIT": "RTO",                # Return in transit
-        "RTO OUT FOR DELIVERY": "RTO",          # RTO out for delivery to warehouse
-        "RTO DELIVERED": "RTO_DELIVERED",       # Successfully returned to warehouse
-        
-        # Exception/Failure Statuses
-        "DELIVERY FAILED": "FAILED",            # Delivery attempt failed (NDR)
-        "UNDELIVERED": "FAILED",                # Could not deliver
-        "CANCELLED": "CANCELLED",               # Shipment cancelled
-        "LOST": "LOST",                         # Package lost in transit
-        "DAMAGED": "DAMAGED",                   # Package damaged
-    }
-
-
-    normalized = raw_status.strip().upper().replace("-", " ")
-    internal_status = STATUS_MAP.get(normalized)
-
-    if not internal_status:
-        logger.info(f"[WEBHOOK] Unhandled status '{raw_status}', ignored")
-        return {"ok": True}
-
-    # -------------------------
-    # 2.5️⃣ Status Mapping for Refunds & Exchanges
-    # -------------------------
-    # Map delivery statuses to refund statuses
-    REFUND_STATUS_MAP = {
-        'DELIVERED': 'Return Received',
-        'FAILED': 'Pickup Failed',
-        'RTO_DELIVERED': 'Return Failed - RTO',
-        'CANCELLED': 'Cancelled',
-        'LOST': 'Lost in Transit',
-        'DAMAGED': 'Damaged',
-        'PICKED_UP': 'Return In Transit',
-        'IN_TRANSIT': 'Return In Transit',
-        'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
-    }
+    # ========================================
+    # SECURITY LAYER 3: Background Processing
+    # ========================================
+    # Return 200 OK immediately and process in background
+    logger.info(f"[WEBHOOK] Payload received from {client_ip} - Queuing background task")
+    background_tasks.add_task(process_delhivery_update_task, payload)
     
-    # Map delivery statuses to exchange return statuses
-    EXCHANGE_RETURN_STATUS_MAP = {
-        'DELIVERED': 'Return Received',
-        'FAILED': 'Pickup Failed',
-        'RTO_DELIVERED': 'Return Failed - RTO',
-        'CANCELLED': 'Cancelled',
-        'LOST': 'Lost in Transit',
-        'DAMAGED': 'Damaged',
-        'PICKED_UP': 'Return In Transit',
-        'IN_TRANSIT': 'Return In Transit',
-        'OUT_FOR_DELIVERY': 'Delivering to Warehouse',
-    }
-    
-    # Map delivery statuses to exchange new shipment statuses
-    EXCHANGE_NEW_STATUS_MAP = {
-        'DELIVERED': 'Completed',
-        'FAILED': 'Delivery Failed',
-        'RTO': 'RTO In Progress',
-        'RTO_DELIVERED': 'RTO Completed',
-        'CANCELLED': 'Cancelled',
-        'LOST': 'Lost in Transit',
-        'DAMAGED': 'Damaged',
-        'PICKED_UP': 'Out for Delivery',
-        'IN_TRANSIT': 'In Transit',
-        'OUT_FOR_DELIVERY': 'Out for Delivery',
-    }
-
-
-    # -------------------------
-    # 3️⃣ Find Delivery
-    # -------------------------
-    delivery = db.query(Delivery).filter(
-        Delivery.awb_number == awb
-    ).first()
-
-    if not delivery:
-        logger.warning(f"[WEBHOOK] No delivery found for AWB {awb}")
-        # Continue to check Exchanges, as it might be a return shipment not in Delivery table
-    else:
-        # -------------------------
-        # 4️⃣ Smart Status Progression Validation
-        # -------------------------
-        # Define status categories
-        TERMINAL_STATUSES = ["DELIVERED", "RTO_DELIVERED", "CANCELLED", "LOST"]
-        EXCEPTION_STATUSES = ["FAILED", "DAMAGED", "UNDELIVERED"]
-        
-        # Forward shipment progression
-        FORWARD_STATUS_ORDER = [
-            "AWB_GENERATED",
-            "PICKUP_REQUESTED",
-            "PICKED_UP",
-            "IN_TRANSIT",
-            "OUT_FOR_DELIVERY",
-            "DELIVERED",
-        ]
-        
-        # RTO progression
-        RTO_STATUS_ORDER = [
-            "RTO",
-            "RTO_DELIVERED",
-        ]
-        
-        def should_update_status(current_status: str, new_status: str) -> bool:
-            """
-            Determine if status update should be allowed based on smart category validation
-            """
-            # Always allow terminal and exception statuses (can happen at any time)
-            if new_status in TERMINAL_STATUSES or new_status in EXCEPTION_STATUSES:
-                logger.info(f"[WEBHOOK] Allowing terminal/exception status: {new_status}")
-                return True
-            
-            # Don't update if already in terminal state (final states are permanent)
-            if current_status in TERMINAL_STATUSES:
-                logger.info(f"[WEBHOOK] Blocked update - already in terminal status: {current_status}")
-                return False
-            
-            # Allow transition from forward to RTO (delivery failed, returning to origin)
-            if current_status in FORWARD_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
-                logger.info(f"[WEBHOOK] Allowing forward → RTO transition: {current_status} → {new_status}")
-                return True
-            
-            # Check forward progression (only allow moving forward, not backward)
-            if current_status in FORWARD_STATUS_ORDER and new_status in FORWARD_STATUS_ORDER:
-                try:
-                    current_index = FORWARD_STATUS_ORDER.index(current_status)
-                    new_index = FORWARD_STATUS_ORDER.index(new_status)
-                    if new_index >= current_index:
-                        return True
-                    else:
-                        logger.info(f"[WEBHOOK] Blocked backward forward progression: {current_status} → {new_status}")
-                        return False
-                except ValueError:
-                    return True
-            
-            # Check RTO progression (only allow moving forward in RTO flow)
-            if current_status in RTO_STATUS_ORDER and new_status in RTO_STATUS_ORDER:
-                try:
-                    current_index = RTO_STATUS_ORDER.index(current_status)
-                    new_index = RTO_STATUS_ORDER.index(new_status)
-                    if new_index >= current_index:
-                        return True
-                    else:
-                        logger.info(f"[WEBHOOK] Blocked backward RTO progression: {current_status} → {new_status}")
-                        return False
-                except ValueError:
-                    return True
-            
-            # Default: allow update for any other case
-            logger.info(f"[WEBHOOK] Allowing status update (default): {current_status} → {new_status}")
-            return True
-        
-        # Validate status transition
-        if not should_update_status(delivery.delivery_status, internal_status):
-            logger.info(
-                f"[WEBHOOK] Ignored invalid status transition {delivery.delivery_status} → {internal_status} for AWB {awb}"
-            )
-        else:
-            # -------------------------
-            # 5️⃣ Update DB (Delivery)
-            # -------------------------
-            delivery.delivery_status = internal_status
-
-            if delivery.order:
-                delivery.order.status = internal_status
-
-            db.commit()
-            logger.info(f"[WEBHOOK] Updated Delivery AWB {awb} → {internal_status}")
-
-    # -------------------------
-    # 6️⃣ Update Exchange (if applicable)
-    # -------------------------
-    # Check for Exchange Return
-    exchange_return = db.query(Exchange).filter(Exchange.return_awb_number == awb).first()
-    if exchange_return:
-        exchange_return.return_delivery_status = internal_status
-        
-        # Update exchange return status based on delivery status using dictionary mapping
-        if internal_status in EXCHANGE_RETURN_STATUS_MAP:
-            exchange_return.status = EXCHANGE_RETURN_STATUS_MAP[internal_status]
-            logger.info(f"[WEBHOOK] Updated exchange {exchange_return.id} return status to '{exchange_return.status}'")
-            
-            # Special handling for critical statuses
-            if internal_status == 'DELIVERED':
-                logger.info(f"[WEBHOOK] Exchange return delivered to warehouse for exchange {exchange_return.id}")
-            elif internal_status in ['FAILED', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
-                logger.warning(f"[WEBHOOK] ⚠️ Exchange {exchange_return.id} return has exception status: {exchange_return.status}")
-        
-        db.commit()
-        logger.info(f"[WEBHOOK] Updated Exchange Return AWB {awb} -> {internal_status}")
-
-    # Check for Exchange New Shipment
-    exchange_new = db.query(Exchange).filter(Exchange.new_awb_number == awb).first()
-    if exchange_new:
-        exchange_new.new_delivery_status = internal_status
-        
-        # Sync Order Status with Exchange New Delivery Status
-        if exchange_new.order:
-             exchange_new.order.status = internal_status
-             logger.info(f"[WEBHOOK] Synced Order {exchange_new.order_id} status to {internal_status}")
-
-        # Update exchange new status based on delivery status using dictionary mapping
-        if internal_status in EXCHANGE_NEW_STATUS_MAP:
-            exchange_new.status = EXCHANGE_NEW_STATUS_MAP[internal_status]
-            logger.info(f"[WEBHOOK] Updated exchange {exchange_new.id} new shipment status to '{exchange_new.status}'")
-            
-            # Special handling for completion and critical statuses
-            if internal_status == 'DELIVERED':
-                exchange_new.completed_at = datetime.utcnow()
-                logger.info(f"[WEBHOOK] Exchange {exchange_new.id} completed successfully")
-            elif internal_status in ['FAILED', 'RTO', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
-                logger.warning(f"[WEBHOOK] ⚠️ Exchange {exchange_new.id} new shipment has exception status: {exchange_new.status}")
-        
-        db.commit()
-        logger.info(f"[WEBHOOK] Updated Exchange New AWB {awb} -> {internal_status}")
-
-    # -------------------------
-    # 7️⃣ Update Refund (if applicable)
-    # -------------------------
-    # Check for Refund Return Shipment
-    refund = db.query(Refund).filter(Refund.return_awb_number == awb).first()
-    if refund:
-        refund.return_delivery_status = internal_status
-        
-        # Update refund status based on delivery status using dictionary mapping
-        if internal_status in REFUND_STATUS_MAP:
-            refund.status = REFUND_STATUS_MAP[internal_status]
-            logger.info(f"[WEBHOOK] Updated refund {refund.id} status to '{refund.status}'")
-            
-            # Special handling for critical statuses
-            if internal_status == 'DELIVERED':
-                logger.info(f"[WEBHOOK] Refund return delivered to warehouse for refund {refund.id}")
-            elif internal_status in ['FAILED', 'RTO_DELIVERED', 'LOST', 'DAMAGED']:
-                logger.warning(f"[WEBHOOK] ⚠️ Refund {refund.id} has exception status: {refund.status}")
-        
-        db.commit()
-        logger.info(f"[WEBHOOK] Updated Refund Return AWB {awb} -> {internal_status}")
-
-
     return {"ok": True}
 
-<<<<<<< HEAD
-=======
+# ========================================
+# TEST ENDPOINT
+# ========================================
+@delivery_router.get("/test")
+async def test_delivery_router():
+    """Test endpoint to verify delivery_router is working"""
+    return {"message": "Delivery router is working!", "status": "ok"}
 
 # ========================================
 # PICKUP SCHEDULING ENDPOINT
 # ========================================
-
 @delivery_router.post("/schedule-pickup/{order_id}")
 async def schedule_pickup(
     order_id: str,
@@ -368,83 +315,112 @@ async def schedule_pickup(
     db: Session = Depends(get_db)
 ):
     """
-    Schedule pickup with Delhivery API
-    Integrates with Delhivery's pickup request API
+    Schedule pickup for an order.
+    1. Saves pickup time to DB
+    2. Calls Delhivery Pickup Request API: POST /fm/request/new/
+
+    Body:
+    {
+        "pickup_datetime": "2026-02-26T15:00:00",   (ISO format)
+        "expected_package_count": 1                  (optional, default 1)
+    }
     """
-    from app.modules.delivery.delhivery_client import delhivery_client
-    from datetime import datetime
-    
-    logger.info(f"[PICKUP] Scheduling pickup for order {order_id}")
-    
-    # Get order
-    order = db.query(Order).filter(Order.order_id == order_id).first()
-    if not order:
-        logger.error(f"[PICKUP] Order not found: {order_id}")
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    # Check if AWB is generated
-    if not order.awb_number:
-        logger.error(f"[PICKUP] AWB not generated for order {order_id}")
-        raise HTTPException(
-            status_code=400, 
-            detail="AWB must be generated before scheduling pickup"
-        )
-    
-    # Extract pickup time and date
-    pickup_datetime_str = pickup_data.get("pickup_datetime")
-    if not pickup_datetime_str:
-        raise HTTPException(status_code=400, detail="pickup_datetime is required")
-    
     try:
-        # Parse datetime
-        pickup_datetime = datetime.fromisoformat(pickup_datetime_str.replace('Z', '+00:00'))
-        pickup_date = pickup_datetime.strftime("%Y-%m-%d")
-        pickup_time = pickup_datetime.strftime("%H:%M")
-        
-        logger.info(f"[PICKUP] Parsed date: {pickup_date}, time: {pickup_time}")
-        
-        # Call Delhivery API
-        delhivery_payload = {
-            "pickup_time": pickup_time,
-            "pickup_date": pickup_date,
-            "pickup_location": "sevenxt",  # Must match warehouse name in Delhivery
-            "expected_package_count": 1
-        }
-        
-        logger.info(f"[PICKUP] Calling Delhivery API with payload: {delhivery_payload}")
-        response = delhivery_client.pickup_request(delhivery_payload)
-        logger.info(f"[PICKUP] Delhivery response: {response}")
-        
-        # Update database
+        pickup_datetime = pickup_data.get("pickup_datetime")
+        expected_package_count = pickup_data.get("expected_package_count", 1)
+
+        if not pickup_datetime:
+            raise HTTPException(status_code=400, detail="pickup_datetime is required")
+
+        # Find the order
+        order = db.query(Order).filter(Order.order_id == order_id).first()
+        if not order:
+            raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
+
+        # Find the delivery
         delivery = db.query(Delivery).filter(Delivery.order_id == order.id).first()
-        if delivery:
-            delivery.schedule_pickup = pickup_datetime
-            delivery.delivery_status = "PICKUP_REQUESTED"
-            logger.info(f"[PICKUP] Updated delivery record for order {order_id}")
-        
-        order.status = "PICKUP_REQUESTED"
+        if not delivery:
+            raise HTTPException(status_code=404, detail=f"Delivery not found for order {order_id}")
+
+        # --- Validate AWB exists before scheduling pickup ---
+        if not delivery.awb_number:
+            raise HTTPException(
+                status_code=400,
+                detail="AWB not generated yet. Generate AWB before scheduling pickup."
+            )
+
+        # Parse the datetime
+        try:
+            pickup_dt = datetime.fromisoformat(pickup_datetime.replace('Z', '+00:00'))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid datetime format: {str(e)}")
+
+        # Format for Delhivery API (as per docs)
+        pickup_date_str = pickup_dt.strftime("%Y-%m-%d")   # "2026-02-26"
+        pickup_time_str = pickup_dt.strftime("%H:%M:%S")   # "15:00:00"
+
+        # ─────────────────────────────────────────────────────────
+        # STEP 1: Save pickup time to YOUR DB first (always)
+        # ─────────────────────────────────────────────────────────
+        delivery.schedule_pickup = pickup_dt
+        delivery.delivery_status = "Pickup Time Scheduled"
+        order.status = "Pickup Time Scheduled"
         db.commit()
-        
-        logger.info(f"[PICKUP] ✅ Pickup scheduled successfully for order {order_id}")
-        
-        return {
+        db.refresh(delivery)
+
+        logger.info(f"✅ Pickup saved in DB for order {order_id} at {pickup_date_str} {pickup_time_str}")
+
+        # ─────────────────────────────────────────────────────────
+        # STEP 2: Call Delhivery Pickup Request API
+        # POST /fm/request/new/
+        # Body: pickup_time, pickup_date, pickup_location, expected_package_count
+        # ─────────────────────────────────────────────────────────
+        delhivery_pickup_result = None
+        delhivery_error = None
+
+        try:
+            from app.modules.delivery.delhivery_client import DelhiveryClient
+            from app.modules.delivery.shipment_service import DELHIVERY_TOKEN
+
+            client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+
+            delhivery_pickup_result = client.request_pickup(
+                pickup_date=pickup_date_str,
+                pickup_time=pickup_time_str,
+                pickup_location="sevenxt",          # Your registered warehouse name
+                expected_package_count=int(expected_package_count),
+            )
+
+            logger.info(f"[PICKUP REQUEST] Delhivery Response: {delhivery_pickup_result}")
+
+        except Exception as deli_err:
+            # Don't fail the whole request if Delhivery API fails
+            # DB is already updated
+            delhivery_error = str(deli_err)
+            logger.error(f"❌ Delhivery Pickup API failed for {order_id}: {deli_err}")
+
+        # ─────────────────────────────────────────────────────────
+        # STEP 3: Return response
+        # ─────────────────────────────────────────────────────────
+        response_data = {
             "success": True,
             "message": "Pickup scheduled successfully",
             "order_id": order_id,
-            "pickup_date": pickup_date,
-            "pickup_time": pickup_time,
-            "delhivery_response": response
+            "pickup_date": pickup_date_str,
+            "pickup_time": pickup_time_str,
+            "delivery_status": delivery.delivery_status,
+            "delhivery_pickup_response": delhivery_pickup_result,
         }
-        
-    except ValueError as e:
-        logger.error(f"[PICKUP] Invalid datetime format: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid datetime format: {str(e)}")
-    except Exception as e:
-        logger.exception(f"[PICKUP] Failed to schedule pickup: {e}")
-        db.rollback()
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to schedule pickup: {str(e)}"
-        )
 
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
+        if delhivery_error:
+            response_data["delhivery_warning"] = f"DB updated but Delhivery API call failed: {delhivery_error}"
+
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error scheduling pickup for order {order_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

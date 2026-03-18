@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { Product, SalesData } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: (import.meta as any).env.VITE_GEMINI_API_KEY || "" });
 
 export const generateProductDescription = async (productName: string, category: string): Promise<string> => {
   try {

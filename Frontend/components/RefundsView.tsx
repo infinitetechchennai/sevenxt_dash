@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, RotateCcw, AlertCircle, CheckCircle, XCircle, DollarSign, Calendar, FileText, Camera, QrCode, X, Mail, Smartphone, Eye, Send, MessageSquare } from 'lucide-react';
+import { Search, RotateCcw, AlertCircle, CheckCircle, XCircle, DollarSign, Calendar, FileText, Camera, QrCode, X, Mail, Smartphone, Eye, Send, MessageSquare, Download } from 'lucide-react';
 import { apiService, API_BASE_URL } from '../services/api';
+import { exportToExcel } from '../utils/excelExport';
 
 export const RefundsView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState('Pending');
+    const [activeTab, setActiveTab] = useState('All Refunds');
     const [searchTerm, setSearchTerm] = useState('');
     const [refunds, setRefunds] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -88,8 +89,24 @@ export const RefundsView: React.FC = () => {
     };
 
     const handleViewProof = (imageUrl: string) => {
-        const baseUrl = API_BASE_URL;
-        setSelectedProof(`${baseUrl}${imageUrl}`);
+        // Parse if it's a JSON array string like ["url"]
+        let finalUrl = imageUrl;
+        try {
+            if (imageUrl.startsWith('[')) {
+                const parsed = JSON.parse(imageUrl);
+                finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imageUrl;
+            }
+        } catch (e) {
+            // If parsing fails, use the original path
+            finalUrl = imageUrl;
+        }
+
+        // Fix missing port - add :8000 if URL has IP but no port
+        if (finalUrl.includes('sevenxt.in/') && !finalUrl.includes('sevenxt.in:')) {
+            finalUrl = finalUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
+        }
+
+        setSelectedProof(finalUrl);
         setProofModalOpen(true);
     };
 
@@ -132,6 +149,20 @@ export const RefundsView: React.FC = () => {
         if (activeTab === 'All Refunds') return matchesSearch;
         return matchesSearch && item.status === activeTab;
     });
+
+    const handleExport = () => {
+        const data = filteredRefunds.map(item => ({
+            'Refund ID': item.id,
+            'Order ID': item.order_number,
+            'Customer': item.customer_name,
+            'Reason': item.reason,
+            'Amount': item.amount,
+            'Status': item.status,
+            'Return Status': item.return_delivery_status || '-',
+            'Date': new Date(item.created_at).toLocaleDateString()
+        }));
+        exportToExcel(data, `refunds_${activeTab.toLowerCase().replace(' ', '_')}`, activeTab);
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -214,15 +245,23 @@ export const RefundsView: React.FC = () => {
             </div>
 
             {/* Controls */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search by Order ID, Customer or Refund ID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="relative w-full max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by Order ID, Customer or Refund ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <button
+                    onClick={handleExport}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
+                >
+                    <Download size={16} /> Export
+                </button>
             </div>
 
             {/* Refunds Table */}

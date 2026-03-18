@@ -7,7 +7,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
-DELHIVERY_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"
+DELHIVERY_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"  # Old working token
 
 
 def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
@@ -26,8 +26,8 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         _debug_service = "S"
         
    
-    # 1. Check if AWB already exists
-    if order.awb_number:
+    # 1. Check if AWB already exists (and is not null)
+    if order.awb_number and order.awb_number.strip():
         logger.warning(f"[SHIPMENT] AWB already exists: {order.awb_number}")
         return order.awb_number
 
@@ -58,7 +58,7 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
     # Use separate city, state, pincode fields (no parsing from address)
     city = order.city if (hasattr(order, 'city') and order.city) else "Chennai"
     state = order.state if (hasattr(order, 'state') and order.state) else "Tamil Nadu"
-    pincode = order.pincode if (hasattr(order, 'pincode') and order.pincode) else "600001"
+    pincode = order.pincode if (hasattr(order, 'pincode') and order.pincode) else "600018"
 
     # Format phone number: Remove +91, -, spaces, and keep only 10 digits
     phone = order.phone or ""
@@ -116,13 +116,6 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
     client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
     
     try:
-        # Force update warehouse details to ensure correct address on label
-        logger.info("[SHIPMENT] Updating warehouse details...")
-        try:
-            client.create_warehouse()
-        except Exception as wh_e:
-            logger.warning(f"[SHIPMENT] Warehouse update failed (non-fatal): {wh_e}")
-
         response = client.create_shipment(order_data)
         logger.info(f"[SHIPMENT] API Response: {response}")
 
@@ -191,6 +184,48 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
 
     logger.info(f"[SHIPMENT] AWB Generated Successfully: {waybill}")
 
+    # Generate Commercial Invoice automatically
+    try:
+        # Update order object with AWB for invoice generation
+        order.awb_number = waybill
+        
+        from app.modules.orders.invoice_generator import generate_invoice_pdf
+        from app.modules.auth.sendgrid_utils import sendgrid_service
+        import os
+
+        # FIX: Check for placeholder email and try to resolve from B2C Applications
+        if not order.email or 'example.com' in order.email or not order.email.strip():
+            try:
+                from app.modules.orders.models import B2CApplication
+                if order.phone:
+                    # Search by phone in B2C App
+                    b2c_user = db.query(B2CApplication).filter(B2CApplication.phone_number == order.phone).first()
+                    if b2c_user and b2c_user.email:
+                        logger.info(f"[SHIPMENT] Fixed missing email for Order {order.order_id}: {order.email} -> {b2c_user.email}")
+                        order.email = b2c_user.email
+                        db.add(order) 
+            except Exception as e:
+                logger.warning(f"[SHIPMENT] Email resolution failed: {e}")
+        
+        inv_dir = os.path.join("uploads", "invoices")
+        inv_filename = generate_invoice_pdf(order, inv_dir)
+        inv_path = os.path.join(inv_dir, inv_filename)
+        logger.info(f"[SHIPMENT] Commercial Invoice generated: {inv_path}")
+        
+        # Send Invoice via Email
+        if order.email:
+             logger.info(f"[SHIPMENT] Sending Invoice Email to {order.email}")
+             sent = sendgrid_service.send_invoice_email(order.email, order.order_id, inv_path)
+             if sent:
+                 logger.info(f"[SHIPMENT] Invoice Email Sent Successfully")
+             else:
+                 logger.error(f"[SHIPMENT] Invoice Email Failed to Send")
+        else:
+             logger.warning(f"[SHIPMENT] No customer email found for Order {order.order_id}, skipping email.")
+
+    except Exception as inv_e:
+        logger.error(f"[SHIPMENT] Failed to generate commercial invoice: {inv_e}")
+
     # 7. Fetch and Save Label
     awb_label_path = None
     try:
@@ -246,6 +281,155 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         logger.exception(f"[SHIPMENT] Database Update Failed: {e}")
         db.rollback()
         return None
+
+
+# --------------------------------------------------
+# BULK SHIPMENT CREATION (Multiple Orders at Once)
+# --------------------------------------------------
+def create_bulk_shipments_for_orders(db: Session, orders: list) -> dict:
+    """
+    Create AWB for multiple orders in ONE Delhivery API call.
+    Returns: {"success": [...], "failed": [...]}
+    """
+    logger.info(f"[BULK SHIPMENT] Processing {len(orders)} orders in one API call")
+
+    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+
+    # 1. Prepare all valid orders — skip already processed / invalid ones
+    orders_data = []
+    skipped = []
+    for order in orders:
+        if order.awb_number and order.awb_number.strip():
+            logger.warning(f"[BULK SHIPMENT] Skipping {order.order_id} — AWB already exists")
+            skipped.append(order.order_id)
+            continue
+
+        if not order.address or not order.phone:
+            logger.error(f"[BULK SHIPMENT] Skipping {order.order_id} — missing address/phone")
+            skipped.append(order.order_id)
+            continue
+
+        # Format phone
+        phone = re.sub(r"[^\d]", "", order.phone or "")
+        phone = phone[-10:] if len(phone) >= 10 else phone
+        if not phone:
+            logger.error(f"[BULK SHIPMENT] Skipping {order.order_id} — invalid phone")
+            skipped.append(order.order_id)
+            continue
+
+        city = order.city if (hasattr(order, 'city') and order.city) else "Chennai"
+        state = order.state if (hasattr(order, 'state') and order.state) else "Tamil Nadu"
+        pincode = order.pincode if (hasattr(order, 'pincode') and order.pincode) else "600018"
+
+        delivery = db.query(Delivery).filter(Delivery.order_id == order.id).first()
+        item_name = delivery.item_name if delivery and delivery.item_name else "Product"
+        quantity = delivery.quantity if delivery and delivery.quantity else 1
+        service_type = "S" if (order.weight and float(order.weight) > 10.0) else "E"
+
+        orders_data.append({
+            "customer_name": order.customer_name or "Customer",
+            "address": order.address,
+            "pincode": str(pincode),
+            "city": city,
+            "state": state,
+            "phone": phone,
+            "email": order.email or "noreply@sevenxt.com",
+            "order_id": order.order_id,
+            "payment_status": order.payment,
+            "amount": float(order.amount) if order.amount else 0.0,
+            "length": float(order.length) if order.length else 10.0,
+            "breadth": float(order.breadth) if order.breadth else 10.0,
+            "height": float(order.height) if order.height else 10.0,
+            "weight": float(order.weight) if order.weight else 0.5,
+            "item_name": item_name,
+            "quantity": quantity,
+            "service_type": service_type,
+        })
+
+    if not orders_data:
+        logger.warning("[BULK SHIPMENT] No valid orders to process")
+        return {"success": [], "failed": skipped}
+
+    # 2. ONE API call for ALL orders
+    results = {"success": [], "failed": list(skipped)}
+    try:
+        response = client.create_bulk_shipment(orders_data)
+        logger.info(f"[BULK SHIPMENT] API done. Packages: {len(response.get('packages', []))}")
+
+        if "packages" not in response:
+            logger.error(f"[BULK SHIPMENT] No packages in response: {response}")
+            results["failed"].extend([o["order_id"] for o in orders_data])
+            return results
+
+    except Exception as e:
+        logger.exception(f"[BULK SHIPMENT] API Call Failed: {e}")
+        results["failed"].extend([o["order_id"] for o in orders_data])
+        return results
+
+    # 3. Process each package result
+    for package in response.get("packages", []):
+        waybill = package.get("waybill")
+        order_id = package.get("refnum")   # Delhivery echoes back your order_id
+        pkg_status = package.get("status")
+
+        if not waybill or not order_id:
+            logger.warning(f"[BULK SHIPMENT] Missing waybill/refnum: {package}")
+            continue
+
+        if pkg_status == "Fail":
+            logger.error(f"[BULK SHIPMENT] {order_id} failed: {package.get('remarks')}")
+            results["failed"].append(order_id)
+            continue
+
+        # Find matching order object
+        order = next((o for o in orders if o.order_id == order_id), None)
+        if not order:
+            logger.warning(f"[BULK SHIPMENT] Order object not found for {order_id}")
+            continue
+
+        logger.info(f"[BULK SHIPMENT] AWB={waybill} for order={order_id}")
+
+        # 4. Fetch and save AWB label PDF
+        awb_label_path = None
+        try:
+            import os
+            pdf_content, error = client.fetch_awb_label(waybill)
+            if pdf_content:
+                upload_dir = os.path.join("uploads", "awb")
+                os.makedirs(upload_dir, exist_ok=True)
+                filename = f"awb_{waybill}.pdf"
+                file_path = os.path.join(upload_dir, filename)
+                with open(file_path, "wb") as f:
+                    f.write(pdf_content)
+                awb_label_path = f"/uploads/awb/{filename}"
+                logger.info(f"[BULK SHIPMENT] Label saved: {file_path}")
+        except Exception as le:
+            logger.exception(f"[BULK SHIPMENT] Label fetch failed for {waybill}: {le}")
+
+        # 5. Update DB for this order
+        try:
+            order.awb_number = waybill
+            order.status = "AWB_GENERATED"
+            delivery = db.query(Delivery).filter(Delivery.order_id == order.id).first()
+            if delivery:
+                delivery.awb_number = waybill
+                delivery.delivery_status = "AWB Generated"
+                if awb_label_path:
+                    delivery.awb_label_path = awb_label_path
+            results["success"].append({"order_id": order_id, "waybill": waybill})
+        except Exception as dbe:
+            logger.exception(f"[BULK SHIPMENT] DB update failed for {order_id}: {dbe}")
+            results["failed"].append(order_id)
+
+    # 6. Commit all DB updates at once
+    try:
+        db.commit()
+        logger.info(f"[BULK SHIPMENT] Complete. Success={len(results['success'])}, Failed={len(results['failed'])}")
+    except Exception as ce:
+        logger.exception(f"[BULK SHIPMENT] Commit failed: {ce}")
+        db.rollback()
+
+    return results
 
 
 def create_return_shipment(db: Session, refund) -> tuple:
@@ -338,6 +522,7 @@ def create_return_shipment(db: Session, refund) -> tuple:
         
         # Fetch and save return label with retry logic
         return_label_path = None
+        file_path = None
         try:
             import time
             max_retries = 3
@@ -371,14 +556,25 @@ def create_return_shipment(db: Session, refund) -> tuple:
                 
                 return_label_path = f"/uploads/return_awb/{filename}"
                 logger.info(f"[RETURN] Label saved to {file_path}")
-                
-                # Send email with AWB label
-                send_return_label_email(order.email, order.customer_name, return_awb, file_path, refund.reason)
             else:
                 logger.error(f"[RETURN] Failed to fetch return label after all retries")
         
         except Exception as e:
             logger.exception(f"[RETURN] Error fetching/saving label: {e}")
+        
+        # ALWAYS send email with AWB details (with or without label attachment)
+        try:
+            logger.info(f"[RETURN] Sending return label email to {order.email}")
+            send_return_label_email(
+                customer_email=order.email,
+                customer_name=order.customer_name or "Customer",
+                awb_number=return_awb,
+                label_path=file_path,  # Will be None if fetch failed
+                reason=refund.reason
+            )
+            logger.info(f"[RETURN] Email sent successfully")
+        except Exception as email_error:
+            logger.error(f"[RETURN] Failed to send email: {email_error}")
         
         return (return_awb, return_label_path)
     
@@ -387,9 +583,10 @@ def create_return_shipment(db: Session, refund) -> tuple:
         return (None, None)
 
 
-def send_return_label_email(customer_email: str, customer_name: str, awb_number: str, label_path: str, reason: str):
+def send_return_label_email(customer_email: str, customer_name: str, awb_number: str, label_path: str = None, reason: str = ""):
     """
     Send return AWB label to customer via SendGrid
+    If label_path is None or file doesn't exist, sends email without attachment
     """
     try:
         from sendgrid import SendGridAPIClient
@@ -410,39 +607,19 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
         # Validate email
         if not customer_email or '@' not in customer_email:
             logger.error(f"[EMAIL] Invalid customer email: {customer_email}")
-            return
+            return False
         
-        # Check if file exists
-        if not os.path.exists(label_path):
-            logger.error(f"[EMAIL] Label file not found: {label_path}")
-            return
+        # Check if we have a valid label file
+        has_label = label_path and os.path.exists(label_path)
         
-        # Read the PDF file
-        logger.info(f"[EMAIL] Reading label file: {label_path}")
-        with open(label_path, 'rb') as f:
-            pdf_data = f.read()
+        if has_label:
+            logger.info(f"[EMAIL] Label file found: {label_path}")
+        else:
+            logger.warning(f"[EMAIL] No label file available, sending email without attachment")
         
-        logger.info(f"[EMAIL] PDF file size: {len(pdf_data)} bytes")
-        
-        # Encode to base64
-        encoded_file = base64.b64encode(pdf_data).decode()
-        
-        # Create attachment
-        attached_file = Attachment(
-            FileContent(encoded_file),
-            FileName(f'return_label_{awb_number}.pdf'),
-            FileType('application/pdf'),
-            Disposition('attachment')
-        )
-        
-        logger.info(f"[EMAIL] Attachment created successfully")
-        
-        # Create email with proper from format
-        message = Mail(
-            from_email=From(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
-            to_emails=customer_email,
-            subject=f'Return Label for Your Refund Request - AWB: {awb_number}',
-            html_content=f'''
+        # Prepare email content based on whether we have a label
+        if has_label:
+            email_body = f'''
             <html>
                 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -478,9 +655,82 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
                 </body>
             </html>
             '''
+        else:
+            email_body = f'''
+            <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h2 style="color: #4F46E5;">Your Return Request Has Been Approved</h2>
+                        
+                        <p>Dear {customer_name},</p>
+                        
+                        <p>Your refund request has been approved. Your return AWB number has been generated.</p>
+                        
+                        <div style="background-color: #F3F4F6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="margin-top: 0;">Return Details:</h3>
+                            <p><strong>Return AWB Number:</strong> {awb_number}</p>
+                            <p><strong>Reason:</strong> {reason}</p>
+                        </div>
+                        
+                        <div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                            <p style="margin: 0;"><strong>Note:</strong> Your return label is being generated and will be sent to you shortly in a separate email. You can also contact our support team at support@sevenxt.com to get your return label.</p>
+                        </div>
+                        
+                        <h3>Next Steps:</h3>
+                        <ol>
+                            <li>Wait for the return label email (or contact support)</li>
+                            <li>Print the return label</li>
+                            <li>Pack the item securely in its original packaging</li>
+                            <li>Attach the return label to the package</li>
+                            <li>Our delivery partner will pick up the package from your address</li>
+                        </ol>
+                        
+                        <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+                            <strong>Need Help?</strong><br>
+                            Contact us at support@sevenxt.com with your AWB number: {awb_number}
+                        </p>
+                        
+                        <p style="color: #6B7280; font-size: 12px; margin-top: 20px;">
+                            This is an automated email. Please do not reply to this message.
+                        </p>
+                    </div>
+                </body>
+            </html>
+            '''
+        
+        # Create email
+        message = Mail(
+            from_email=From(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
+            to_emails=customer_email,
+            subject=f'Return Label for Your Refund Request - AWB: {awb_number}',
+            html_content=email_body
         )
         
-        message.attachment = attached_file
+        # Add attachment only if we have a valid label file
+        if has_label:
+            try:
+                # Read the PDF file
+                logger.info(f"[EMAIL] Reading label file: {label_path}")
+                with open(label_path, 'rb') as f:
+                    pdf_data = f.read()
+                
+                logger.info(f"[EMAIL] PDF file size: {len(pdf_data)} bytes")
+                
+                # Encode to base64
+                encoded_file = base64.b64encode(pdf_data).decode()
+                
+                # Create attachment
+                attached_file = Attachment(
+                    FileContent(encoded_file),
+                    FileName(f'return_label_{awb_number}.pdf'),
+                    FileType('application/pdf'),
+                    Disposition('attachment')
+                )
+                
+                message.add_attachment(attached_file)
+                logger.info(f"[EMAIL] Attachment added successfully")
+            except Exception as attach_error:
+                logger.error(f"[EMAIL] Failed to attach label, sending email without it: {attach_error}")
         
         logger.info(f"[EMAIL] Email message created, sending via SendGrid...")
         
@@ -488,14 +738,11 @@ def send_return_label_email(customer_email: str, customer_name: str, awb_number:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         response = sg.send(message)
         
-        logger.info(f"[EMAIL] ✅ Return label sent successfully to {customer_email}. Status: {response.status_code}")
+        logger.info(f"[EMAIL] ✅ Return label email sent successfully to {customer_email}. Status: {response.status_code}")
         logger.info(f"[EMAIL] Response headers: {response.headers}")
         
         return True
         
-    except FileNotFoundError as e:
-        logger.error(f"[EMAIL] ❌ Label file not found: {e}")
-        return False
     except Exception as e:
         logger.exception(f"[EMAIL] ❌ Failed to send return label email: {e}")
         logger.error(f"[EMAIL] Error type: {type(e).__name__}")

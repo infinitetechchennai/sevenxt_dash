@@ -418,7 +418,7 @@ export const MOCK_KYC_REQUESTS: KYCRequest[] = [
     companyName: 'Global Imports Inc',
     email: 'jane@global.com',
     documentType: 'GST Certificate',
-    documentNumber: '29ABCDE1234F1Z5',
+    documentNumber: '33ABLCS5237N1ZU',
     submittedDate: '2024-03-20',
     status: 'Pending',
     imageUrl: 'https://picsum.photos/id/10/800/600' // Placeholder for doc

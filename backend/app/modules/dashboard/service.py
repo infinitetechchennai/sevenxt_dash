@@ -19,9 +19,13 @@ class DashboardService:
         # 2. Main KPI Metrics
         kpi_query = text(f"""
             SELECT 
-                COALESCE(SUM(amount), 0)::float as revenue,
+                (SELECT COALESCE(SUM(amount), 0)::float FROM public.transactions WHERE status = 'SUCCESS' AND created_at >= NOW() - INTERVAL '{interval}') as revenue,
                 COUNT(*)::int as orders,
-                (SELECT COUNT(*)::int FROM public.users WHERE created_at >= NOW() - INTERVAL '{interval}') as users,
+                (
+                    (SELECT COUNT(*)::int FROM public.users WHERE created_at >= NOW() - INTERVAL '{interval}') +
+                    (SELECT COUNT(*)::int FROM public.b2c_applications WHERE created_at >= NOW() - INTERVAL '{interval}') +
+                    (SELECT COUNT(*)::int FROM public.b2b_applications WHERE created_at >= NOW() - INTERVAL '{interval}')
+                ) as users,
                 (SELECT COUNT(*)::int FROM public.exchanges WHERE created_at >= NOW() - INTERVAL '{interval}') as refunds
             FROM public.orders
             WHERE created_at >= NOW() - INTERVAL '{interval}';
@@ -79,7 +83,7 @@ class DashboardService:
         delivery_query = text(f"""
             SELECT 
                 COUNT(CASE WHEN UPPER(delivery_status) IN ('DELIVERED', 'COMPLETED') THEN 1 END)::int as delivered,
-                COUNT(CASE WHEN UPPER(delivery_status) IN ('PENDING', 'IN TRANSIT', 'READY TO PICKUP') THEN 1 END)::int as pending,
+                COUNT(CASE WHEN UPPER(delivery_status) IN ('PENDING', 'IN TRANSIT', 'READY TO PICKUP', 'AWB GENERATED', 'PICKUP SCHEDULED', 'PICKUP_SCHEDULED', 'PICKED UP', 'PICKED_UP', 'OUT FOR DELIVERY', 'OUT_FOR_DELIVERY', 'RTO') THEN 1 END)::int as pending,
                 COUNT(*)::int as total
             FROM public.deliveries
             WHERE created_at >= NOW() - INTERVAL '{interval}';

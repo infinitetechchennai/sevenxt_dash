@@ -1,12 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-<<<<<<< HEAD
 import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar, Check } from 'lucide-react';
-=======
-import { Plus, Search, MoreHorizontal, ArrowUpDown, Sparkles, FileUp, FileDown, Users, ShoppingBag, ChevronLeft, ChevronRight, Eye, Trash2, ListPlus, Palette, Star, MessageSquare, X, Copy, Archive, CheckCircle, AlertTriangle, Image as ImageIcon, RefreshCw, Upload, Percent, Calendar } from 'lucide-react';
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 import { Product, ProductAttribute, ProductVariant } from '../types';
 import { generateProductDescription } from '../services/geminiService';
-import { fetchProducts, createProduct, updateProduct, deleteProduct, importProducts, fetchReviews, createReview } from '../services/api';
+import { fetchProducts, createProduct, updateProduct, deleteProduct, importProducts, fetchReviews, createReview, API_BASE_URL } from '../services/api';
 import { DashboardView } from './DashboardView';
 
 interface Review {
@@ -51,35 +47,37 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // --- Category Management ---
-  const DEFAULT_CATEGORIES = [
-    { value: "Computers", label: "Computers & Laptops" },
-    { value: "Mobile", label: "Smartphones & Accessories" },
-    { value: "Audio", label: "Audio & Sound" },
-    { value: "Home Appliances", label: "Home Appliances" },
-    { value: "Smart Home", label: "Smart Home & IoT" },
-    { value: "Cameras", label: "Cameras & Photography" },
-    { value: "Wearables", label: "Wearable Technology" }
-  ];
+  // Default categories removed - categories now loaded from database and localStorage only
 
-  const [availableCategories, setAvailableCategories] = useState<{ value: string, label: string }[]>(DEFAULT_CATEGORIES);
+  const [availableCategories, setAvailableCategories] = useState<{ value: string, label: string }[]>([]);
+  const [deletedCategories, setDeletedCategories] = useState<string[]>([]);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
 
   // Load from LocalStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('custom_categories');
+    const deletedSaved = localStorage.getItem('deleted_categories');
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          setAvailableCategories(prev => {
-            const existing = new Set(prev.map(c => c.value));
-            const uniqueSaved = parsed.filter((c: any) => !existing.has(c.value));
-            return [...prev, ...uniqueSaved];
-          });
+          setAvailableCategories(parsed);
         }
       } catch (e) {
         console.error("Failed to parse custom categories", e);
+      }
+    }
+
+    if (deletedSaved) {
+      try {
+        const parsed = JSON.parse(deletedSaved);
+        if (Array.isArray(parsed)) {
+          setDeletedCategories(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse deleted categories", e);
       }
     }
   }, []);
@@ -90,7 +88,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         const existingValues = new Set(prev.map(c => c.value));
         const newCats: { value: string, label: string }[] = [];
         products.forEach(p => {
-          if (p.category && !existingValues.has(p.category)) {
+          // Only add if category exists, not already in list, and not deleted
+          if (p.category && !existingValues.has(p.category) && !deletedCategories.includes(p.category)) {
             existingValues.add(p.category);
             newCats.push({ value: p.category, label: p.category });
           }
@@ -98,7 +97,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         return [...prev, ...newCats];
       });
     }
-  }, [products]);
+  }, [products, deletedCategories]);
 
   const handleAddCategory = () => {
     if (newCategoryName.trim()) {
@@ -132,23 +131,23 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     const currentCat = formData.category;
     if (!currentCat) return;
 
-    const isDefault = DEFAULT_CATEGORIES.some(c => c.value === currentCat);
-
-    if (isDefault) {
-      alert("Cannot delete default categories.");
-      return;
-    }
-
     if (window.confirm(`Delete category "${currentCat}"?`)) {
-      setAvailableCategories(prev => prev.filter(c => c.value !== currentCat));
+      const newCategories = availableCategories.filter(c => c.value !== currentCat);
+      setAvailableCategories(newCategories);
+
+      // Add to deleted categories list
+      const newDeletedCategories = [...deletedCategories, currentCat];
+      setDeletedCategories(newDeletedCategories);
 
       try {
-        const saved = JSON.parse(localStorage.getItem('custom_categories') || '[]');
-        const newSaved = saved.filter((c: any) => c.value !== currentCat);
-        localStorage.setItem('custom_categories', JSON.stringify(newSaved));
+        // Save the updated lists to localStorage
+        localStorage.setItem('custom_categories', JSON.stringify(newCategories));
+        localStorage.setItem('deleted_categories', JSON.stringify(newDeletedCategories));
       } catch (e) { console.error(e); }
 
-      setFormData(prev => ({ ...prev, category: 'Computers' }));
+      // Set to first available category or empty string
+      const fallbackCategory = availableCategories.length > 1 ? availableCategories.filter(c => c.value !== currentCat)[0]?.value : '';
+      setFormData(prev => ({ ...prev, category: fallbackCategory || '' }));
     }
   };
 
@@ -203,10 +202,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     id: undefined,
     name: '',
     category: 'Computers',
+    colors: '',
+    brandName: '',
     b2cPrice: 0,
     compareAtPrice: 0,
     b2bPrice: 0,
-    description: '',
+    info: '',
     status: 'Active',
     image: '',
     attributes: [],
@@ -357,8 +358,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const handleGenerateDescription = async () => {
     if (!formData.name) return;
     setIsGenerating(true);
-    const description = await generateProductDescription(formData.name, formData.category || 'Electronics');
-    setFormData(prev => ({ ...prev, description }));
+    const info = await generateProductDescription(formData.name, formData.category || 'Electronics');
+    setFormData(prev => ({ ...prev, info }));
     setIsGenerating(false);
   };
 
@@ -367,10 +368,12 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       id: undefined,
       name: '',
       category: 'Computers',
+      colors: '',
+      brandName: '',
       b2cPrice: 0,
       compareAtPrice: 0,
       b2bPrice: 0,
-      description: '',
+      info: '',
       status: 'Active',
       image: '',
       attributes: [],
@@ -405,8 +408,10 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
   const handleEditProduct = (product: Product) => {
     setFormData({
       ...product,
-      description: product.description || '',
+      info: product.info || '',
       compareAtPrice: product.compareAtPrice || 0,
+      colors: product.colors || '',
+      brandName: product.brandName || '',
       attributes: product.attributes || [],
       variants: product.variants || [],
       // Regular discounts (always visible)
@@ -556,11 +561,19 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     if (!hasActiveB2COffer) b2cOfferPrice = 0;
     if (!hasActiveB2BOffer) b2bOfferPrice = 0;
 
+    // Extract colors from variants and save to colors field
+    let colorsString = '';
+    if (formData.variants && formData.variants.length > 0) {
+      const uniqueColors = [...new Set(formData.variants.map(v => v.color))];
+      colorsString = uniqueColors.join(', ');
+    }
+
     const productData = {
       ...formData,
-      description: formData.description || '',
+      info: formData.info || '',
       stock: finalStock,
       image: formData.image || `https://picsum.photos/200/200?random=${Date.now()}`,
+      colors: colorsString, // Save extracted colors from variants
       // Set active offer prices
       b2cOfferPrice: b2cOfferPrice > 0 ? b2cOfferPrice : 0,
       b2bOfferPrice: b2bOfferPrice > 0 ? b2bOfferPrice : 0,
@@ -668,8 +681,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
       // Prepare data for Excel export
       const excelData = productsToExport.map(p => ({
         'Product ID': p.id,
-        'Name': p.name,
-        'Category': p.category,
+        'Name': (p.name || '').substring(0, 32000),
+        'Category': (p.category || '').substring(0, 32000),
         'B2C Price': p.b2cPrice || 0,
         'B2B Price': p.b2bPrice || 0,
         'MRP': p.compareAtPrice || 0,
@@ -684,10 +697,11 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         'B2B Offer Start Date': formatDateTime(p.b2bOfferStartDate),
         'B2B Offer End Date': formatDateTime(p.b2bOfferEndDate),
         'Stock': p.stock || 0,
-        'Variants (Colors)': p.variants && p.variants.length > 0
+        'Variants (Colors)': (p.variants && p.variants.length > 0
           ? p.variants.map(v => `${v.color} (Stock: ${v.stock})`).join(', ')
-          : '',
-        'Description': p.description || '',
+          : '').substring(0, 32000),
+        'Info': (p.info || '').substring(0, 32000), // Truncate to avoid Excel limit
+        'Description': (p.description || '').substring(0, 32000), // Truncate to avoid Excel limit
         'Status': p.status,
         'SGST %': p.sgst || 0,
         'CGST %': p.cgst || 0,
@@ -697,7 +711,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
         'Breadth (cm)': p.breadth || 0,
         'Length (cm)': p.length || 0,
 
-        'Image URL': p.image || '',
+        'Image URL': (p.image || '').substring(0, 32000), // Truncate to avoid Excel limit
         'Rating': p.rating || 0,
         'Reviews': p.reviews || 0,
         'Created Date': p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ''
@@ -815,16 +829,40 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
     }
   };
 
-  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setFormData(prev => ({ ...prev, image: event.target!.result as string }));
+      try {
+        // Create FormData to send file to backend
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Get auth token
+        const token = localStorage.getItem('token');
+
+        // Upload to backend
+        const response = await fetch(`${API_BASE_URL}/api/v1/products/upload-image`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to upload image');
         }
-      };
-      reader.readAsDataURL(file);
+
+        const data = await response.json();
+
+        // Set the image URL from backend
+        const imageUrl = `${API_BASE_URL}${data.url}`;
+        setFormData(prev => ({ ...prev, image: imageUrl }));
+
+      } catch (error) {
+        console.error('Image upload failed:', error);
+        alert('Failed to upload image. Please try again.');
+      }
     }
   };
 
@@ -995,7 +1033,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[80px]">Image</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground max-w-[200px]">Description</th>
+                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground max-w-[200px]">Info</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Rating</th>
                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                   <div className="flex items-center gap-1"><ShoppingBag size={14} /> Price (B2C)</div>
@@ -1053,7 +1091,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                       </div>
                     </td>
                     <td className="p-4 align-middle">
-                      <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${product.status === 'Active' ? 'border-transparent bg-green-100 text-green-800' : 'border-transparent bg-gray-100 text-gray-800'
+                      <div className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${product.status === 'Published' || product.status === 'Active' ? 'border-transparent bg-green-100 text-green-800' : 'border-transparent bg-gray-100 text-gray-800'
                         }`}>
                         {product.status}
                       </div>
@@ -1062,8 +1100,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                       <div className="font-medium text-gray-900">{product.name}</div>
                     </td>
                     <td className="p-4 align-middle max-w-[200px]">
-                      <div className="text-sm text-gray-600 truncate" title={product.description || ''}>
-                        {product.description || <span className="text-gray-400 italic">No description</span>}
+                      <div className="text-sm text-gray-600 truncate" title={product.info || ''}>
+                        {product.info || <span className="text-gray-400 italic">No info</span>}
                       </div>
                     </td>
                     <td className="p-4 align-middle">
@@ -1378,7 +1416,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <label className="text-sm font-medium text-gray-700">Category</label>
-<<<<<<< HEAD
                   <div className="flex gap-2 relative">
                     <select
                       value={formData.category}
@@ -1389,18 +1426,6 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         <option key={cat.value} value={cat.value}>{cat.label}</option>
                       ))}
                     </select>
-=======
-                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900">
-                    <option value="Computers">Computers & Laptops</option>
-                    <option value="Mobile">Smartphones & Accessories</option>
-                    <option value="Audio">Audio & Sound</option>
-                    <option value="Home Appliances">Home Appliances</option>
-                    <option value="Smart Home">Smart Home & IoT</option>
-                    <option value="Cameras">Cameras & Photography</option>
-                    <option value="Wearables">Wearable Technology</option>
-                  </select>
-                </div>
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
                     <div className="flex gap-1 items-center">
                       <button
@@ -1415,7 +1440,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                         onClick={handleDeleteCategory}
                         className="h-9 px-3 border rounded-md flex items-center justify-center bg-gray-50 border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-gray-50 disabled:hover:text-gray-400 disabled:hover:border-gray-300"
                         title="Delete Selected Category"
-                        disabled={!formData.category || DEFAULT_CATEGORIES.some(c => c.value === formData.category)}
+                        disabled={!formData.category}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1456,6 +1481,16 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
                       </div>
                     )}
                   </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-gray-700">Brand Name</label>
+                  <input
+                    value={formData.brandName || ''}
+                    onChange={(e) => setFormData({ ...formData, brandName: e.target.value })}
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm text-gray-900"
+                    placeholder="e.g., Samsung, Apple, Sony"
+                  />
                 </div>
               </div>
 
@@ -1686,12 +1721,18 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
 
               <div className="grid gap-2 mt-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">Description</label>
+                  <label className="text-sm font-medium text-gray-700">Info</label>
                   {/* <button onClick={handleGenerateDescription} disabled={isGenerating || !formData.name} className="text-xs flex items-center gap-1 text-blue-600 hover:underline disabled:opacity-50 font-medium">
                     <Sparkles size={12} /> {isGenerating ? 'Generating...' : 'Auto-generate AI'}
                   </button> */}
                 </div>
-                <textarea value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="flex min-h-[80px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900" />
+                <textarea value={formData.info || ''} onChange={(e) => setFormData({ ...formData, info: e.target.value })} className="flex min-h-[80px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900" placeholder="Brief product information" />
+              </div>
+
+              {/* Description Input */}
+              <div className="grid gap-2 mt-2">
+                <label className="text-sm font-medium text-gray-700">Description</label>
+                <textarea value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="flex min-h-[100px] w-full rounded-md border border-input bg-white px-3 py-2 text-sm text-gray-900" placeholder="Detailed product description" />
               </div>
 
               {/* Stock Input (Global) */}

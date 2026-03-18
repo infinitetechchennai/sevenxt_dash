@@ -40,7 +40,7 @@ async def generate_return_awb(
             "state": order.state,
             "payment_mode": "Prepaid",  # Return is always prepaid
             "return_add": "Your Warehouse Address",  # TODO: Get from config
-            "return_pin": "600001",  # TODO: Get from config
+            "return_pin": "600018",  # TODO: Get from config
             "return_phone": "1234567890",  # TODO: Get from config
             "return_name": "SevenXT",
             "order": f"{exchange_id}-RETURN",

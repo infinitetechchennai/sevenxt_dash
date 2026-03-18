@@ -8,7 +8,7 @@ class DelhiveryClient:
     def __init__(self, token: str, is_production: bool = False):
         self.token = token
         self.base_url = (
-            "https://api.delhivery.com"
+            "https://track.delhivery.com"
             if is_production
             else "https://staging-express.delhivery.com"
         )
@@ -29,13 +29,11 @@ class DelhiveryClient:
         
         print(f"[DEBUG] Phone number being sent: {phone}")
         
-<<<<<<< HEAD
         # Note: Reverse pickup is handled via payment_mode="Pickup" (not is_return flag)
-=======
-        # Check if this is a return shipment
-        is_return = order_data.get("is_return", False)
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
+        # Check if this is a reverse shipment
+        is_reverse = order_data.get("payment_status") == "Pickup"
+        
         shipment_payload = {
             "name": order_data["customer_name"],
             "add": order_data["address"],
@@ -47,54 +45,38 @@ class DelhiveryClient:
             "mobile": str(phone), # Add mobile field as well
             "email": order_data.get("email", "noreply@sevenxt.com"),  # Add email field
             "order": str(order_data["order_id"]),  # Ensure string
-<<<<<<< HEAD
             "payment_mode": (
-                "Pickup" if order_data.get("payment_status") == "Pickup"
-                else "Prepaid" if order_data.get("payment_status") in ["Paid", "Prepaid"]
-                else "COD"
+                "Pickup" if is_reverse
+                else "Prepaid"  # Force Prepaid as client only uses online payment
             ),
-=======
-            "payment_mode": "Prepaid"
-            if order_data.get("payment_status") in ["Paid", "Prepaid"]
-            else "COD",
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
             "products_desc": order_data.get("item_name", "Product"),
             "hsn_code": "",
-            "cod_amount": (
-                0.0
-                if order_data.get("payment_status") in ["Paid", "Prepaid"]
-                else float(order_data["amount"])
-            ),
-            "order_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "cod_amount": 0.0,  # Always 0.0 for Prepaid/Pickup
             "total_amount": float(order_data["amount"]),
             "quantity": int(order_data.get("quantity", 1)),
             # Dimensions (CM)
             "shipment_length": float(order_data["length"]),
-            "shipment_breadth": float(order_data["breadth"]),
+            "shipment_width": float(order_data["breadth"]), # Renamed from breadth to width
             "shipment_height": float(order_data["height"]),
             # Weight in KG (IMPORTANT)
             "shipment_weight": float(order_data["weight"]),
             # Service Type: E (Express) or S (Surface)
             "service": order_data.get("service_type", "E"),
+            
+            # Return/Destination Address (for reverse pickups only)
+            # These fields specify where the package should be delivered TO (warehouse)
+            "return_add": "Sevenxt Electronics, Connaught Place" if is_reverse else None,
+            "return_pin": "110001" if is_reverse else None,
+            "return_city": "New Delhi" if is_reverse else None,
+            "return_state": "Delhi" if is_reverse else None,
+            "return_phone": "9363286257" if is_reverse else None,
         }
         
-<<<<<<< HEAD
+        # Remove None values to keep payload clean
+        shipment_payload = {k: v for k, v in shipment_payload.items() if v is not None}
+        
         # For reverse pickup: payment_mode="Pickup" + customer address in main fields
         # pickup_location.name specifies the warehouse (destination)
-=======
-        # Add return/pickup details if this is a return shipment
-        if is_return and "pickup_name" in order_data:
-            shipment_payload.update({
-                "return_name": order_data.get("pickup_name"),
-                "return_add": order_data.get("pickup_address"),
-                "return_pin": str(order_data.get("pickup_pincode", "")),
-                "return_city": order_data.get("pickup_city"),
-                "return_state": order_data.get("pickup_state"),
-                "return_phone": str(order_data.get("pickup_phone", "")),
-                "return_country": "India",
-            })
-            print(f"[DEBUG] Return shipment - Pickup from: {order_data.get('pickup_name')}, {order_data.get('pickup_city')}")
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
         payload_data = {
             "shipments": [shipment_payload],
@@ -123,17 +105,132 @@ class DelhiveryClient:
         print("DELHIVERY SHIPMENT RESPONSE:", response.text)
         response.raise_for_status()
         return response.json()
-            
+    
+    # --------------------------------------------------
+    # CREATE BULK SHIPMENTS (Multiple Orders in ONE Call)
+    # --------------------------------------------------
+    def create_bulk_shipment(self, orders_data: list) -> dict:
+        """
+        Create multiple shipments in a SINGLE Delhivery API call.
+        Delhivery auto-generates a waybill for each order.
+        orders_data: list of order dicts (same format as create_shipment)
+        """
+        url = f"{self.base_url}/api/cmu/create.json"
+        print(f"[BULK SHIPMENT] Creating {len(orders_data)} shipments in one call. URL: {url}")
+
+        shipments_list = []
+        for order in orders_data:
+            phone = str(order.get("phone", ""))
+            is_reverse = order.get("payment_status") == "Pickup"
+
+            shipment = {
+                "name": order["customer_name"],
+                "add": order["address"],
+                "pin": str(order["pincode"]),
+                "city": order["city"],
+                "state": order["state"],
+                "country": "India",
+                "phone": phone,
+                "mobile": phone,
+                "email": order.get("email", "noreply@sevenxt.com"),
+                "order": str(order["order_id"]),
+                "payment_mode": "Pickup" if is_reverse else "Prepaid",
+                "products_desc": order.get("item_name", "Product"),
+                "hsn_code": "",
+                "cod_amount": 0.0,
+                "total_amount": float(order.get("amount", 0.0)),
+                "quantity": int(order.get("quantity", 1)),
+                "shipment_length": float(order.get("length", 10.0)),
+                "shipment_width": float(order.get("breadth", 10.0)),
+                "shipment_height": float(order.get("height", 10.0)),
+                "shipment_weight": float(order.get("weight", 0.5)),
+                "service": order.get("service_type", "E"),
+            }
+            # Remove None values
+            shipment = {k: v for k, v in shipment.items() if v is not None}
+            shipments_list.append(shipment)
+
+        payload_data = {
+            "shipments": shipments_list,  # ← ALL orders in ONE call
+            "pickup_location": {"name": "sevenxt"},
+        }
+
+        print(f"[BULK SHIPMENT] Payload has {len(shipments_list)} shipments")
+
+        form_data = {
+            "format": "json",
+            "data": json.dumps(payload_data),
+        }
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+
+        response = requests.post(url, data=form_data, headers=headers)
+        print(f"[BULK SHIPMENT] Response: {response.text}")
+        response.raise_for_status()
+        return response.json()
+
+    # --------------------------------------------------
+    # PICKUP REQUEST CREATION
+    # --------------------------------------------------
+    def request_pickup(
+        self,
+        pickup_date: str,           # Format: "YYYY-MM-DD"
+        pickup_time: str,           # Format: "HH:MM:SS"
+        pickup_location: str = "sevenxt",   # Registered warehouse name in Delhivery
+        expected_package_count: int = 1,    # Number of packages to pick up
+    ) -> dict:
+        """
+        Call Delhivery Pickup Request Creation API.
+        Must be called when shipment is packed and ready for FE pickup.
+
+        Docs: POST /fm/request/new/
+        Required: pickup_time (hh:mm:ss), pickup_date (YYYY-MM-DD),
+                  pickup_location (warehouse name), expected_package_count (int)
+        """
+        url = f"{self.base_url}/fm/request/new/"
+        print(f"[PICKUP REQUEST] Calling: {url}")
+        print(f"[PICKUP REQUEST] Date={pickup_date}, Time={pickup_time}, Location={pickup_location}, Count={expected_package_count}")
+
+        payload = {
+            "pickup_time": pickup_time,
+            "pickup_date": pickup_date,
+            "pickup_location": pickup_location,
+            "expected_package_count": expected_package_count,
+        }
+
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"[PICKUP REQUEST] Response Status: {response.status_code}")
+        print(f"[PICKUP REQUEST] Response Body: {response.text}")
+
+        if response.status_code != 200:
+            return {
+                "success": False,
+                "error": f"HTTP {response.status_code}",
+                "body": response.text
+            }
+
+        try:
+            return response.json()
+        except Exception:
+            return {"success": True, "raw": response.text}
+
     # --------------------------------------------------
     # CREATE WAREHOUSE / PICKUP LOCATION
     # --------------------------------------------------
     def create_warehouse(
         self,
         name: str = "sevenxt",
-        address: str = "Sevenxt Electroic pvt ltd ",
-        city: str = "chennai",
-        state: str = "Tamil nadu",
-        pin: str = "600014",
+        address: str = "Sevenxt Electronics, Connaught Place",
+        city: str = "New Delhi",
+        state: str = "Delhi",
+        pin: str = "110001",
         phone: str = "9363286257",
         email: str = "loguloges77@gmail.com",
         contact_person: str = "Manager",
@@ -220,10 +317,10 @@ class DelhiveryClient:
         print(f"[WAREHOUSE] Using default warehouse values")
         return {
             "name": warehouse_name,
-            "address": "Sevenxt Electronic pvt ltd, Chennai",
-            "city": "Chennai",
-            "state": "Tamil Nadu",
-            "pincode": "600014",
+            "address": "Sevenxt Electronics, Connaught Place",
+            "city": "New Delhi",
+            "state": "Delhi",
+            "pincode": "110001",
             "phone": "9363286257",
             "email": "loguloges77@gmail.com",
         }
@@ -235,10 +332,14 @@ class DelhiveryClient:
         """
         Fetch AWB label PDF using waybill number
         """
-        url = f"{self.base_url}/api/p/packing_slip"
+        # Use api.delhivery.com for labels specifically, as track.delhivery.com can be flaky for packing_slip
+        label_base_url = "https://api.delhivery.com" if "track.delhivery.com" in self.base_url else self.base_url
+        url = f"{label_base_url}/api/p/packing_slip"
+        
         params = {
             "wbns": waybill,
             "pdf": "true",
+            "ss": "100x150",  # Request 100mm x 150mm (4x6 inch) size
         }
 
         headers = {
@@ -327,8 +428,7 @@ class DelhiveryClient:
 # INITIALIZATION (SANDBOX)
 # --------------------------------------------------
 
-DELHIVERY_TEST_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"
-
+DELHIVERY_TEST_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"  # Old token - has Prepaid enabled
 delhivery_client = DelhiveryClient(
     token=DELHIVERY_TEST_TOKEN,
     is_production=False,

@@ -129,7 +129,6 @@ def delete_user(
 def update_user(
     user_id: int,
     user_data: schemas.UserUpdate,
-<<<<<<< HEAD
     user_type: str = Query(..., alias="type"), # Use alias to match frontend query param 'type'
     db: Session = Depends(get_db),
     current_user: Any = Depends(get_current_employee)
@@ -188,32 +187,6 @@ def update_user(
     except Exception as e:
         logger.error(f"Error updating user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-=======
-    type: str,
-    db: Session = Depends(get_db),
-    current_user: Union[EmployeeUser, AdminUser] = Depends(get_current_employee)
-):
-    """Update a user/employee"""
-    updated_user = service.update_user(db, user_id, type, user_data.dict(exclude_unset=True))
-    if not updated_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Log activity
-    log_activity(
-        db=db,
-        action="Updated User",
-        module="Users",
-        user_id=str(current_user.id),
-        user_name=current_user.name,
-        user_type=current_user.role.capitalize(),
-        details=f"Updated {type} user with ID: {user_id}",
-        status="Success",
-        affected_entity_type="User",
-        affected_entity_id=str(user_id)
-    )
-    
-    return {"message": "User updated successfully", "user": updated_user}
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
 
 # ========== EMPLOYEES ROUTER ==========
 

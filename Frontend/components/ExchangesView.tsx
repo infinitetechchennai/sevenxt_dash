@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Package, RefreshCw, CheckCircle, XCircle, Clock, Truck, Search, AlertCircle, Camera, X, ArrowRight, RotateCcw } from 'lucide-react';
+import { Package, RefreshCw, CheckCircle, XCircle, Clock, Truck, Search, AlertCircle, Camera, X, ArrowRight, RotateCcw, Copy, Check, Download } from 'lucide-react';
 import { apiService, API_BASE_URL } from '../services/api';
+import { exportToExcel } from '../utils/excelExport';
 
 interface Exchange {
     id: number;
@@ -46,6 +47,7 @@ const ExchangesView: React.FC = () => {
     const [processingId, setProcessingId] = useState<number | null>(null);
     const [rejectModalOpen, setRejectModalOpen] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchExchanges();
@@ -153,8 +155,24 @@ const ExchangesView: React.FC = () => {
 
 
     const handleViewProof = (path: string) => {
-        const baseUrl = API_BASE_URL;
-        setSelectedProof(`${baseUrl}${path}`);
+        // Parse if it's a JSON array string like ["url"]
+        let imageUrl = path;
+        try {
+            if (path.startsWith('[')) {
+                const parsed = JSON.parse(path);
+                imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : path;
+            }
+        } catch (e) {
+            // If parsing fails, use the original path
+            imageUrl = path;
+        }
+
+        // Fix missing port - add :8000 if URL has IP but no port
+        if (imageUrl.includes('sevenxt.in/') && !imageUrl.includes('sevenxt.in:')) {
+            imageUrl = imageUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
+        }
+
+        setSelectedProof(imageUrl);
         setProofModalOpen(true);
     };
 
@@ -193,6 +211,21 @@ const ExchangesView: React.FC = () => {
         if (activeTab === 'Completed') return matchesSearch && (exchange.status === 'Completed' || exchange.status === 'Refunded' || exchange.status === 'New Product Dispatched');
         return matchesSearch && exchange.status === activeTab;
     });
+
+    const handleExport = () => {
+        const data = filteredExchanges.map(item => ({
+            'Exchange ID': item.id,
+            'Order ID': item.order_id,
+            'Customer': item.customer_name,
+            'Product': item.product_name,
+            'Reason': item.reason,
+            'Status': item.status,
+            'Return AWB': item.return_awb_number || '-',
+            'New AWB': item.new_awb_number || '-',
+            'Date': new Date(item.created_at).toLocaleDateString()
+        }));
+        exportToExcel(data, `exchanges_${activeTab.toLowerCase().replace(' ', '_')}`, activeTab);
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -268,15 +301,23 @@ const ExchangesView: React.FC = () => {
             </div>
 
             {/* Controls */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search by Order ID, Customer, or Product..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="relative w-full max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search by Order ID, Customer, or Product..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                </div>
+                <button
+                    onClick={handleExport}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
+                >
+                    <Download size={16} /> Export
+                </button>
             </div>
 
             {/* Exchanges Table */}
@@ -306,7 +347,22 @@ const ExchangesView: React.FC = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-semibold text-blue-600">{item.order_id}</div>
+                                        <div className="text-sm font-semibold text-blue-600 flex items-center gap-2">
+                                            {item.order_id}
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(item.order_id);
+                                                    setCopiedId(item.order_id);
+                                                    setTimeout(() => setCopiedId(null), 2000);
+                                                }}
+                                                className={`transition-colors p-1 rounded ${copiedId === item.order_id ? "text-green-600 bg-green-50"
+                                                    : "text-gray-400 hover:text-blue-600 bg-blue-50 hover:bg-blue-100"
+                                                    }`}
+                                                title="Copy Order ID"
+                                            >
+                                                {copiedId === item.order_id ? <Check size={12} /> : <Copy size={12} />}
+                                            </button>
+                                        </div>
                                         <div className="text-sm text-gray-500">{item.customer_name || 'Unknown'}</div>
                                     </td>
                                     <td className="px-6 py-4">

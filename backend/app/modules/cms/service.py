@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from .models import CMSBanner, CMSCategoryBanner, CMSNotification, CMSPage
+from .models import CMSBanner, CMSCategoryBanner, CMSNotification, CMSPage, AppNotification
 from twilio.rest import Client
 from app.config import settings
 import logging
@@ -156,6 +156,17 @@ def create_notification(db: Session, data: dict):
         new_notif.status = "FAILED"
         db.commit()
         return new_notif
+
+# --- WORKFLOW: APP NOTIFICATIONS ---
+def get_app_notifications(db: Session):
+    return db.query(AppNotification).order_by(AppNotification.created_at.desc()).all()
+
+def create_app_notification(db: Session, data: dict):
+    notif = AppNotification(**data)
+    db.add(notif)
+    db.commit()
+    db.refresh(notif)
+    return notif
 
 # --- WORKFLOW 4: STATIC PAGES ---
 def get_pages(db: Session):

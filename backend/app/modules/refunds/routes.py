@@ -57,7 +57,16 @@ def create_refund(refund: schemas.RefundCreate, db: Session = Depends(get_db)):
             order_id=refund.order_id,
             reason=refund.reason,
             amount=refund.amount,
-            proof_image_path=refund.proof_image_path
+            proof_image_path=refund.proof_image_path,
+            # New fields
+            order_item_id=refund.order_item_id,
+            email=refund.email,
+            description=refund.description,
+            payment_method=refund.payment_method,
+            type=refund.type,
+            product_name=refund.product_name,
+            quantity=refund.quantity,
+            customer=refund.customer
         )
         
         # Fetch with order details
@@ -146,6 +155,16 @@ def _format_refund_response(refund):
         "return_label_path": refund.return_label_path,
         "return_delivery_status": refund.return_delivery_status,
         
+        # New fields mapping
+        "order_item_id": refund.order_item_id,
+        "email": refund.email or (refund.order.email if refund.order else None),
+        "description": refund.description,
+        "payment_method": refund.payment_method,
+        "type": refund.type,
+        "product_name": refund.product_name,
+        "quantity": refund.quantity,
+        "customer": refund.customer,
+        
         # New fields
         "rejection_reason": refund.rejection_reason,
         "admin_notes": refund.admin_notes,
@@ -196,6 +215,16 @@ def update_refund_awb(
         "return_awb_number": updated_refund.return_awb_number,
         "return_label_path": updated_refund.return_label_path,
         "return_delivery_status": updated_refund.return_delivery_status,
+
+        # New fields mapping
+        "order_item_id": updated_refund.order_item_id,
+        "email": updated_refund.email or (updated_refund.order.email if updated_refund.order else None),
+        "description": updated_refund.description,
+        "payment_method": updated_refund.payment_method,
+        "type": updated_refund.type,
+        "product_name": updated_refund.product_name,
+        "quantity": updated_refund.quantity,
+        "customer": updated_refund.customer,
         "created_at": updated_refund.created_at,
         "updated_at": updated_refund.updated_at,
         "approved_at": updated_refund.approved_at,

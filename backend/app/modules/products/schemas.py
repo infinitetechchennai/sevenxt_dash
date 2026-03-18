@@ -38,6 +38,8 @@ class ProductVariant(ProductVariantBase):
 class ProductBase(BaseModel):
     name: str
     category: str
+    colors: Optional[str] = None
+    brand_name: Optional[str] = Field(None, alias="brandName")
     
     b2c_price: float = Field(0.0, alias="b2cPrice")
     compare_at_price: float = Field(0.0, alias="compareAtPrice")
@@ -55,16 +57,13 @@ class ProductBase(BaseModel):
     b2b_offer_start_date: Optional[datetime] = Field(None, alias="b2bOfferStartDate")
     b2b_offer_end_date: Optional[datetime] = Field(None, alias="b2bOfferEndDate")
     
+    info: Optional[str] = None
     description: Optional[str] = None
     status: str = "Draft"
     stock: int = 0
     image: Optional[str] = None
     rating: float = 0.0
-<<<<<<< HEAD
     # reviews: int = 0
-=======
-    reviews: int = 0
->>>>>>> 18b14a9a377cc9a7ca746e390bd3e86ba8561ad7
     
     # Tax and Compliance
     sgst: float = 0.0
@@ -97,6 +96,8 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
+    colors: Optional[str] = None
+    brand_name: Optional[str] = Field(None, alias="brandName")
     
     b2c_price: Optional[float] = Field(None, alias="b2cPrice")
     compare_at_price: Optional[float] = Field(None, alias="compareAtPrice")
@@ -114,6 +115,7 @@ class ProductUpdate(BaseModel):
     b2b_offer_start_date: Optional[datetime] = Field(None, alias="b2bOfferStartDate")
     b2b_offer_end_date: Optional[datetime] = Field(None, alias="b2bOfferEndDate")
     
+    info: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = None
     stock: Optional[int] = None
