@@ -59,8 +59,8 @@ app.add_middleware(
         # "http://192.168.29.146:3000", # Local LAN Access
         "https://sevenxt.in",  # Production Domain
         "https://www.sevenxt.in",  # Production Domain WWW
-        "https://subconjunctively-unrebated-curtis.ngrok-free.dev"  # ngrok
-        "https://sevenxt-dash.vercel.app"  # vercel
+        "https://subconjunctively-unrebated-curtis.ngrok-free.dev",  # ngrok
+        "https://sevenxt-dash.vercel.app",  # vercel
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods (GET, POST, PUT, DELETE, etc.)
