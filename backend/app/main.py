@@ -60,6 +60,7 @@ app.add_middleware(
         "https://sevenxt.in",  # Production Domain
         "https://www.sevenxt.in",  # Production Domain WWW
         "https://subconjunctively-unrebated-curtis.ngrok-free.dev"  # ngrok
+        "https://sevenxt-dash.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods (GET, POST, PUT, DELETE, etc.)
