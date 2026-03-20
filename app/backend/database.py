@@ -13,14 +13,14 @@ def get_db_connection():
     """
     try:
         connection = psycopg2.connect(
-            # REPLACE with your System A (Office) IP address from ipconfig
-            host="192.168.1.6", 
+            # Read from environment variables for Render deployment, fallback to local settings
+            host=os.getenv("DB_HOST", "192.168.1.6"), 
             
             # Your PostgreSQL credentials
-            user="postgres",
-            password="12345",
-            database="sevenext",
-            port=5432,
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", "12345"),
+            database=os.getenv("DB_NAME", "sevenext"),
+            port=int(os.getenv("DB_PORT", 5432)),
             
             # Optional: Prevents the app from hanging if the network is down
             connect_timeout=10 

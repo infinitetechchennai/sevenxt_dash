@@ -3,12 +3,14 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+import os
+
 # --- Configuration ---
 # IMPORTANT: In a real application, you should load this from a secure config file, not hardcode it.
 # Use a long, random string for your actual secret key.
-SECRET_KEY = "a-very-secret-key-that-you-should-change"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # The token will be valid for 30 minutes
+SECRET_KEY = os.getenv("SECRET_KEY", "a-very-secret-key-that-you-should-change")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # The token will be valid for 30 minutes
 
 # --- Password Hashing ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
