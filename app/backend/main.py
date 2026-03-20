@@ -1420,3 +1420,6 @@ async def get_orders_by_user(
     finally:
         cursor.close()
         conn.close()
+@app.get("/")
+async def root():
+    return {"message": "API is running!"}
