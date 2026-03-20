@@ -1,6 +1,7 @@
 # main.py — CORRECTED VERSION
 
 import os
+import psycopg2.extras
 import uuid
 import json  
 from fastapi import Request
@@ -52,7 +53,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT id FROM auth_users WHERE email = %s", (email,))
     user = cursor.fetchone()
     conn.close()
@@ -67,7 +68,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 @app.post("/auth/signup")
 async def signup(user: UserCreate):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cursor.execute("SELECT id FROM auth_users WHERE email = %s", (user.email,))
         if cursor.fetchone():
@@ -101,7 +102,7 @@ async def signup(user: UserCreate):
 @app.post("/auth/login")
 async def login(form: UserLogin):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         # First, check auth_users table
         cursor.execute("SELECT id, password_hash, email FROM auth_users WHERE email = %s", (form.email,))
@@ -155,7 +156,7 @@ async def register_b2c(payload: B2CRegister):
     
     # Call signup to create user
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         # Check if email exists
         cursor.execute("SELECT id FROM auth_users WHERE email = %s", (payload.email,))
@@ -399,7 +400,7 @@ async def delete_address(user_address_id: str, current_user_id: str = Depends(ge
 @app.get("/users/addresses")
 async def list_addresses(current_user_id: str = Depends(get_current_user)):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cursor.execute("""
             SELECT 
@@ -433,7 +434,7 @@ async def get_me(token: str = Depends(oauth2_scheme)):
         raise HTTPException(401, "Invalid or expired token")
 
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
         user_info = {
@@ -587,7 +588,7 @@ async def update_user_profile(
     Update user profile information.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # First check user type from token
@@ -684,7 +685,7 @@ async def get_products(
     Get products with filtering. User type determines which price to show.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Base query - REMOVED 'rating, reviews' as they don't exist in products table
@@ -812,7 +813,7 @@ async def get_product(product_id: str, user_type: str = "b2c"):
     Get a single product by ID.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         cursor.execute("""
@@ -912,7 +913,7 @@ async def get_new_arrivals(
     Get newly added products.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         query = """
@@ -992,7 +993,7 @@ async def get_on_sale_products(
     Get products that are currently on sale.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         current_time = datetime.now()
@@ -1099,7 +1100,7 @@ async def add_review(
     Add a review/rating to a product.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Check if product exists
@@ -1166,7 +1167,7 @@ async def get_product_reviews(
     Get reviews for a specific product.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Check if product exists
@@ -1222,7 +1223,7 @@ async def search_products(
     Search products by name or category.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         search_term = f"%{query}%"
@@ -1373,7 +1374,7 @@ async def get_orders_by_user(
     Get all orders for a specific user by email.
     """
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     try:
         # Fetch orders for the user
