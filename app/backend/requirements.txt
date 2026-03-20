@@ -3,6 +3,6 @@ uvicorn[standard]
 python-multipart
 python-jose
 passlib[bcrypt]
-pydantic
+pydantic[email]
 mysql-connector-python
 typing-extensions
