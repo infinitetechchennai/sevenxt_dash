@@ -57,26 +57,11 @@ class ApiService {
       headers,
     });
 
-    console.log('📡 API Response:', {
-      url: url,
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok
-    });
-
-    // Parse JSON once (works for both success and error responses)
     const data = await response.json().catch(() => ({
       detail: "An error occurred",
     }));
 
-    console.log('📦 Response Data:', data);
-
     if (!response.ok) {
-      console.error('❌ API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: data
-      });
 
       // Handle 401 Global Logout
       if (response.status === 401) {

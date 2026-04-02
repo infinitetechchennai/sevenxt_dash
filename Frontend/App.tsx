@@ -100,10 +100,8 @@ const App: React.FC = () => {
   const fetchUserProfile = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      console.log('🔍 Fetching user profile with token:', token ? 'Token exists' : 'No token');
 
       if (!token) {
-        console.error('❌ No auth token found');
         setIsAuthenticated(false);
         return;
       }
@@ -112,10 +110,9 @@ const App: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      console.log('📡 Profile API response status:', response.status);
+
 
       if (!response.ok) {
-        console.error('❌ Profile fetch failed:', response.status, response.statusText);
         // If unauthorized, clear auth and redirect to login
         if (response.status === 401) {
           localStorage.removeItem('auth_token');
@@ -127,7 +124,6 @@ const App: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log('✅ Profile data received:', data);
       setUserProfile(data);
 
       // Auto-redirect if current view is not allowed
@@ -164,7 +160,7 @@ const App: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error('❌ Failed to fetch profile:', error);
+      console.error('Failed to fetch profile:', error);
       // On error, log out the user to prevent infinite loading
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');

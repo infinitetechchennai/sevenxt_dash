@@ -1,4 +1,4 @@
-# Clean main.py with proper CORS configuration
+# SevenXT Admin API — Main Application
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +17,6 @@ from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog
 from app.modules.exchanges.models import Exchange
 from app.modules.reviews.models import ProductReview
-# from app.modules.categories.models import Category
 
 # Import all routers
 from app.modules.auth import routes as auth_routes
@@ -37,7 +36,6 @@ from app.modules.finance.routes import router as finance_router
 from app.modules.reports.routes import router as reports_router
 from app.modules.dashboard import routes as dashboard_routes
 from app.modules.reviews import routes as reviews_routes
-# from app.modules.categories.routes import router as categories_router
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -52,15 +50,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # React frontend
-        # "http://localhost:3001",  # React frontend (Vite alternate port)
-        # "http://localhost:5173",  # Vite frontend
-        "http://localhost:8001",  # Backend (for testing)
-        # "http://192.168.29.146:3000", # Local LAN Access
-        "https://sevenxt.in",  # Production Domain
-        "https://www.sevenxt.in",  # Production Domain WWW
-        "https://subconjunctively-unrebated-curtis.ngrok-free.dev",  # ngrok
-        "https://sevenxt-dash.vercel.app",  # vercel
+        "http://localhost:3000",
+        "https://sevenxt.in",
+        "https://www.sevenxt.in",
+        "https://sevenxt-dash.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods (GET, POST, PUT, DELETE, etc.)
@@ -123,7 +116,6 @@ app.include_router(user_routes.employees_router, prefix=API_PREFIX)
 
 # Products & Orders
 app.include_router(product_routes.router, prefix=API_PREFIX)
-# app.include_router(categories_router, prefix=API_PREFIX)
 app.include_router(order_routes.router, prefix=API_PREFIX)
 
 # Delivery & Webhooks
@@ -169,13 +161,3 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
-# ========================================
-# CORS TEST ENDPOINT
-# ========================================
-@app.get("/api/v1/test-cors")
-def test_cors():
-    """Test endpoint to verify CORS is working"""
-    return {
-        "message": "CORS is working!",
-        "cors_enabled": True
-    }

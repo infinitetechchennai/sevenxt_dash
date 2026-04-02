@@ -21,10 +21,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://sevenxt-dash.onrender.com",
         "https://sevenxt.in",
         "https://www.sevenxt.in",
-        "https://your-frontend.vercel.app",
+        "https://sevenxt-dash.vercel.app",
     ]
 
     # ========================================

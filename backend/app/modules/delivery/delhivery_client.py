@@ -425,11 +425,14 @@ class DelhiveryClient:
 
 
 # --------------------------------------------------
-# INITIALIZATION (SANDBOX)
+# INITIALIZATION
 # --------------------------------------------------
+import os
 
-DELHIVERY_TEST_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"  # Old token - has Prepaid enabled
+DELHIVERY_API_TOKEN = os.getenv("DELHIVERY_API_TOKEN", "cb5e84d71ecff61c73abc80b20b326dec8302d8c")
+IS_PRODUCTION = os.getenv("DELHIVERY_PRODUCTION", "false").lower() == "true"
+
 delhivery_client = DelhiveryClient(
-    token=DELHIVERY_TEST_TOKEN,
-    is_production=False,
+    token=DELHIVERY_API_TOKEN,
+    is_production=IS_PRODUCTION,
 )
