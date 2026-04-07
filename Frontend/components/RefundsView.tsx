@@ -106,6 +106,21 @@ export const RefundsView: React.FC = () => {
             finalUrl = finalUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
         }
 
+        // Fix mixed content blocked by browser (e.g., http://13.233.199.134/...)
+        if (finalUrl.includes('http://13.233.199.134')) {
+            finalUrl = finalUrl.replace('http://13.233.199.134', API_BASE_URL);
+        }
+
+        // Also fix any http://localhost or other insecure direct IP links if dashboard is on https
+        if (window.location.protocol === 'https:' && finalUrl.startsWith('http://') && !finalUrl.includes('localhost')) {
+            try {
+                const urlObj = new URL(finalUrl);
+                finalUrl = `${API_BASE_URL}${urlObj.pathname}${urlObj.search}`;
+            } catch (e) {
+                finalUrl = finalUrl.replace('http://', 'https://');
+            }
+        }
+
         // Add backend base URL if it's a relative path
         if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
             finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;

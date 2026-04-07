@@ -172,6 +172,23 @@ const ExchangesView: React.FC = () => {
             imageUrl = imageUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
         }
 
+        // Fix mixed content blocked by browser (e.g., http://13.233.199.134/...)
+        if (imageUrl.includes('http://13.233.199.134')) {
+            imageUrl = imageUrl.replace('http://13.233.199.134', API_BASE_URL);
+        }
+
+        // Also fix any http://localhost or other insecure direct IP links if dashboard is on https
+        if (window.location.protocol === 'https:' && imageUrl.startsWith('http://') && !imageUrl.includes('localhost')) {
+            // Extract the path after the origin
+            try {
+                const urlObj = new URL(imageUrl);
+                imageUrl = `${API_BASE_URL}${urlObj.pathname}${urlObj.search}`;
+            } catch (e) {
+                // If parsing fails, just try to replace http with https
+                imageUrl = imageUrl.replace('http://', 'https://');
+            }
+        }
+
         // Add backend base URL if it's a relative path
         if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
             imageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
