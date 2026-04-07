@@ -669,6 +669,25 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     }
   };
 
+  const handlePrintAWBLabel = async (orderId: string) => {
+    try {
+      if (!orderId) return;
+      const blob = await apiService.downloadAWBLabel(orderId);
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `AWB_${orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error("Error downloading AWB label:", err);
+      alert(err.message || "Failed to download AWB label. It may not be generated yet.");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 -m-4 sm:-m-6 lg:-m-8 font-sans overflow-hidden relative">
       {/* Header */}
@@ -973,15 +992,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                             </div>
                           </td>
                           <td className="py-4 px-6 text-center">
-                            {order.awb_label_path ? (
-                              <a
-                                href={`${API_BASE_URL}${order.awb_label_path}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                            {order.awb_label_path || order.awb_number ? (
+                              <button
+                                onClick={() => handlePrintAWBLabel(order.id)}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
+                                title="Download Custom AWB Label"
                               >
                                 <Download size={14} /> Download
-                              </a>
+                              </button>
                             ) : (
                               <span className="text-slate-300 text-[10px]">-</span>
                             )}

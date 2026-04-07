@@ -833,6 +833,68 @@ def generate_label(order_id: str, db: Session = Depends(get_db)):
         logger.exception(f"[INVOICE_LABEL] Failed to generate label for {order_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/{order_id}/awb/download")
+def download_awb_label(order_id: str, db: Session = Depends(get_db)):
+    """Download AWB label PDF, fetching from Delhivery if missing"""
+    from fastapi.responses import FileResponse, Response
+    
+    order = service.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    awb_number = order.awb_number
+    if not awb_number:
+        raise HTTPException(status_code=400, detail="AWB not generated yet")
+
+    from app.modules.orders.models import Delivery
+    delivery = db.query(Delivery).filter(Delivery.order_id == order.id).first()
+    
+    # 1. Check if we already have it locally
+    awb_path = None
+    if delivery and delivery.awb_label_path:
+        awb_path = os.path.join(BASE_DIR.parent, delivery.awb_label_path.lstrip('/'))
+        if os.path.exists(awb_path):
+            return FileResponse(
+                path=awb_path,
+                filename=f"AWB_{awb_number}.pdf",
+                media_type="application/pdf"
+            )
+
+    # 2. Fetch from Delhivery
+    from app.modules.delivery.delhivery_client import delhivery_client
+    pdf_content, err = delhivery_client.fetch_awb_label(awb_number)
+    
+    if pdf_content:
+        # Save it locally for future hits
+        try:
+            output_dir = os.path.join(BASE_DIR.parent, "uploads", "awb")
+            os.makedirs(output_dir, exist_ok=True)
+            filename = f"awb_{awb_number}.pdf"
+            local_path = os.path.join(output_dir, filename)
+            
+            with open(local_path, "wb") as f:
+                f.write(pdf_content)
+                
+            if delivery:
+                delivery.awb_label_path = f"/uploads/awb/{filename}"
+                db.commit()
+                
+            return Response(
+                content=pdf_content, 
+                media_type="application/pdf", 
+                headers={"Content-Disposition": f"attachment; filename=AWB_{awb_number}.pdf"}
+            )
+        except Exception as e:
+            logger.error(f"Failed to save fetched AWB {awb_number}: {e}")
+            return Response(
+                content=pdf_content, 
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename=AWB_{awb_number}.pdf"}
+            )
+            
+    logger.error(f"Failed to fetch AWB from Delhivery: {err}")
+    raise HTTPException(status_code=404, detail="AWB label not found on Delhivery servers")
+
 @router.post("/{order_id}/email-invoice")
 def email_invoice_endpoint(order_id: str, db: Session = Depends(get_db)):
     """Manually generate and email commercial invoice"""

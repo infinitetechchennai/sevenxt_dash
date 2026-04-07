@@ -715,6 +715,33 @@ class ApiService {
       method: "POST",
     });
   }
+
+  async downloadAWBLabel(orderId: string): Promise<Blob> {
+    const token = this.getAuthToken();
+    const base = API_BASE_URL.replace(/\/+$/g, "");
+    const url = `${base}/api/v1/orders/${orderId}/awb/download`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Failed to download: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+      } catch (e) {
+        // Not JSON
+      }
+      throw new Error(errorMessage);
+    }
+
+    return response.blob();
+  }
 }
 
 
