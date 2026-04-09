@@ -167,32 +167,20 @@ const ExchangesView: React.FC = () => {
             imageUrl = path;
         }
 
-        // Fix missing port - add :8000 if URL has IP but no port
-        if (imageUrl.includes('sevenxt.in/') && !imageUrl.includes('sevenxt.in:')) {
-            imageUrl = imageUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
-        }
-
-        // Fix mixed content blocked by browser (e.g., http://13.233.199.134/...)
-        if (imageUrl.includes('http://13.233.199.134')) {
-            imageUrl = imageUrl.replace('http://13.233.199.134', API_BASE_URL);
-        }
-
-        // Also fix any http://localhost or other insecure direct IP links if dashboard is on https
-        if (window.location.protocol === 'https:' && imageUrl.startsWith('http://') && !imageUrl.includes('localhost')) {
-            // Extract the path after the origin
-            try {
-                const urlObj = new URL(imageUrl);
-                imageUrl = `${API_BASE_URL}${urlObj.pathname}${urlObj.search}`;
-            } catch (e) {
-                // If parsing fails, just try to replace http with https
-                imageUrl = imageUrl.replace('http://', 'https://');
-            }
-        }
-
-        // Add backend base URL if it's a relative path
-        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+        // Extract the path if it contains /uploads/ or /upload/ to use the correct API_BASE_URL
+        // This handles cases where the DB has saved an old IP address or domain
+        if (imageUrl && imageUrl.includes('/uploads/')) {
+            const uploadPath = imageUrl.substring(imageUrl.indexOf('/uploads/'));
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+            imageUrl = `${cleanBaseUrl}${uploadPath}`;
+        } else if (imageUrl && imageUrl.includes('upload/')) {
+            const uploadPath = imageUrl.substring(imageUrl.indexOf('upload/'));
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+            imageUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
+        } else if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
             imageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            imageUrl = `${API_BASE_URL}${imageUrl}`;
+            imageUrl = `${cleanBaseUrl}${imageUrl}`;
         }
 
         setSelectedProof(imageUrl);

@@ -101,30 +101,21 @@ export const RefundsView: React.FC = () => {
             finalUrl = imageUrl;
         }
 
-        // Fix missing port - add :8000 if URL has IP but no port
-        if (finalUrl.includes('sevenxt.in/') && !finalUrl.includes('sevenxt.in:')) {
-            finalUrl = finalUrl.replace('sevenxt.in/', 'sevenxt.in:8000/');
-        }
-
-        // Fix mixed content blocked by browser (e.g., http://13.233.199.134/...)
-        if (finalUrl.includes('http://13.233.199.134')) {
-            finalUrl = finalUrl.replace('http://13.233.199.134', API_BASE_URL);
-        }
-
-        // Also fix any http://localhost or other insecure direct IP links if dashboard is on https
-        if (window.location.protocol === 'https:' && finalUrl.startsWith('http://') && !finalUrl.includes('localhost')) {
-            try {
-                const urlObj = new URL(finalUrl);
-                finalUrl = `${API_BASE_URL}${urlObj.pathname}${urlObj.search}`;
-            } catch (e) {
-                finalUrl = finalUrl.replace('http://', 'https://');
-            }
-        }
-
-        // Add backend base URL if it's a relative path
-        if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
+        // Extract the path if it contains /uploads/ or /upload/ to use the correct API_BASE_URL
+        // This handles cases where the DB has saved an old IP address or domain
+        if (finalUrl && finalUrl.includes('/uploads/')) {
+            const uploadPath = finalUrl.substring(finalUrl.indexOf('/uploads/'));
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+            finalUrl = `${cleanBaseUrl}${uploadPath}`;
+        } else if (finalUrl && finalUrl.includes('upload/')) {
+            const uploadPath = finalUrl.substring(finalUrl.indexOf('upload/'));
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+            finalUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
+        } else if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
+            // Add backend base URL if it's a relative path without /uploads/
+            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
             finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
-            finalUrl = `${API_BASE_URL}${finalUrl}`;
+            finalUrl = `${cleanBaseUrl}${finalUrl}`;
         }
 
         setSelectedProof(finalUrl);
