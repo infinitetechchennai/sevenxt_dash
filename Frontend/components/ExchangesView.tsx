@@ -158,29 +158,41 @@ const ExchangesView: React.FC = () => {
         // Parse if it's a JSON array string like ["url"]
         let imageUrl = path;
         try {
-            if (path.startsWith('[')) {
-                const parsed = JSON.parse(path);
-                imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : path;
+            const urlMatch = path.match(/https?:\/\/[^\s"'\]\\]+/);
+            if (urlMatch) {
+                imageUrl = urlMatch[0];
+            } else {
+                let cleanStr = path.trim();
+                if (cleanStr.startsWith('"') && cleanStr.endsWith('"')) {
+                    cleanStr = cleanStr.substring(1, cleanStr.length - 1);
+                }
+                if (cleanStr.startsWith('[')) {
+                    cleanStr = cleanStr.replace(/\\"/g, '"');
+                    const parsed = JSON.parse(cleanStr);
+                    imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cleanStr;
+                }
             }
         } catch (e) {
-            // If parsing fails, use the original path
+            console.error("Parse proof image url error", e);
             imageUrl = path;
         }
 
         // Extract the path if it contains /uploads/ or /upload/ to use the correct API_BASE_URL
-        // This handles cases where the DB has saved an old IP address or domain
-        if (imageUrl && imageUrl.includes('/uploads/')) {
-            const uploadPath = imageUrl.substring(imageUrl.indexOf('/uploads/'));
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            imageUrl = `${cleanBaseUrl}${uploadPath}`;
-        } else if (imageUrl && imageUrl.includes('upload/')) {
-            const uploadPath = imageUrl.substring(imageUrl.indexOf('upload/'));
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            imageUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
-        } else if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            imageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-            imageUrl = `${cleanBaseUrl}${imageUrl}`;
+        // ONLY apply if the URL is relative (doesn't start with http). Plural handles cases where DB has saved an old IP.
+        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
+            if (imageUrl.includes('/uploads/')) {
+                const uploadPath = imageUrl.substring(imageUrl.indexOf('/uploads/'));
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                imageUrl = `${cleanBaseUrl}${uploadPath}`;
+            } else if (imageUrl.includes('upload/')) {
+                const uploadPath = imageUrl.substring(imageUrl.indexOf('upload/'));
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                imageUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
+            } else {
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                imageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                imageUrl = `${cleanBaseUrl}${imageUrl}`;
+            }
         }
 
         setSelectedProof(imageUrl);

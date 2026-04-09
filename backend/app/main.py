@@ -88,6 +88,9 @@ async def cors_preflight_handler(request: Request, call_next):
 # Keep /static for temp PDFs (AWB labels, invoices) only
 import os as _os
 _os.makedirs("static/temp", exist_ok=True)
+_os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 # ========================================
 # STARTUP EVENT

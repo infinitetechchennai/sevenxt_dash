@@ -92,20 +92,42 @@ export const RefundsView: React.FC = () => {
         // Parse if it's a JSON array string like ["url"]
         let finalUrl = imageUrl;
         try {
-            if (imageUrl.startsWith('[')) {
-                const parsed = JSON.parse(imageUrl);
-                finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imageUrl;
+            const urlMatch = imageUrl.match(/https?:\/\/[^\s"'\]\\]+/);
+            if (urlMatch) {
+                finalUrl = urlMatch[0];
+            } else {
+                let cleanStr = imageUrl.trim();
+                if (cleanStr.startsWith('"') && cleanStr.endsWith('"')) {
+                    cleanStr = cleanStr.substring(1, cleanStr.length - 1);
+                }
+                if (cleanStr.startsWith('[')) {
+                    cleanStr = cleanStr.replace(/\\"/g, '"');
+                    const parsed = JSON.parse(cleanStr);
+                    finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cleanStr;
+                }
             }
         } catch (e) {
+            console.error("Parse proof image url error", e);
             finalUrl = imageUrl;
         }
 
         // If it's already a full URL (Cloudinary or any https), use it directly.
         // For old local /uploads/ paths still in DB, reconstruct with backend base URL.
+        // ONLY apply if the URL is relative (doesn't start with http). Plural handles cases where DB has saved an old IP.
         if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
-            finalUrl = `${cleanBaseUrl}${finalUrl}`;
+            if (finalUrl.includes('/uploads/')) {
+                const uploadPath = finalUrl.substring(finalUrl.indexOf('/uploads/'));
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                finalUrl = `${cleanBaseUrl}${uploadPath}`;
+            } else if (finalUrl.includes('upload/')) {
+                const uploadPath = finalUrl.substring(finalUrl.indexOf('upload/'));
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                finalUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
+            } else {
+                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
+                finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
+                finalUrl = `${cleanBaseUrl}${finalUrl}`;
+            }
         }
 
         setSelectedProof(finalUrl);
