@@ -205,70 +205,36 @@ async def upload_product_image(
     file: UploadFile = File(...)
 ):
     """
-    Upload a product image and return the URL.
-    Resizes image to max width 420px and saves to uploads/products/ directory.
+    Upload a product image to Cloudinary and return the URL.
+    Resizes image to max width 420px before uploading.
     """
     try:
         # Validate file type
         allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
         file_extension = Path(file.filename).suffix.lower()
-        
+
         if file_extension not in allowed_extensions:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}"
             )
-        
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("uploads/products")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Read file contents
+
         contents = await file.read()
-        
-        # Resize image to max width 420px
-        from PIL import Image
-        import io
-        
-        # Open image
-        image = Image.open(io.BytesIO(contents))
-        
-        # Calculate new dimensions (max width 420px, maintain aspect ratio)
-        max_width = 420
-        if image.width > max_width:
-            # Calculate new height maintaining aspect ratio
-            aspect_ratio = image.height / image.width
-            new_width = max_width
-            new_height = int(max_width * aspect_ratio)
-            
-            # Resize image
-            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        # Generate unique filename
-        unique_filename = f"{uuid.uuid4()}{file_extension}"
-        file_path = upload_dir / unique_filename
-        
-        # Save resized image
-        # Convert to RGB if PNG with transparency (for JPEG compatibility)
-        if image.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', image.size, (255, 255, 255))
-            if image.mode == 'P':
-                image = image.convert('RGBA')
-            background.paste(image, mask=image.split()[-1] if image.mode == 'RGBA' else None)
-            image = background
-        
-        # Save with optimization
-        image.save(file_path, quality=85, optimize=True)
-        
-        # Return URL (relative path that will be served by FastAPI static files)
-        image_url = f"/uploads/products/{unique_filename}"
-        
+
+        from app.utils.cloudinary_upload import upload_image_to_cloudinary
+        image_url = upload_image_to_cloudinary(
+            file_bytes=contents,
+            folder="sevenxt/products",
+            resize_width=420,
+            quality=85,
+        )
+
         return {
             "status": "success",
             "url": image_url,
-            "filename": unique_filename
+            "filename": file.filename
         }
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()

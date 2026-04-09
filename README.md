@@ -27,6 +27,7 @@ This project is built using modern, highly scalable technologies separated into 
 - **Payments:** Razorpay API (Instant payment verification, transaction logging)
 - **Email Notifications:** SendGrid (Invoices, OTPs, refund/exchange updates)
 - **SMS Notifications:** Twilio (Order updates, B2B verification statuses)
+- **Media Storage:** Cloudinary (Product images, profiles)
 
 ---
 
@@ -36,7 +37,9 @@ This project is built using modern, highly scalable technologies separated into 
 sevenxt_dash/
 ├── Frontend/           # React + Vite admin dashboard
 ├── backend/            # FastAPI python backend
-│   ├── app/            # Main application code (routes, models, database)
+│   ├── app/            # Main application code
+│   │   ├── modules/    # Modular API endpoints (auth, products, refunds, etc.)
+│   │   └── utils/      # Shared utilities (e.g., Cloudinary uploads)
 │   ├── migrations/     # Alembic database migrations
 │   ├── uploads/        # System storage (Invoice PDFs, AWB Labels, Profiles)
 │   └── start.py        # Entry point to run backend locally

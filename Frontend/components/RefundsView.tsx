@@ -97,22 +97,12 @@ export const RefundsView: React.FC = () => {
                 finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imageUrl;
             }
         } catch (e) {
-            // If parsing fails, use the original path
             finalUrl = imageUrl;
         }
 
-        // Extract the path if it contains /uploads/ or /upload/ to use the correct API_BASE_URL
-        // This handles cases where the DB has saved an old IP address or domain
-        if (finalUrl && finalUrl.includes('/uploads/')) {
-            const uploadPath = finalUrl.substring(finalUrl.indexOf('/uploads/'));
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            finalUrl = `${cleanBaseUrl}${uploadPath}`;
-        } else if (finalUrl && finalUrl.includes('upload/')) {
-            const uploadPath = finalUrl.substring(finalUrl.indexOf('upload/'));
-            const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-            finalUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
-        } else if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
-            // Add backend base URL if it's a relative path without /uploads/
+        // If it's already a full URL (Cloudinary or any https), use it directly.
+        // For old local /uploads/ paths still in DB, reconstruct with backend base URL.
+        if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
             const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
             finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
             finalUrl = `${cleanBaseUrl}${finalUrl}`;

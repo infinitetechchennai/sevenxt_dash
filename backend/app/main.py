@@ -82,15 +82,12 @@ async def cors_preflight_handler(request: Request, call_next):
 
 # ========================================
 # STATIC FILES
+# Note: File uploads are now stored on Cloudinary.
+# Local uploads/ directory is no longer used.
 # ========================================
-uploads_dir = "uploads"
-os.makedirs(uploads_dir, exist_ok=True)
-os.makedirs(f"{uploads_dir}/banners", exist_ok=True)
-os.makedirs(f"{uploads_dir}/categories", exist_ok=True)
-os.makedirs(f"{uploads_dir}/campaigns", exist_ok=True)
-os.makedirs(f"{uploads_dir}/awb", exist_ok=True)
-
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Keep /static for temp PDFs (AWB labels, invoices) only
+import os as _os
+_os.makedirs("static/temp", exist_ok=True)
 
 # ========================================
 # STARTUP EVENT

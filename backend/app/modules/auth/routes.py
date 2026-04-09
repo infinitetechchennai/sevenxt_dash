@@ -143,9 +143,6 @@ def reset_password_otp(
 # ========== PROFILE PICTURE UPLOAD ==========
 
 from fastapi import File, UploadFile
-import os
-import shutil
-from pathlib import Path
 
 @router.post("/upload-profile-picture")
 async def upload_profile_picture(
@@ -155,30 +152,24 @@ async def upload_profile_picture(
 ):
     """Upload profile picture for current user"""
     try:
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("uploads/profiles")
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Generate unique filename
-        file_extension = os.path.splitext(file.filename)[1]
-        filename = f"{current_employee.id}_{int(datetime.now().timestamp())}{file_extension}"
-        file_path = upload_dir / filename
-        
-        # Save file
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
+        from app.utils.cloudinary_upload import upload_image_to_cloudinary
+        contents = await file.read()
+        profile_picture_url = upload_image_to_cloudinary(
+            file_bytes=contents,
+            folder="sevenxt/profiles",
+            resize_width=300,
+            quality=85,
+        )
+
         # Update database based on user type
-        profile_picture_url = f"/uploads/profiles/{filename}"
-        
         if isinstance(current_employee, AdminUser):
             current_employee.profile_picture = profile_picture_url
         elif isinstance(current_employee, EmployeeUser):
             current_employee.profile_picture = profile_picture_url
-        
+
         db.commit()
         db.refresh(current_employee)
-        
+
         return {
             "message": "Profile picture uploaded successfully",
             "profile_picture": profile_picture_url

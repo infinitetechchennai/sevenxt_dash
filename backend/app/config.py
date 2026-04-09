@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     RAZORPAY_WEBHOOK_SECRET: str = ""
 
     # ========================================
+    # CLOUDINARY (File Storage)
+    # ========================================
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
+    # ========================================
     # DELHIVERY WEBHOOK
     # ========================================
     DELHIVERY_WEBHOOK_SECRET: str = ""

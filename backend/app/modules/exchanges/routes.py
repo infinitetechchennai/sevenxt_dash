@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
@@ -10,6 +10,50 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/exchanges", tags=["Exchanges"])
+
+
+@router.post("/upload-proof")
+async def upload_exchange_proof(file: UploadFile = File(...)):
+    """
+    Upload an exchange proof image to Cloudinary.
+    Returns the Cloudinary URL to be saved with the exchange request.
+    """
+    try:
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"}
+        import os, uuid
+        file_extension = os.path.splitext(file.filename)[1].lower()
+
+        if file_extension not in allowed_extensions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+            )
+
+        contents = await file.read()
+
+        from app.utils.cloudinary_upload import upload_image_to_cloudinary, upload_raw_to_cloudinary
+
+        if file_extension == ".pdf":
+            proof_url = upload_raw_to_cloudinary(
+                file_bytes=contents,
+                folder="sevenxt/exchanges/proofs",
+                filename=f"proof_{uuid.uuid4().hex}.pdf"
+            )
+        else:
+            proof_url = upload_image_to_cloudinary(
+                file_bytes=contents,
+                folder="sevenxt/exchanges/proofs",
+                quality=85,
+            )
+
+        return {
+            "status": "success",
+            "url": proof_url
+        }
+
+    except Exception as e:
+        logger.exception("Failed to upload exchange proof")
+        raise HTTPException(status_code=500, detail=f"Failed to upload proof: {str(e)}")
 
 
 @router.post("", response_model=schemas.ExchangeResponse)
