@@ -41,6 +41,7 @@ const ExchangesView: React.FC = () => {
     // Modals
     const [proofModalOpen, setProofModalOpen] = useState(false);
     const [selectedProof, setSelectedProof] = useState<string | null>(null);
+    const [proofError, setProofError] = useState(false);
     const [qcModalOpen, setQcModalOpen] = useState(false);
     const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
     const [qcNotes, setQcNotes] = useState('');
@@ -155,51 +156,29 @@ const ExchangesView: React.FC = () => {
 
 
     const handleViewProof = (path: string) => {
-        // Parse if it's a JSON array string like ["url"]
-        let imageUrl = path;
+        let imageUrl = path?.trim();
+        if (!imageUrl) return;
+
         try {
-            const urlMatch = path.match(/https?:\/\/[^\s"'\]\\]+/);
+            // Handle JSON array format like ["https://res.cloudinary.com/..."] or escaped variants
+            if (imageUrl.startsWith('"') && imageUrl.endsWith('"')) {
+                imageUrl = imageUrl.slice(1, -1);
+            }
+            if (imageUrl.startsWith('[')) {
+                imageUrl = imageUrl.replace(/\\"/g, '"');
+                const parsed = JSON.parse(imageUrl);
+                imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imageUrl;
+            }
+            // Extract URL if embedded inside a string
+            const urlMatch = imageUrl.match(/https?:\/\/[^\s"'\]\\]+/);
             if (urlMatch) {
                 imageUrl = urlMatch[0];
-            } else {
-                let cleanStr = path.trim();
-                if (cleanStr.startsWith('"') && cleanStr.endsWith('"')) {
-                    cleanStr = cleanStr.substring(1, cleanStr.length - 1);
-                }
-                if (cleanStr.startsWith('[')) {
-                    cleanStr = cleanStr.replace(/\\"/g, '"');
-                    const parsed = JSON.parse(cleanStr);
-                    imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cleanStr;
-                }
             }
         } catch (e) {
-            console.error("Parse proof image url error", e);
-            imageUrl = path;
+            console.error('Failed to parse proof URL:', e);
         }
 
-        // Extract the path if it contains /uploads/ or /upload/ to use the correct API_BASE_URL
-        // ONLY apply if the URL is relative (doesn't start with http). Plural handles cases where DB has saved an old IP.
-        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-            if (imageUrl.includes('/uploads/')) {
-                const uploadPath = imageUrl.substring(imageUrl.indexOf('/uploads/'));
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                imageUrl = `${cleanBaseUrl}${uploadPath}`;
-            } else if (imageUrl.includes('upload/')) {
-                const uploadPath = imageUrl.substring(imageUrl.indexOf('upload/'));
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                imageUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
-            } else {
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                imageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-                imageUrl = `${cleanBaseUrl}${imageUrl}`;
-            }
-        }
-
-        // Fix for mixed content warning (loading http:// backend image on https:// frontend)
-        if (imageUrl && imageUrl.startsWith('http://') && window.location.protocol === 'https:') {
-            imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}`;
-        }
-
+        setProofError(false);
         setSelectedProof(imageUrl);
         setProofModalOpen(true);
     };
@@ -560,11 +539,20 @@ const ExchangesView: React.FC = () => {
                             <X size={20} />
                         </button>
                         <div className="bg-gray-100 p-1 flex items-center justify-center min-h-[300px]">
-                            <img
-                                src={selectedProof}
-                                alt="Proof"
-                                className="max-w-full max-h-[60vh] object-contain rounded"
-                            />
+                            {proofError ? (
+                                <div className="flex flex-col items-center gap-3 py-10 text-gray-400">
+                                    <Camera size={40} className="opacity-40" />
+                                    <p className="text-sm font-medium">Image no longer available</p>
+                                    <p className="text-xs text-gray-400">This proof was uploaded to an old server and cannot be retrieved.</p>
+                                </div>
+                            ) : (
+                                <img
+                                    src={selectedProof!}
+                                    alt="Proof"
+                                    className="max-w-full max-h-[60vh] object-contain rounded"
+                                    onError={() => setProofError(true)}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>

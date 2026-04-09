@@ -12,6 +12,7 @@ export const RefundsView: React.FC = () => {
     // Modal & Processing States
     const [proofModalOpen, setProofModalOpen] = useState(false);
     const [selectedProof, setSelectedProof] = useState<string | null>(null);
+    const [proofError, setProofError] = useState(false);
     const [qrModalOpen, setQrModalOpen] = useState(false);
     const [selectedQRRefund, setSelectedQRRefund] = useState<any>(null);
     const [processingId, setProcessingId] = useState<number | null>(null);
@@ -89,52 +90,29 @@ export const RefundsView: React.FC = () => {
     };
 
     const handleViewProof = (imageUrl: string) => {
-        // Parse if it's a JSON array string like ["url"]
-        let finalUrl = imageUrl;
+        let finalUrl = imageUrl?.trim();
+        if (!finalUrl) return;
+
         try {
-            const urlMatch = imageUrl.match(/https?:\/\/[^\s"'\]\\]+/);
+            // Handle JSON array format like ["https://res.cloudinary.com/..."] or escaped variants
+            if (finalUrl.startsWith('"') && finalUrl.endsWith('"')) {
+                finalUrl = finalUrl.slice(1, -1);
+            }
+            if (finalUrl.startsWith('[')) {
+                finalUrl = finalUrl.replace(/\\"/g, '"');
+                const parsed = JSON.parse(finalUrl);
+                finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : finalUrl;
+            }
+            // Extract URL if embedded inside a string
+            const urlMatch = finalUrl.match(/https?:\/\/[^\s"'\]\\]+/);
             if (urlMatch) {
                 finalUrl = urlMatch[0];
-            } else {
-                let cleanStr = imageUrl.trim();
-                if (cleanStr.startsWith('"') && cleanStr.endsWith('"')) {
-                    cleanStr = cleanStr.substring(1, cleanStr.length - 1);
-                }
-                if (cleanStr.startsWith('[')) {
-                    cleanStr = cleanStr.replace(/\\"/g, '"');
-                    const parsed = JSON.parse(cleanStr);
-                    finalUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : cleanStr;
-                }
             }
         } catch (e) {
-            console.error("Parse proof image url error", e);
-            finalUrl = imageUrl;
+            console.error('Failed to parse proof URL:', e);
         }
 
-        // If it's already a full URL (Cloudinary or any https), use it directly.
-        // For old local /uploads/ paths still in DB, reconstruct with backend base URL.
-        // ONLY apply if the URL is relative (doesn't start with http). Plural handles cases where DB has saved an old IP.
-        if (finalUrl && !finalUrl.startsWith('http') && !finalUrl.startsWith('data:')) {
-            if (finalUrl.includes('/uploads/')) {
-                const uploadPath = finalUrl.substring(finalUrl.indexOf('/uploads/'));
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                finalUrl = `${cleanBaseUrl}${uploadPath}`;
-            } else if (finalUrl.includes('upload/')) {
-                const uploadPath = finalUrl.substring(finalUrl.indexOf('upload/'));
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                finalUrl = `${cleanBaseUrl}/${uploadPath.replace('upload/', 'uploads/')}`;
-            } else {
-                const cleanBaseUrl = API_BASE_URL.replace(/\/+$/, '');
-                finalUrl = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
-                finalUrl = `${cleanBaseUrl}${finalUrl}`;
-            }
-        }
-
-        // Fix for mixed content warning (loading http:// backend image on https:// frontend)
-        if (finalUrl && finalUrl.startsWith('http://') && window.location.protocol === 'https:') {
-            finalUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}`;
-        }
-
+        setProofError(false);
         setSelectedProof(finalUrl);
         setProofModalOpen(true);
     };
@@ -421,11 +399,20 @@ export const RefundsView: React.FC = () => {
                             <X size={20} />
                         </button>
                         <div className="bg-gray-100 p-1 flex items-center justify-center min-h-[300px]">
-                            <img
-                                src={selectedProof}
-                                alt="Customer Proof"
-                                className="max-w-full max-h-[60vh] object-contain rounded"
-                            />
+                            {proofError ? (
+                                <div className="flex flex-col items-center gap-3 py-10 text-gray-400">
+                                    <Camera size={40} className="opacity-40" />
+                                    <p className="text-sm font-medium">Image no longer available</p>
+                                    <p className="text-xs text-gray-400">This proof was uploaded to an old server and cannot be retrieved.</p>
+                                </div>
+                            ) : (
+                                <img
+                                    src={selectedProof!}
+                                    alt="Customer Proof"
+                                    className="max-w-full max-h-[60vh] object-contain rounded"
+                                    onError={() => setProofError(true)}
+                                />
+                            )}
                         </div>
                         <div className="p-4 bg-white">
                             <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
