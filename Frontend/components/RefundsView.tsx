@@ -130,6 +130,11 @@ export const RefundsView: React.FC = () => {
             }
         }
 
+        // Fix for mixed content warning (loading http:// backend image on https:// frontend)
+        if (finalUrl && finalUrl.startsWith('http://') && window.location.protocol === 'https:') {
+            finalUrl = `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}`;
+        }
+
         setSelectedProof(finalUrl);
         setProofModalOpen(true);
     };

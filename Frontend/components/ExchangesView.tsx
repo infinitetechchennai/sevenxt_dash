@@ -195,6 +195,11 @@ const ExchangesView: React.FC = () => {
             }
         }
 
+        // Fix for mixed content warning (loading http:// backend image on https:// frontend)
+        if (imageUrl && imageUrl.startsWith('http://') && window.location.protocol === 'https:') {
+            imageUrl = `https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}`;
+        }
+
         setSelectedProof(imageUrl);
         setProofModalOpen(true);
     };
