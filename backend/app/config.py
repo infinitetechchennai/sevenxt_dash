@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # https://sandbox.co.in — B2B GSTIN lookup
     # ========================================
     SANDBOX_API_KEY: str = ""
+    SANDBOX_API_SECRET: str = ""
 
     # ========================================
     # CLOUDINARY (File Storage)
