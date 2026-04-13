@@ -1275,20 +1275,34 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
     ? parseFloat(order.amount.replace(/[^0-9.-]+/g, ""))
     : order.amount;
 
-  // Calculate GST dynamically based on stored percentages
-  // Default to 0 if not present
-  const sgstPercent = Number(order.sgst_percentage) || 0;
-  const cgstPercent = Number(order.cgst_percentage) || 0;
+  const REGISTERED_STATES: Record<string, string> = {
+    "tamil nadu": "33ABLCS5237N1ZU",
+    // add more states here when company registers in new states
+  };
 
-  // Total Tax Rate (e.g., 18% = 0.18)
-  const totalTaxRate = (sgstPercent + cgstPercent) / 100;
+  const buyerState = (
+    order.state || order.address || ''
+  ).toLowerCase();
 
-  // Subtotal = Amount / (1 + Tax Rate)
-  const subtotal = totalTaxRate > 0 ? (amountValue / (1 + totalTaxRate)) : amountValue;
+  const isIntraState = Object.keys(REGISTERED_STATES)
+    .some(s => buyerState.includes(s));
 
-  // Calculate specific tax amounts
-  const sgst = subtotal * (sgstPercent / 100);
+  const sellerGstin = Object.entries(REGISTERED_STATES)
+    .find(([s]) => buyerState.includes(s))?.[1]
+    || "33ABLCS5237N1ZU";
+
+  const GST_RATE = 0.18;
+  const subtotal = amountValue / (1 + GST_RATE);
+  const cgstPercent = isIntraState ? 9 : 0;
+  const sgstPercent = isIntraState ? 9 : 0;
+  const igstPercent = isIntraState ? 0 : 18;
   const cgst = subtotal * (cgstPercent / 100);
+  const sgst = subtotal * (sgstPercent / 100);
+  const igst = subtotal * (igstPercent / 100);
+
+  const invoiceNumber = order.order_number
+    ? order.order_number.replace('ORD-', 'INV-')
+    : `INV-${order.order_id || order.id}`;
 
   // Generate dummy items based on item count
   // Use actual product list if available, otherwise fallback to dummy items
@@ -1356,12 +1370,12 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
             </div>
             <p className="text-sm text-gray-500">123 Innovation Park, Tech CitNo.181/1, Old No.80/1, Swamy Naicken Street,y</p>
             <p className="text-sm text-gray-500">Chintadripet Chennai 600002</p>
-            <p className="text-sm text-gray-500 mt-1">GSTIN: 33ABLCS5237N1ZU</p>
+            <p className="text-sm text-gray-500 mt-1">GSTIN: {sellerGstin}</p>
           </div>
           <div className="text-right">
             <h2 className="text-4xl font-light text-gray-200 uppercase tracking-widest mb-2">Invoice</h2>
             <p className="text-sm text-gray-500 mb-1">Invoice Number</p>
-            <p className="text-lg font-bold text-gray-900 font-mono">INV-{order.order_id || order.id}</p>
+            <p className="text-lg font-bold text-gray-900 font-mono">{invoiceNumber}</p>
             <p className="text-sm text-gray-500 mt-2">Date: {order.date}</p>
             <div className={`mt-2 inline-block px-3 py-1 rounded border text-xs font-bold uppercase ${order.payment === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
               {order.payment}
@@ -1384,7 +1398,7 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
           <div className="text-right">
             <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Order Details</h3>
             <div className="text-sm text-gray-600 space-y-1">
-              <p>Order ID: <span className="font-mono font-medium text-gray-900">{order.id}</span></p>
+              <p>Order ID: <span className="font-mono font-medium text-gray-900">{order.order_number || order.order_id || order.id}</span></p>
               <p>Order Type: <span className="font-medium text-gray-900">{order.type}</span></p>
               <p>Total Items: <span className="font-medium text-gray-900">{order.items}</span></p>
             </div>
@@ -1445,14 +1459,38 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
               <span>Subtotal</span>
               <span className="font-medium">₹{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>SGST ({sgstPercent}%)</span>
-              <span className="font-medium">₹{sgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>CGST ({cgstPercent}%)</span>
-              <span className="font-medium">₹{cgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {isIntraState ? (
+              <>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>CGST (9%)</span>
+                  <span className="font-medium">
+                    ₹{cgst.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>SGST (9%)</span>
+                  <span className="font-medium">
+                    ₹{sgst.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>IGST (18%)</span>
+                <span className="font-medium">
+                  ₹{igst.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold text-gray-900 border-t border-gray-200 pt-3">
               <span>Total Amount</span>
               <span className="text-blue-600">₹{amountValue.toLocaleString()}</span>
