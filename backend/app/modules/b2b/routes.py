@@ -68,29 +68,59 @@ async def verify_pan(data: VerificationRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KYC Gateway Error: {str(e)}")
 
+import re
+
 @router.post("/verify-gst")
 async def verify_gst(data: VerificationRequest):
-    """Verifies GSTIN using Razorpay's modern Identity API"""
-    auth = HTTPBasicAuth(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
+    """Verifies GSTIN using Sandbox API"""
     
-    # Standard 2025 Verification Endpoint
-    url = "https://api.razorpay.com/v1/instants/gstin"
-    
+    gstin = (data.number or "").strip().upper()
+
+    # 1. First validate GSTIN format using regex
+    pattern = r"^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+    if not re.match(pattern, gstin):
+        return {"valid": False, "detail": "Invalid GSTIN format"}
+
+    # 2. Call Sandbox API to verify
+    url = f"https://api.sandbox.co.in/gsp/taxpayer/gstin/{gstin}"
+    headers = {
+        "Authorization": settings.SANDBOX_API_KEY,
+        "x-api-version": "1.0",
+        "x-api-source": "api"
+    }
+
     try:
-        response = requests.post(url, json={"gstin": data.number}, auth=auth)
+        response = requests.get(url, headers=headers)
         res_data = response.json()
 
         print(f"DEBUG GST API RESPONSE: {res_data}")
+        
+        # Sandbox wraps the successful response under "data"
+        api_data = res_data.get("data", {})
+        status = api_data.get("sts", "")
 
-        if response.status_code == 200:
+        # 3. Check response
+        if response.status_code == 200 and status == "Active":
+            # Extract desired fields
+            legal_name = api_data.get("lgnm", "")
+            trade_name = api_data.get("tradeNam", "")
+            reg_date = api_data.get("rgdt", "")
+            
+            # State might be inside pradr (Principal Address)
+            # or stjCd/stj (State Jurisdiction)
+            state_code = api_data.get("pradr", {}).get("addr", {}).get("stcd", "N/A")
+            
             return {
                 "valid": True,
-                "business_name": res_data.get("legal_name", "N/A"),
-                "status_desc": f"Active - {res_data.get('status', 'Verified')}"
+                "business_name": trade_name or legal_name or "N/A",
+                "status_desc": "Active",
+                "state": state_code,
+                "registration_date": reg_date
             }
         else:
-            error_msg = res_data.get("error", {}).get("description", "Feature not enabled on your account")
-            return {"valid": False, "detail": error_msg}
+            # If status is not "Active" -> reject with proper error message
+            error_msg = res_data.get("message", "GSTIN is not Active or not found")
+            return {"valid": False, "detail": f"Verification failed: {error_msg}"}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KYC Gateway Error: {str(e)}")

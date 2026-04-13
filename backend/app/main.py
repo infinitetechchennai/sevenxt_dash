@@ -18,6 +18,7 @@ from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog
 from app.modules.exchanges.models import Exchange
 from app.modules.reviews.models import ProductReview
+from app.modules.orders.order_id_generator import OrderSequence  # noqa: F401 — ensures table is created
 
 # Import all routers
 from app.modules.auth import routes as auth_routes

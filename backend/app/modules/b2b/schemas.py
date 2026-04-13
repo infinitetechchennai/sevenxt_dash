@@ -17,6 +17,8 @@ class B2BResponse(BaseModel):
     gst_certificate_url: Optional[str] = None
     business_license_url: Optional[str] = None
     status: str
+    state: Optional[str] = None
+    registration_date: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

@@ -22,5 +22,7 @@ class B2BApplication(Base):
     gst_certificate_url = Column(String(500), nullable=True)
     business_license_url = Column(String(500), nullable=True)
     status = Column(String(50), default="Pending")
+    state = Column(String(100), nullable=True)
+    registration_date = Column(String(50), nullable=True)
     address_id = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     RAZORPAY_WEBHOOK_SECRET: str = ""
 
     # ========================================
+    # SANDBOX (GST Verification)
+    # https://sandbox.co.in — B2B GSTIN lookup
+    # ========================================
+    SANDBOX_API_KEY: str = ""
+
+    # ========================================
     # CLOUDINARY (File Storage)
     # ========================================
     CLOUDINARY_CLOUD_NAME: str = ""
