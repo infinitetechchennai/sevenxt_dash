@@ -683,7 +683,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     try {
       if (!orderId) return;
       const blob = await apiService.downloadAWBLabel(orderId);
-      
+
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
