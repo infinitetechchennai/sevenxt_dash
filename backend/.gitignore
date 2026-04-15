@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Credentials (NEVER commit)
+CREDENTIALS_BACKUP.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploads (user data - don't track)
+uploads/
+
+# Node
+node_modules/
