@@ -1285,13 +1285,35 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
     ? parseFloat(order.amount.replace(/[^0-9.-]+/g, ""))
     : order.amount;
 
+  // Registered states and their GSTINs
+  const REGISTERED_STATES: Record<string, string> = {
+    "tamil nadu": "33ABLCS5237N1ZU",
+    // Add more states here when company registers in new states
+  };
+
+  // Detect buyer state from order
+  const buyerState = (
+    order.state ||
+    order.address ||
+    ''
+  ).toLowerCase();
+
+  // Check if intra-state
+  const matchedState = Object.keys(REGISTERED_STATES)
+    .find(s => buyerState.includes(s));
+  const isIntraState = !!matchedState;
+  const sellerGstin = matchedState
+    ? REGISTERED_STATES[matchedState]
+    : "33ABLCS5237N1ZU";
+
+  // Always use 18% total GST
   const GST_RATE = 0.18;
   const subtotal = amountValue / (1 + GST_RATE);
-  const cgstPercent = Number(order.cgst_percentage ?? 0);
-  const sgstPercent = Number(order.sgst_percentage ?? 0);
-  const igstPercent = Number(order.igst_percentage ?? 0);
-  const isIntraState = igstPercent === 0;
-  const sellerGstin = order.seller_gstin || "33ABLCS5237N1ZU";
+
+  // Split based on intra/inter state
+  const cgstPercent = isIntraState ? 9 : 0;
+  const sgstPercent = isIntraState ? 9 : 0;
+  const igstPercent = isIntraState ? 0 : 18;
   const cgst = subtotal * (cgstPercent / 100);
   const sgst = subtotal * (sgstPercent / 100);
   const igst = subtotal * (igstPercent / 100);

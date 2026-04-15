@@ -25,8 +25,16 @@ def _ensure_order_compliance(db: Session, order: Order) -> None:
         changed = True
 
     breakdown = compute_gst(float(order.amount or 0), order.state or "")
-    expected_sgst = breakdown.get("sgst_rate", 0.0)
-    expected_cgst = breakdown.get("cgst_rate", 0.0)
+    gst_type = breakdown.get("gst_type", "intra")
+
+    if gst_type == "intra":
+        expected_sgst = float(breakdown.get("sgst_rate", 0.0))
+        expected_cgst = float(breakdown.get("cgst_rate", 0.0))
+        expected_igst = 0.0
+    else:
+        expected_sgst = 0.0
+        expected_cgst = 0.0
+        expected_igst = float(breakdown.get("igst_rate", 0.0))
 
     current_sgst = float(order.sgst_percentage or 0.0)
     current_cgst = float(order.cgst_percentage or 0.0)
@@ -35,6 +43,12 @@ def _ensure_order_compliance(db: Session, order: Order) -> None:
         order.sgst_percentage = expected_sgst
         order.cgst_percentage = expected_cgst
         changed = True
+
+    if hasattr(order, "igst_percentage"):
+        current_igst = float(getattr(order, "igst_percentage") or 0.0)
+        if current_igst != expected_igst:
+            setattr(order, "igst_percentage", expected_igst)
+            changed = True
 
     if changed:
         db.add(order)
