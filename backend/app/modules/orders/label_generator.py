@@ -7,6 +7,9 @@ from reportlab.graphics.barcode import code128
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
 
+from app.modules.orders.order_id_generator import derive_invoice_number
+from app.modules.orders.gst_utils import compute_gst
+
 # 100mm x 150mm
 PAGE_WIDTH = 100 * mm
 PAGE_HEIGHT = 150 * mm
@@ -19,8 +22,15 @@ def generate_invoice_label_pdf(order_data, output_dir):
     """
     os.makedirs(output_dir, exist_ok=True)
     oid = order_data.get('order_id') or str(order_data.get('id', ''))
+    display_order_id = order_data.get("razorpay_order_id") or oid
     filename = f"label_{oid}.pdf"
     filepath = os.path.join(output_dir, filename)
+
+    buyer_state = str(order_data.get("state") or "")
+    final_amount = float(order_data.get("amount") or 0) if str(order_data.get("amount") or "").strip() else 0.0
+    gst = compute_gst(total_amount=final_amount, buyer_state=buyer_state)
+    seller_gstin = gst.get("seller_gstin") or "33ABLCS5237N1ZU"
+    invoice_number = derive_invoice_number(oid)
     
     c = canvas.Canvas(filepath, pagesize=(PAGE_WIDTH, PAGE_HEIGHT))
     
@@ -116,7 +126,7 @@ def generate_invoice_label_pdf(order_data, output_dir):
     else:
         draw_qr_scaled("NO AWB", start_x + qr_size + gap, qr_y, qr_size)
     # QR 3
-    draw_qr_scaled(oid, start_x + 2*qr_size + 2*gap, qr_y, qr_size)
+    draw_qr_scaled(display_order_id, start_x + 2*qr_size + 2*gap, qr_y, qr_size)
     
     y = qr_y - 3*mm
     
@@ -165,9 +175,9 @@ def generate_invoice_label_pdf(order_data, output_dir):
     c.rect(table_x, y - row_h, sum(cols), row_h)
     current_x = table_x
     
-    inv_val = oid.replace('ORD-', '')
+    inv_val = invoice_number
     date_val = str(order_data.get('date', ''))[:10]
-    vals = ["1", "SevenXt", "33ABLC...", inv_val, date_val, "ELEC/ACC"]
+    vals = ["1", "SevenXt", seller_gstin, inv_val, date_val, "ELEC/ACC"]
     
     for i, w in enumerate(cols):
          if i < len(cols):

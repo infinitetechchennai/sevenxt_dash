@@ -96,6 +96,13 @@ def derive_invoice_number(order_id: str) -> str:
     Falls back gracefully for legacy random-string order IDs:
         "order_SbJ3QBRhTjV3wA" → "INV-order_SbJ3QBRhTjV3wA"
     """
+    # As requested: invoice number should be month-based only (INV-YYYY-MM).
+    # For standard order IDs "ORD-YYYY-MM-XXXX", derive "INV-YYYY-MM".
     if order_id and order_id.startswith("ORD-"):
+        parts = order_id.split("-")
+        if len(parts) >= 3:
+            year = parts[1]
+            month = parts[2]
+            return f"INV-{year}-{month}"
         return "INV-" + order_id[4:]
     return f"INV-{order_id}"

@@ -5,6 +5,7 @@ from datetime import datetime
 class OrderBase(BaseModel):
     order_id : str
     order_number: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
     gst_type: Optional[str] = None
     seller_gstin: Optional[str] = None
     igst_percentage: Optional[float] = 0.0

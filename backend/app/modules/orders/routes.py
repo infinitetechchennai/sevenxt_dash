@@ -80,6 +80,7 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
             "id": order.id,
             "order_id": order.order_id,
             "order_number": order.order_id,
+            "razorpay_order_id": getattr(order, "razorpay_order_id", None),
             "gst_type": tax_meta["gst_type"],
             "seller_gstin": tax_meta["seller_gstin"],
             "igst_percentage": tax_meta["igst_percentage"],
@@ -440,6 +441,7 @@ def read_order(order_id: str, db: Session = Depends(get_db)):
         "id": order.id,
         "order_id": order.order_id,
         "order_number": order.order_id,
+        "razorpay_order_id": getattr(order, "razorpay_order_id", None),
         "gst_type": service.get_order_tax_meta(order)["gst_type"],
         "seller_gstin": service.get_order_tax_meta(order)["seller_gstin"],
         "igst_percentage": service.get_order_tax_meta(order)["igst_percentage"],
@@ -508,6 +510,7 @@ def update_order_status(
         "id": updated_order.id,
         "order_id": updated_order.order_id,
         "order_number": updated_order.order_id,
+        "razorpay_order_id": getattr(updated_order, "razorpay_order_id", None),
         "gst_type": service.get_order_tax_meta(updated_order)["gst_type"],
         "seller_gstin": service.get_order_tax_meta(updated_order)["seller_gstin"],
         "igst_percentage": service.get_order_tax_meta(updated_order)["igst_percentage"],
@@ -559,6 +562,7 @@ def update_order_dimensions(order_id: str, dimensions: schemas.OrderDimensionsUp
         "id": updated_order.id,
         "order_id": updated_order.order_id,
         "order_number": updated_order.order_id,
+        "razorpay_order_id": getattr(updated_order, "razorpay_order_id", None),
         "gst_type": service.get_order_tax_meta(updated_order)["gst_type"],
         "seller_gstin": service.get_order_tax_meta(updated_order)["seller_gstin"],
         "igst_percentage": service.get_order_tax_meta(updated_order)["igst_percentage"],
@@ -833,6 +837,7 @@ def generate_label(order_id: str, db: Session = Depends(get_db)):
     order_data = {
         "id": order.order_id,
         "order_id": order.order_id,  # Add this for label_generator compatibility
+        "razorpay_order_id": getattr(order, "razorpay_order_id", None),
         "awb_number": order.awb_number,
         "customer": order.customer_name,
         "address": order.address,
@@ -841,6 +846,7 @@ def generate_label(order_id: str, db: Session = Depends(get_db)):
         "pincode": order.pincode,
         "phone": order.phone,
         "date": order.created_at.strftime('%Y-%m-%d') if order.created_at else "",
+        "amount": float(order.amount) if order.amount else 0.0,
     }
     
     # Define output directory with absolute path

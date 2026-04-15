@@ -59,12 +59,27 @@ def _normalize(state: str) -> str:
 
 def get_seller_gstin(buyer_state: str) -> str:
     """Return the correct seller GSTIN based on the buyer's state."""
-    return REGISTERED_STATES.get(_normalize(buyer_state), DEFAULT_GSTIN)
+    s = _normalize(buyer_state)
+    # Be resilient to variants like "Tamilnadu", "Tamil Nadu - India", etc.
+    for key, gstin in REGISTERED_STATES.items():
+        k = _normalize(key)
+        if not k:
+            continue
+        if s == k or k in s or s.replace(" ", "") == k.replace(" ", ""):
+            return gstin
+    return DEFAULT_GSTIN
 
 
 def is_intra_state(buyer_state: str) -> bool:
     """True when buyer's state is one of our registered states."""
-    return _normalize(buyer_state) in REGISTERED_STATES
+    s = _normalize(buyer_state)
+    for key in REGISTERED_STATES.keys():
+        k = _normalize(key)
+        if not k:
+            continue
+        if s == k or k in s or s.replace(" ", "") == k.replace(" ", ""):
+            return True
+    return False
 
 
 def compute_gst(total_amount: float, buyer_state: str) -> Dict[str, Any]:

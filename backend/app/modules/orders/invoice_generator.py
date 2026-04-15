@@ -43,12 +43,14 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     os.makedirs(output_dir, exist_ok=True)
 
     oid = getattr(order, 'order_id', str(order.id))
+    display_order_id = getattr(order, "razorpay_order_id", None) or oid
 
     # ------------------------------------------------------------------ #
     #  FEATURE 2: Correct invoice number — INV-YYYY-MM-XXXX               #
     # ------------------------------------------------------------------ #
     invoice_number = derive_invoice_number(oid)
-    filename = f"{invoice_number}.pdf"
+    # Invoice number is month-based, so ensure file names don't overwrite.
+    filename = f"{invoice_number}_{oid}.pdf"
     filepath = os.path.join(output_dir, filename)
 
     doc = SimpleDocTemplate(
@@ -89,7 +91,7 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     inv_meta = f"""<font size=32 color="#e5e7eb">INVOICE</font><br/>
     <font size=10 color="grey">Invoice Number</font><br/>
     <font size=12><b>{invoice_number}</b></font><br/><br/>
-    <font size=10 color="grey">Order ID: {oid}</font><br/>
+    <font size=10 color="grey">Order ID: {display_order_id}</font><br/>
     <font size=10 color="grey">Date: {date_str}</font><br/>
     <font color='{pay_color}'><b>{pay_status}</b></font>
     """
@@ -128,7 +130,7 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     </font>"""
 
     order_details_html = f"""<font size=8 color="grey">ORDER DETAILS</font><br/>
-    Order ID: <b>{oid}</b><br/>
+    Order ID: <b>{display_order_id}</b><br/>
     Invoice No: <b>{invoice_number}</b><br/>
     Order Type: <b>{getattr(order, 'customer_type', 'B2C')}</b><br/>
     GST Type: <b>{gst_type_label}</b><br/>

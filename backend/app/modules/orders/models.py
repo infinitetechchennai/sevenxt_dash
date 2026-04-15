@@ -72,6 +72,7 @@ class Order(Base):
     # GST Percentages
     sgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
     cgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
+    razorpay_order_id = Column(String(50), nullable=True)
 
     # GST and Pricing fields
     original_price = Column(DECIMAL(10, 2), nullable=True)  # Price before tax
