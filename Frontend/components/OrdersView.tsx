@@ -698,6 +698,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
     }
   };
 
+  const handleDownloadFullInvoice = (orderId: string) => {
+    const url = `${API_BASE_URL}/orders/${orderId}/download-invoice-pdf?t=${new Date().getTime()}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-50 -m-4 sm:-m-6 lg:-m-8 font-sans overflow-hidden relative">
       {/* Header */}
@@ -1158,11 +1163,11 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
                       <td className="py-4 px-6 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => setSelectedOrder(order)}
+                            onClick={() => handleDownloadFullInvoice(order.id)}
                             className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="View Invoice"
+                            title="Download Full Invoice"
                           >
-                            <Eye size={18} />
+                            <Download size={18} />
                           </button>
                         </div>
                       </td>
@@ -1184,14 +1189,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
         </div>
       </div >
 
-      {/* Invoice Modal */}
-      {
-        selectedOrder && (
-          <div className="fixed inset-0 z-[1000] flex justify-center items-start bg-black/60 backdrop-blur-sm p-4 pt-24 overflow-y-auto">
-            <InvoiceModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
-          </div>
-        )
-      }
+      {/* Invoice Modal removed to use actual PDF */}
 
 
 
@@ -1386,8 +1384,8 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
               <img src={logo} alt="Logo" className="h-[90px] w-auto" />
               {/* <h1 className="text-2xl font-bold text-gray-900">Sevenxt</h1> */}
             </div>
-            <p className="text-sm text-gray-500">123 Innovation Park, Tech CitNo.181/1, Old No.80/1, Swamy Naicken Street,y</p>
-            <p className="text-sm text-gray-500">Chintadripet Chennai 600002</p>
+            <p className="text-sm text-gray-500">No.181/1, Old No.80/1, Swamy Naicken Street,</p>
+            <p className="text-sm text-gray-500">Chintadripet, Chennai - 600002</p>
             <p className="text-sm text-gray-500 mt-1">GSTIN: {sellerGstin}</p>
           </div>
           <div className="text-right">

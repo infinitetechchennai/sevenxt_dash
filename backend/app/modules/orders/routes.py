@@ -871,6 +871,33 @@ def generate_label(order_id: str, db: Session = Depends(get_db)):
         logger.exception(f"[INVOICE_LABEL] Failed to generate label for {order_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/{order_id}/download-invoice-pdf")
+def download_invoice_pdf(order_id: str, db: Session = Depends(get_db)):
+    """Generate and return full A4 commercial invoice PDF"""
+    from fastapi.responses import FileResponse
+    order = service.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    from app.modules.orders.invoice_generator import generate_invoice_pdf
+    
+    # Define output directory
+    output_dir = os.path.join(BASE_DIR.parent, "uploads", "invoices")
+    
+    try:
+        filename = generate_invoice_pdf(order, output_dir)
+        full_path = os.path.join(output_dir, filename)
+        
+        return FileResponse(
+            path=full_path,
+            filename=filename,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename={filename}"}
+        )
+    except Exception as e:
+        logger.exception(f"[INVOICE_PDF] Failed to generate A4 invoice for {order_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/{order_id}/awb/download")
 def download_awb_label(order_id: str, db: Session = Depends(get_db)):
     """Download AWB label PDF, fetching from Delhivery if missing"""
