@@ -60,12 +60,13 @@ def _normalize(state: str) -> str:
 def get_seller_gstin(buyer_state: str) -> str:
     """Return the correct seller GSTIN based on the buyer's state."""
     s = _normalize(buyer_state)
-    # Be resilient to variants like "Tamilnadu", "Tamil Nadu - India", etc.
+    s_nospace = s.replace(" ", "")
     for key, gstin in REGISTERED_STATES.items():
         k = _normalize(key)
         if not k:
             continue
-        if s == k or k in s or s.replace(" ", "") == k.replace(" ", ""):
+        k_nospace = k.replace(" ", "")
+        if s == k or k in s or k_nospace in s_nospace:
             return gstin
     return DEFAULT_GSTIN
 
@@ -73,11 +74,13 @@ def get_seller_gstin(buyer_state: str) -> str:
 def is_intra_state(buyer_state: str) -> bool:
     """True when buyer's state is one of our registered states."""
     s = _normalize(buyer_state)
+    s_nospace = s.replace(" ", "")
     for key in REGISTERED_STATES.keys():
         k = _normalize(key)
         if not k:
             continue
-        if s == k or k in s or s.replace(" ", "") == k.replace(" ", ""):
+        k_nospace = k.replace(" ", "")
+        if s == k or k in s or k_nospace in s_nospace:
             return True
     return False
 
