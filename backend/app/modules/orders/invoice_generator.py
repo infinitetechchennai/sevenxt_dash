@@ -215,9 +215,17 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     # ------------------------------------------------------------------ #
     #  5. Totals — correct GST breakdown                                   #
     # ------------------------------------------------------------------ #
-    totals_data = [
-        ["Subtotal (excl. GST)", f"Rs. {gst['subtotal']:,.2f}"],
-    ]
+    totals_data = []
+    
+    # If the sum of items doesn't match the final amount, show the difference (Discount/Shipping)
+    if abs(total_calc - final_amount) > 0.01:
+        totals_data.append(["Items Total (Inc. GST)", f"Rs. {total_calc:,.2f}"])
+        if total_calc > final_amount:
+            totals_data.append(["Discount", f"-Rs. {(total_calc - final_amount):,.2f}"])
+        else:
+            totals_data.append(["Shipping / Extra", f"+Rs. {(final_amount - total_calc):,.2f}"])
+
+    totals_data.append(["Taxable Value", f"Rs. {gst['subtotal']:,.2f}"])
 
     if gst['gst_type'] == 'intra':
         totals_data.append([f"CGST ({gst['cgst_rate']:.0f}%)",
