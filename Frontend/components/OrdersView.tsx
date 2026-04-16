@@ -699,7 +699,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({ initialSearchTerm = '' }
   };
 
   const handleDownloadFullInvoice = (orderId: string) => {
-    const url = `${API_BASE_URL}/orders/${orderId}/download-invoice-pdf?t=${new Date().getTime()}`;
+    const url = `${API_BASE_URL}/api/v1/orders/${orderId}/download-invoice-pdf?t=${new Date().getTime()}`;
     window.open(url, '_blank');
   };
 
