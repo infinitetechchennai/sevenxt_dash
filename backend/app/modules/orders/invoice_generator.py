@@ -70,7 +70,10 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     # ------------------------------------------------------------------ #
     #  FEATURE 3 & 5: GST computation                                      #
     # ------------------------------------------------------------------ #
-    buyer_state  = getattr(order, 'state', '') or getattr(order, 'address', '') or ''
+    buyer_state  = getattr(order, 'state', '') or ''
+    # Fallback: if state field is empty, try to extract location from the full address
+    if not buyer_state.strip():
+        buyer_state = getattr(order, 'address', '') or ''
     final_amount = _get_float(getattr(order, 'amount', 0))
     gst          = compute_gst(total_amount=final_amount, buyer_state=buyer_state)
 

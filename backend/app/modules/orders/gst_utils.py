@@ -53,20 +53,44 @@ _IGST_RATE  = 18.0  # %
 _TOTAL_RATE = 18.0  # %
 
 
+# All known aliases for Tamil Nadu (covers typos, abbreviations, etc.)
+_TN_ALIASES = {
+    "tamil nadu", "tamilnadu", "tamil-nadu", "tamilnad", "t.n",
+    "tn", "tamilnadu state", "tamilnadu,", "tamilnadu.",
+}
+
 def _normalize(state: str) -> str:
     return (state or "").strip().lower()
+
+
+def _is_registered_state(normalized_state: str, registered_key: str) -> bool:
+    """Check if normalized_state matches registered_key using multiple strategies."""
+    s = normalized_state
+    k = _normalize(registered_key)
+    if not k:
+        return False
+    # 1. Exact match
+    if s == k:
+        return True
+    # 2. Registered key contained in state string (e.g. state is "tamil nadu india")
+    if k in s:
+        return True
+    # 3. Remove spaces and compare (tamilnadu == tamilnadu)
+    if s.replace(" ", "").replace("-", "") == k.replace(" ", "").replace("-", ""):
+        return True
+    # 4. Check individual words in the state string against known aliases
+    for word in s.replace(",", " ").replace(".", " ").split():
+        clean = word.strip()
+        if clean in _TN_ALIASES:
+            return True
+    return False
 
 
 def get_seller_gstin(buyer_state: str) -> str:
     """Return the correct seller GSTIN based on the buyer's state."""
     s = _normalize(buyer_state)
-    s_nospace = s.replace(" ", "")
     for key, gstin in REGISTERED_STATES.items():
-        k = _normalize(key)
-        if not k:
-            continue
-        k_nospace = k.replace(" ", "")
-        if s == k or k in s or k_nospace in s_nospace:
+        if _is_registered_state(s, key):
             return gstin
     return DEFAULT_GSTIN
 
@@ -74,13 +98,8 @@ def get_seller_gstin(buyer_state: str) -> str:
 def is_intra_state(buyer_state: str) -> bool:
     """True when buyer's state is one of our registered states."""
     s = _normalize(buyer_state)
-    s_nospace = s.replace(" ", "")
     for key in REGISTERED_STATES.keys():
-        k = _normalize(key)
-        if not k:
-            continue
-        k_nospace = k.replace(" ", "")
-        if s == k or k in s or k_nospace in s_nospace:
+        if _is_registered_state(s, key):
             return True
     return False
 
