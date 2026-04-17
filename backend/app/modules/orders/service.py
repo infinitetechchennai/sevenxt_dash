@@ -24,7 +24,7 @@ def _ensure_order_compliance(db: Session, order: Order) -> None:
         order.order_id = generate_order_id(db)
         changed = True
 
-    state_str = order.state or order.address or ""
+    state_str = " ".join([str(order.state or ""), str(order.city or ""), str(order.address or "")]).strip()
     breakdown = compute_gst(float(order.amount or 0), state_str)
     gst_type = breakdown.get("gst_type", "intra")
 
@@ -56,7 +56,7 @@ def _ensure_order_compliance(db: Session, order: Order) -> None:
 
 
 def get_order_tax_meta(order: Order) -> dict:
-    state_str = order.state or order.address or ""
+    state_str = " ".join([str(order.state or ""), str(order.city or ""), str(order.address or "")]).strip()
     breakdown = compute_gst(float(order.amount or 0), state_str)
     return {
         "gst_type": breakdown.get("gst_type", "intra"),

@@ -70,10 +70,14 @@ def generate_invoice_pdf(order, output_dir: str) -> str:
     # ------------------------------------------------------------------ #
     #  FEATURE 3 & 5: GST computation                                      #
     # ------------------------------------------------------------------ #
-    buyer_state  = getattr(order, 'state', '') or ''
-    # Fallback: if state field is empty, try to extract location from the full address
-    if not buyer_state.strip():
-        buyer_state = getattr(order, 'address', '') or ''
+    # Build a robust location string for GST:
+    # Some legacy rows may have `state` populated with city (or other non-state data).
+    # Passing a combined string lets gst_utils detect Tamil Nadu from the full address reliably.
+    buyer_state = " ".join([
+        str(getattr(order, 'state', '') or ''),
+        str(getattr(order, 'city', '') or ''),
+        str(getattr(order, 'address', '') or ''),
+    ]).strip()
     final_amount = _get_float(getattr(order, 'amount', 0))
     gst          = compute_gst(total_amount=final_amount, buyer_state=buyer_state)
 

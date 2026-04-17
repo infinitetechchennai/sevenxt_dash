@@ -26,7 +26,11 @@ def generate_invoice_label_pdf(order_data, output_dir):
     filename = f"label_{oid}.pdf"
     filepath = os.path.join(output_dir, filename)
 
-    buyer_state = str(order_data.get("state") or "")
+    buyer_state = " ".join([
+        str(order_data.get("state") or ""),
+        str(order_data.get("city") or ""),
+        str(order_data.get("address") or ""),
+    ]).strip()
     final_amount = float(order_data.get("amount") or 0) if str(order_data.get("amount") or "").strip() else 0.0
     gst = compute_gst(total_amount=final_amount, buyer_state=buyer_state)
     seller_gstin = gst.get("seller_gstin") or "33ABLCS5237N1ZU"
