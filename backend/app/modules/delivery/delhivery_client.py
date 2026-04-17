@@ -78,6 +78,14 @@ class DelhiveryClient:
         # Remove None values to keep payload clean
         shipment_payload = {k: v for k, v in shipment_payload.items() if v is not None}
         
+        # Delhivery API crashes with a NoneType error if GSTIN or HSN is passed as an empty string
+        if shipment_payload.get("seller_gst_tin") == "":
+            del shipment_payload["seller_gst_tin"]
+        if shipment_payload.get("hsn_code") == "":
+            del shipment_payload["hsn_code"]
+        if shipment_payload.get("seller_name") == "":
+            del shipment_payload["seller_name"]
+        
         # For reverse pickup: payment_mode="Pickup" + customer address in main fields
         # pickup_location.name specifies the warehouse (destination)
 
@@ -151,6 +159,15 @@ class DelhiveryClient:
             }
             # Remove None values
             shipment = {k: v for k, v in shipment.items() if v is not None}
+            
+            # Delhivery API crashes with a NoneType error if GSTIN or HSN is passed as an empty string
+            if shipment.get("seller_gst_tin") == "":
+                del shipment["seller_gst_tin"]
+            if shipment.get("hsn_code") == "":
+                del shipment["hsn_code"]
+            if shipment.get("seller_name") == "":
+                del shipment["seller_name"]
+                
             shipments_list.append(shipment)
 
         payload_data = {
