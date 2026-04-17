@@ -10,6 +10,13 @@ import logging
 router = APIRouter(prefix="/finance", tags=["Finance"])
 logger = logging.getLogger(__name__)
 
+def _paise_to_rupees(value) -> float:
+    """Razorpay sends amounts in paise; value may be None."""
+    try:
+        return float(value or 0) / 100
+    except Exception:
+        return 0.0
+
 # 1. GET ALL TRANSACTIONS
 @router.get("/transactions") 
 def read_transactions(db: Session = Depends(get_db)):
@@ -66,8 +73,8 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
             return {"status": "ignored"}
         
         # Razorpay sends these in paise, converting to Rupees
-        rzp_fee = payment_entity.get('fee', 0) / 100
-        rzp_tax = payment_entity.get('tax', 0) / 100
+        rzp_fee = _paise_to_rupees(payment_entity.get("fee"))
+        rzp_tax = _paise_to_rupees(payment_entity.get("tax"))
 
         existing_tx = db.query(models.Transaction).filter(models.Transaction.razorpay_payment_id == payment_entity['id']).first()
 
@@ -76,7 +83,7 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
                 razorpay_payment_id=payment_entity['id'],
                 razorpay_order_id=payment_entity.get('order_id') or f"pay_link_{payment_entity['id']}",
                 internal_order_id=payment_entity.get('order_id') or "WEBHOOK_SYNC",
-                amount=payment_entity['amount'] / 100,
+                amount=_paise_to_rupees(payment_entity.get("amount")),
                 fee=rzp_fee,  # SAVING TAX DATA
                 tax=rzp_tax,  # SAVING TAX DATA
                 currency=payment_entity.get('currency', 'INR'),
