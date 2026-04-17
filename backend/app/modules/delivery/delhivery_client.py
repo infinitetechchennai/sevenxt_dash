@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 from datetime import datetime
 from typing import Tuple, Optional
 
@@ -50,7 +51,9 @@ class DelhiveryClient:
                 else "Prepaid"  # Force Prepaid as client only uses online payment
             ),
             "products_desc": order_data.get("item_name", "Product"),
-            "hsn_code": "",
+            "hsn_code": order_data.get("hsn_code", ""),
+            "seller_gst_tin": order_data.get("seller_gst_tin", os.getenv("SELLER_GSTIN", "")),
+            "seller_name": order_data.get("seller_name", "SevenXT Electronics"),
             "cod_amount": 0.0,  # Always 0.0 for Prepaid/Pickup
             "total_amount": float(order_data["amount"]),
             "quantity": int(order_data.get("quantity", 1)),
@@ -388,19 +391,21 @@ class DelhiveryClient:
 
 
     # --------------------------------------------------
-    # PICKUP REQUEST
+    # PICKUP REQUEST (unified method)
     # --------------------------------------------------
     def pickup_request(self, pickup_data: dict) -> dict:
         """
-        Schedule a pickup request
+        Schedule a pickup request.
+        Accepts a dict with: pickup_time, pickup_date, pickup_location, expected_package_count
+        Also works as request_pickup() — both signatures are supported.
         """
         url = f"{self.base_url}/fm/request/new/"
-        print("DELHIVERY PICKUP REQUEST URL:", url)
+        print(f"[PICKUP REQUEST] Calling: {url}")
 
         payload = {
             "pickup_time": pickup_data.get("pickup_time"),
             "pickup_date": pickup_data.get("pickup_date"),
-            "pickup_location": pickup_data.get("pickup_location"),
+            "pickup_location": pickup_data.get("pickup_location", "sevenxt"),
             "expected_package_count": pickup_data.get("expected_package_count", 1),
         }
 
@@ -409,28 +414,156 @@ class DelhiveryClient:
             "Content-Type": "application/json",
         }
 
+        print(f"[PICKUP REQUEST] Payload: {payload}")
         response = requests.post(url, json=payload, headers=headers)
-        print("PICKUP REQUEST RESPONSE:", response.text)
+        print(f"[PICKUP REQUEST] Response ({response.status_code}): {response.text}")
         
-        # Delhivery returns 201 for success usually, but we check for errors
         if response.status_code not in [200, 201]:
-             # Try to parse error
              try:
                  err = response.json()
-                 raise Exception(f"Delhivery API Error: {err}")
-             except:
-                 raise Exception(f"Delhivery API Error: {response.text}")
+                 raise Exception(f"Delhivery Pickup API Error: {err}")
+             except ValueError:
+                 raise Exception(f"Delhivery Pickup API Error: {response.text}")
                  
         return response.json()
+
+    # --------------------------------------------------
+    # CANCEL SHIPMENT
+    # --------------------------------------------------
+    def cancel_shipment(self, waybill: str) -> dict:
+        """
+        Cancel a shipment using the Edit API.
+        Only works for statuses: Manifested, In Transit, Pending, Open, Scheduled.
+        Docs: POST /api/p/edit with cancellation=true
+        """
+        url = f"{self.base_url}/api/p/edit"
+        print(f"[CANCEL] Cancelling shipment AWB: {waybill}")
+
+        payload = {
+            "waybill": waybill,
+            "cancellation": "true",
+        }
+
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"[CANCEL] Response ({response.status_code}): {response.text}")
+        
+        try:
+            return response.json()
+        except Exception:
+            return {"status_code": response.status_code, "body": response.text}
+
+    # --------------------------------------------------
+    # UPDATE SHIPMENT (Weight/Dimensions/Address)
+    # --------------------------------------------------
+    def update_shipment(self, waybill: str, updates: dict) -> dict:
+        """
+        Update shipment details via the Edit API.
+        Only works before physical pickup (Manifested, Pending, Scheduled).
+        
+        Supported update fields:
+          gm (weight in grams), shipment_length, shipment_width, shipment_height,
+          name, add, phone, cod (COD amount), pt (payment type)
+        """
+        url = f"{self.base_url}/api/p/edit"
+        print(f"[UPDATE] Updating shipment AWB: {waybill} with: {updates}")
+
+        payload = {"waybill": waybill, **updates}
+
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, json=payload, headers=headers)
+        print(f"[UPDATE] Response ({response.status_code}): {response.text}")
+
+        try:
+            return response.json()
+        except Exception:
+            return {"status_code": response.status_code, "body": response.text}
+
+    # --------------------------------------------------
+    # TRACK SHIPMENT (Polling Fallback)
+    # --------------------------------------------------
+    def track_shipment(self, waybill: str) -> dict:
+        """
+        Track shipment status by AWB number.
+        Use as fallback when webhooks fail or for on-demand status check.
+        Supports up to 50 comma-separated waybills.
+        Docs: GET /api/v1/packages/json/?waybill={waybill}
+        """
+        url = f"{self.base_url}/api/v1/packages/json/"
+        params = {
+            "waybill": waybill,
+            "token": self.token,
+        }
+
+        print(f"[TRACK] Tracking AWB: {waybill}")
+        response = requests.get(url, params=params, timeout=10)
+        print(f"[TRACK] Response ({response.status_code})")
+
+        if response.status_code != 200:
+            return {"error": f"HTTP {response.status_code}", "body": response.text}
+
+        try:
+            return response.json()
+        except Exception:
+            return {"error": "Invalid JSON response", "body": response.text}
+
+    # --------------------------------------------------
+    # PINCODE SERVICEABILITY CHECK
+    # --------------------------------------------------
+    def check_pincode_serviceability(self, pincode: str) -> dict:
+        """
+        Check if a pincode is serviceable by Delhivery.
+        Returns serviceability status and details.
+        Docs: GET /c/api/pin-codes/json/?filter_codes={pincode}
+        """
+        url = f"{self.base_url}/c/api/pin-codes/json/"
+        params = {"filter_codes": pincode}
+        headers = {"Authorization": f"Token {self.token}"}
+
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=5)
+            
+            if response.status_code != 200:
+                return {"serviceable": False, "reason": f"API error: HTTP {response.status_code}"}
+
+            data = response.json()
+            delivery_codes = data.get("delivery_codes", [])
+
+            if not delivery_codes:
+                return {"serviceable": False, "reason": "NSZ (Non-serviceable pincode)"}
+
+            pincode_info = delivery_codes[0].get("postal_code", {})
+            remark = pincode_info.get("remarks", "")
+
+            if remark.lower() == "embargo":
+                return {"serviceable": False, "reason": "Temporarily unavailable (Embargo)"}
+
+            return {
+                "serviceable": True,
+                "reason": "Serviceable",
+                "data": pincode_info,
+            }
+        except Exception as e:
+            print(f"[PINCODE] Error checking serviceability: {e}")
+            return {"serviceable": False, "reason": f"Error: {str(e)}"}
 
 
 # --------------------------------------------------
 # INITIALIZATION
 # --------------------------------------------------
-import os
-
-DELHIVERY_API_TOKEN = os.getenv("DELHIVERY_API_TOKEN", "cb5e84d71ecff61c73abc80b20b326dec8302d8c")
+DELHIVERY_API_TOKEN = os.getenv("DELHIVERY_API_TOKEN", "")
 IS_PRODUCTION = os.getenv("DELHIVERY_PRODUCTION", "false").lower() == "true"
+
+if not DELHIVERY_API_TOKEN:
+    print("[WARNING] DELHIVERY_API_TOKEN env var is not set! Delhivery API calls will fail.")
 
 delhivery_client = DelhiveryClient(
     token=DELHIVERY_API_TOKEN,

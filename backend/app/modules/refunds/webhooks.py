@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.modules.refunds.models import Refund
-import  gging
+import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -20,10 +20,6 @@ DELHIVERY_IPS = [
     "18.138.12.254",
     "52.220.167.45",
     "13.229.106.233",
-    "3.1.68.100.69",
-    "3.1.68.100.68",
-    "3.1.68.100.67",
-    "3.1.68.100.66",
     "18.141.172.51",
     # Local testing
     "127.0.0.1",

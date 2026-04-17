@@ -1,13 +1,11 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.modules.orders.models import Order, Delivery
-from app.modules.delivery.delhivery_client import DelhiveryClient
+from app.modules.delivery.delhivery_client import delhivery_client
 import logging
 import re
 
 logger = logging.getLogger(__name__)
-
-DELHIVERY_TOKEN = "cb5e84d71ecff61c73abc80b20b326dec8302d8c"  # Old working token
 
 
 def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
@@ -51,14 +49,19 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         return None
 
     # 4. Prepare Data for Delhivery
-    # Resolve customer name
-    # Resolve customer name
     customer_name = order.customer_name or "Customer"
 
     # Use separate city, state, pincode fields (no parsing from address)
     city = order.city if (hasattr(order, 'city') and order.city) else "Chennai"
     state = order.state if (hasattr(order, 'state') and order.state) else "Tamil Nadu"
     pincode = order.pincode if (hasattr(order, 'pincode') and order.pincode) else "600018"
+
+    # PRE-CHECK: Serviceability (Fix for missing API)
+    serviceability = delhivery_client.check_pincode_serviceability(str(pincode))
+    if not serviceability.get("serviceable", True):  # Fall back to True if API errors
+        msg = f"[SHIPMENT] Cannot create shipment. Pincode {pincode} is not serviceable. Reason: {serviceability.get('reason')}"
+        logger.error(msg)
+        return None
 
     # Format phone number: Remove +91, -, spaces, and keep only 10 digits
     phone = order.phone or ""
@@ -108,12 +111,13 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         "item_name": item_name,
         "quantity": quantity,
         "service_type": service_type,
+        "hsn_code": order.hsn or "",
     }
 
     logger.info(f"[SHIPMENT] Payload prepared: {order_data}")
 
-    # 5. Call Delhivery API
-    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+    # 5. Call Delhivery API (using centralized singleton)
+    client = delhivery_client
     
     try:
         response = client.create_shipment(order_data)
@@ -293,7 +297,7 @@ def create_bulk_shipments_for_orders(db: Session, orders: list) -> dict:
     """
     logger.info(f"[BULK SHIPMENT] Processing {len(orders)} orders in one API call")
 
-    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+    client = delhivery_client
 
     # 1. Prepare all valid orders — skip already processed / invalid ones
     orders_data = []
@@ -489,7 +493,7 @@ def create_return_shipment(db: Session, refund) -> tuple:
     logger.info(f"[RETURN] Payload prepared: {return_order_data}")
     
     # Call Delhivery API
-    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+    client = delhivery_client
     
     try:
         response = client.create_shipment(return_order_data)
@@ -563,18 +567,18 @@ def create_return_shipment(db: Session, refund) -> tuple:
             logger.exception(f"[RETURN] Error fetching/saving label: {e}")
         
         # ALWAYS send email with AWB details (with or without label attachment)
-        try:
-            logger.info(f"[RETURN] Sending return label email to {order.email}")
-            send_return_label_email(
-                customer_email=order.email,
-                customer_name=order.customer_name or "Customer",
-                awb_number=return_awb,
-                label_path=file_path,  # Will be None if fetch failed
-                reason=refund.reason
-            )
-            logger.info(f"[RETURN] Email sent successfully")
-        except Exception as email_error:
-            logger.error(f"[RETURN] Failed to send email: {email_error}")
+        logger.info(f"[RETURN] Sending return label email to {order.email}")
+        email_sent = send_return_label_email(
+            customer_email=order.email,
+            customer_name=order.customer_name or "Customer",
+            awb_number=return_awb,
+            label_path=file_path,  # Will be None if fetch failed
+            reason=refund.reason
+        )
+        if email_sent:
+            logger.info(f"[RETURN] ✅ Email sent successfully")
+        else:
+            logger.error(f"[RETURN] ❌ Failed to send email (See errors above)")
         
         return (return_awb, return_label_path)
     
@@ -806,7 +810,7 @@ def create_exchange_return_shipment(db: Session, exchange) -> tuple:
     
     logger.info(f"[EXCHANGE] Return Payload prepared: {return_order_data}")
     
-    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+    client = delhivery_client
     
     try:
         response = client.create_shipment(return_order_data)
@@ -921,7 +925,7 @@ def create_exchange_forward_shipment(db: Session, exchange) -> tuple:
         "service_type": "E",
     }
     
-    client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+    client = delhivery_client
     
     try:
         response = client.create_shipment(order_data)

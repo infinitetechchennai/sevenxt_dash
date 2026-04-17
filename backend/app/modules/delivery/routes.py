@@ -274,7 +274,7 @@ async def delhivery_webhook(request: Request, background_tasks: BackgroundTasks,
             raise HTTPException(status_code=401, detail="Missing webhook signature")
         
         body = await request.body()
-        expected_signature = hmac.new(
+        expected_signature = hmac.HMAC(
             settings.DELHIVERY_WEBHOOK_SECRET.encode(),
             body,
             hashlib.sha256
@@ -379,10 +379,9 @@ async def schedule_pickup(
         delhivery_error = None
 
         try:
-            from app.modules.delivery.delhivery_client import DelhiveryClient
-            from app.modules.delivery.shipment_service import DELHIVERY_TOKEN
+            from app.modules.delivery.delhivery_client import delhivery_client
 
-            client = DelhiveryClient(token=DELHIVERY_TOKEN, is_production=False)
+            client = delhivery_client
 
             delhivery_pickup_result = client.request_pickup(
                 pickup_date=pickup_date_str,

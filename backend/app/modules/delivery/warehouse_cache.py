@@ -3,7 +3,7 @@ Warehouse Cache Service
 Caches warehouse details from Delhivery to avoid repeated API calls
 """
 from functools import lru_cache
-from backend.app.modules.delivery.delhivery_client import delhivery_client
+from app.modules.delivery.delhivery_client import delhivery_client
 
 
 @lru_cache(maxsize=10)
