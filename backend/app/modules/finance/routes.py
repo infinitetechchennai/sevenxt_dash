@@ -5,8 +5,10 @@ from app.config import settings
 from . import service, schemas, models
 import razorpay
 import json
+import logging
 
 router = APIRouter(prefix="/finance", tags=["Finance"])
+logger = logging.getLogger(__name__)
 
 # 1. GET ALL TRANSACTIONS
 @router.get("/transactions") 
@@ -26,17 +28,42 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
     client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
     
     try:
-        # Verify the webhook is actually from Razorpay
-        client.utility.verify_webhook_signature(raw_body.decode(), signature, settings.RAZORPAY_WEBHOOK_SECRET)
-    except Exception:
+        if not signature:
+            raise HTTPException(status_code=400, detail="Missing X-Razorpay-Signature header")
+
+        if not (settings.RAZORPAY_WEBHOOK_SECRET or "").strip():
+            # Don't hard-fail in environments where the secret isn't configured.
+            # Razorpay will keep retrying on non-2xx; accept the payload but log loudly.
+            logger.warning(
+                "[RAZORPAY_WEBHOOK] RAZORPAY_WEBHOOK_SECRET is not set; skipping signature verification."
+            )
+        else:
+            # Verify the webhook is actually from Razorpay
+            client.utility.verify_webhook_signature(
+                raw_body.decode("utf-8"),
+                signature,
+                settings.RAZORPAY_WEBHOOK_SECRET,
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"[RAZORPAY_WEBHOOK] Signature verification failed: {repr(e)}")
         raise HTTPException(status_code=400, detail="Invalid Webhook Signature")
 
-    payload = json.loads(raw_body)
+    try:
+        payload = json.loads(raw_body)
+    except Exception as e:
+        logger.warning(f"[RAZORPAY_WEBHOOK] Invalid JSON payload: {repr(e)}")
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
     event = payload.get("event")
 
     # Handle Successful Payments (Capturing Tax Data here)
     if event in ["payment.captured", "payment.authorized"]:
-        payment_entity = payload['payload']['payment']['entity']
+        try:
+            payment_entity = payload["payload"]["payment"]["entity"]
+        except Exception:
+            logger.warning(f"[RAZORPAY_WEBHOOK] Missing payment entity for event={event}")
+            return {"status": "ignored"}
         
         # Razorpay sends these in paise, converting to Rupees
         rzp_fee = payment_entity.get('fee', 0) / 100
@@ -65,7 +92,11 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
 
     # Handle Refunds
     elif event == "refund.processed":
-        refund_entity = payload['payload']['refund']['entity']
+        try:
+            refund_entity = payload["payload"]["refund"]["entity"]
+        except Exception:
+            logger.warning("[RAZORPAY_WEBHOOK] Missing refund entity for refund.processed")
+            return {"status": "ignored"}
         payment_id = refund_entity['payment_id']
         tx = db.query(models.Transaction).filter(models.Transaction.razorpay_payment_id == payment_id).first()
         if tx:
