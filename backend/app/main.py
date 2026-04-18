@@ -101,6 +101,23 @@ async def startup_event():
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified successfully")
+        
+        # FIX FOR LIVE RENDER DB: Add missing columns to b2b_applications
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE b2b_applications ADD COLUMN state VARCHAR(100);"))
+                logger.info("✅ Added 'state' column to b2b_applications")
+        except Exception as e:
+            pass # Column already exists
+            
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE b2b_applications ADD COLUMN registration_date VARCHAR(50);"))
+                logger.info("✅ Added 'registration_date' column to b2b_applications")
+        except Exception as e:
+            pass # Column already exists
 
         import asyncio
         from app.modules.products.background_tasks import check_expired_offers
