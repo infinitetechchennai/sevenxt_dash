@@ -22,7 +22,8 @@ import {
   LogOut,
   Plane,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  Key
 } from "lucide-react";
 import { DashboardView } from "./components/DashboardView";
 import { ProductsView } from "./components/ProductsView";
@@ -39,6 +40,7 @@ import { CampaignsView } from "./components/CampaignsView";
 import CMSView from "./components/CMSView";
 import { ReportsView } from "./components/ReportsView";
 import { LoginView } from "./components/LoginView";
+import { AdminResetPasswordView } from "./components/AdminResetPasswordView";
 import { ViewState } from "./types";
 import logo from "./assets/logo.jpg";
 import { apiService } from "./services/api";
@@ -174,6 +176,7 @@ const App: React.FC = () => {
     const routeMap: Record<string, string> = {
       [ViewState.DASHBOARD]: '/dashboard',
       'USERS': '/users',
+      'RESET_PASSWORDS': '/reset-passwords',
       'B2B': '/b2b',
       [ViewState.ORDERS]: '/orders',
       'FINANCE': '/finance',
@@ -190,10 +193,10 @@ const App: React.FC = () => {
     return routeMap[id] || '/dashboard';
   };
 
-  // Sidebar Menu Items configuration
   const menuItems = [
     { id: ViewState.DASHBOARD, label: "Dashboard", icon: LayoutDashboard },
     { id: "USERS", label: "Users", icon: Users },
+    { id: "RESET_PASSWORDS", label: "Password Resets", icon: Key },
     { id: "B2B", label: "B2B Management", icon: Briefcase },
     { id: ViewState.ORDERS, label: "Orders", icon: ShoppingCart },
     { id: "FINANCE", label: "Payments & Finance", icon: DollarSign },
@@ -218,6 +221,7 @@ const App: React.FC = () => {
     switch (item.id) {
       case ViewState.DASHBOARD: return hasPermission('Dashboard');
       case 'USERS': return hasPermission('Users');
+      case 'RESET_PASSWORDS': return hasPermission('Users');
       case 'B2B': return hasPermission('B2B');
       case ViewState.ORDERS: return hasPermission('Orders');
       case 'FINANCE': return hasPermission('Finance');
@@ -427,6 +431,7 @@ const App: React.FC = () => {
               </ProtectedRoute>
             } />
             <Route path="/users" element={<ProtectedRoute permission="Users"><UsersView /></ProtectedRoute>} />
+            <Route path="/reset-passwords" element={<ProtectedRoute permission="Users"><AdminResetPasswordView /></ProtectedRoute>} />
             <Route path="/b2b" element={<ProtectedRoute permission="B2B"><B2BView /></ProtectedRoute>} />
             <Route path="/orders" element={<ProtectedRoute permission="Orders"><OrdersView /></ProtectedRoute>} />
             <Route path="/finance" element={<ProtectedRoute permission="Finance"><FinanceView /></ProtectedRoute>} />

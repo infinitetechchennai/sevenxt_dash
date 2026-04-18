@@ -44,13 +44,14 @@ export const AdminResetPasswordView: React.FC = () => {
 
     const loadUsers = async () => {
         try {
+            // Load both employees and regular users so admins can reset anyone's password
+            // In a real app we might paginate this or search server-side
             const allUsers = await apiService.getUsers();
-            // Only show admin and staff users
-            const employeeUsers = allUsers.filter(
-                (u) => u.role === 'admin' || u.role === 'staff'
-            );
-            setUsers(employeeUsers);
-            setFilteredUsers(employeeUsers);
+            
+            // The endpoint /api/v1/users returns all users (sometimes including employees if logic differs, 
+            // but we can just use the returned list)
+            setUsers(allUsers);
+            setFilteredUsers(allUsers);
         } catch (err) {
             console.error('Failed to load users:', err);
             setError('Failed to load users');
