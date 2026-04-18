@@ -119,6 +119,22 @@ async def startup_event():
         except Exception as e:
             pass # Column already exists
 
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE b2b_applications ADD COLUMN verification_status VARCHAR(50) DEFAULT 'Pending';"))
+                logger.info("✅ Added 'verification_status' column to b2b_applications")
+        except Exception as e:
+            pass # Column already exists
+
+        try:
+            from sqlalchemy import text
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE b2b_applications ADD COLUMN verified_at TIMESTAMP WITH TIME ZONE;"))
+                logger.info("✅ Added 'verified_at' column to b2b_applications")
+        except Exception as e:
+            pass # Column already exists
+
         import asyncio
         from app.modules.products.background_tasks import check_expired_offers
         asyncio.create_task(check_expired_offers())

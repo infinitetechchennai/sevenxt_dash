@@ -140,3 +140,59 @@ async def verify_gst(data: VerificationRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"KYC Gateway Error: {str(e)}")
+
+# =======================================================
+# NEW B2B SELLER VERIFICATION (Mock PDF Validation)
+# =======================================================
+from fastapi import UploadFile, File, Form
+from datetime import datetime
+from app.modules.b2b.seller_verification import validate_seller_documents
+from app.modules.b2b.models import B2BApplication
+
+@router.post("/verify-business")
+async def verify_business(
+    gst_certificate: UploadFile = File(...),
+    pan_card: UploadFile = File(...),
+    gstin: str = Form(...),
+    pan: str = Form(...),
+    user_id: str = Form(None), # Optional, to track in DB
+    db: Session = Depends(get_db)
+):
+    """
+    Verifies GSTIN and PAN via PDF text extraction and structural validation.
+    No live 3rd-party APIs are hit directly here (Mock Mode).
+    """
+    try:
+        # Read files into memory
+        gst_bytes = await gst_certificate.read()
+        pan_bytes = await pan_card.read()
+
+        # Run Validation Logic
+        result = validate_seller_documents(
+            gst_pdf_bytes=gst_bytes,
+            pan_pdf_bytes=pan_bytes,
+            user_gstin=gstin,
+            user_pan=pan
+        )
+
+        status = result["status"]
+        reason = result["reason"]
+
+        db_b2b_app = None
+        # If user_id is provided, save info to DB
+        if user_id:
+            # Upsert logic or find existing
+            db_b2b_app = db.query(B2BApplication).filter(B2BApplication.id == user_id).first()
+            if db_b2b_app:
+                db_b2b_app.verification_status = status
+                if status == "verified":
+                    db_b2b_app.verified_at = datetime.utcnow()
+                db.commit()
+
+        return {
+            "status": status,
+            "reason": reason
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
