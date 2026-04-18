@@ -6,7 +6,7 @@ class B2BApplication(Base):
     __tablename__ = "b2b_applications"
     __table_args__ = {'extend_existing': True}
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String(36), primary_key=True, index=True)
     
     # We map 'bussiness_name' (used in code/frontend) 
     # to 'business_name' (the real column in your database)
@@ -24,5 +24,5 @@ class B2BApplication(Base):
     status = Column(String(50), default="Pending")
     state = Column(String(100), nullable=True)
     registration_date = Column(String(50), nullable=True)
-    address_id = Column(Integer, nullable=True)
+    address_id = Column(String(36), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
