@@ -16,4 +16,4 @@ class Setting(Base):
     updated_by = Column(Integer, nullable=True)  # Employee ID who updated
     
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -51,7 +51,7 @@ class OrderResponse(OrderBase):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DeliveryResponse(BaseModel):
     id: int
@@ -90,7 +90,7 @@ class DeliveryResponse(BaseModel):
     updated_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DeliveryScheduleUpdate(BaseModel):
     schedule_pickup: datetime
