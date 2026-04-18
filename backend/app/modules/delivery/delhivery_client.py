@@ -68,10 +68,10 @@ class DelhiveryClient:
             
             # Return/Destination Address (for reverse pickups only)
             # These fields specify where the package should be delivered TO (warehouse)
-            "return_add": "Sevenxt Electronics, Connaught Place" if is_reverse else None,
-            "return_pin": "110001" if is_reverse else None,
-            "return_city": "New Delhi" if is_reverse else None,
-            "return_state": "Delhi" if is_reverse else None,
+            "return_add": "SevenXT Electronics, Mount Road" if is_reverse else None,
+            "return_pin": "600018" if is_reverse else None,
+            "return_city": "Chennai" if is_reverse else None,
+            "return_state": "Tamil Nadu" if is_reverse else None,
             "return_phone": "9363286257" if is_reverse else None,
         }
         
