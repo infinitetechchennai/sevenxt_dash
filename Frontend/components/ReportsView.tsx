@@ -604,9 +604,9 @@ export const ReportsView: React.FC = () => {
     const totalRevenue = inventoryDataState.reduce((acc, curr) => acc + (curr.totalRevenue || 0), 0);
 
     // Prepare Payment Mix Chart Data
-    const paymentData = allReportsData?.payments ? Object.entries(allReportsData.payments).map(([name, value]) => ({ name, value })) : [];
+    const paymentData = (allReportsData?.payments as any[]) || [];
     // Prepare Delivery Stats Chart Data
-    const deliveryData = allReportsData?.delivery ? Object.entries(allReportsData.delivery).map(([name, value]) => ({ name, value })) : [];
+    const deliveryData = (allReportsData?.delivery as any[]) || [];
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
@@ -677,7 +677,7 @@ export const ReportsView: React.FC = () => {
               {paymentData.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center text-[10px]">
                   <span className="text-slate-500">{item.name}</span>
-                  <span className="font-bold text-slate-700">{item.value} Orders</span>
+                  <span className="font-bold text-slate-700">₹{item.value?.toLocaleString()} ({item.count})</span>
                 </div>
               ))}
             </div>
