@@ -22,7 +22,8 @@ class BestSeller(BaseModel):
 class DashboardOverviewResponse(BaseModel):
     revenue: KPICard
     orders: KPICard
-    users: KPICard
+    b2b_users: KPICard
+    b2c_users: KPICard
     refunds: KPICard
     chart: List[ChartData]
     bestSellers: List[BestSeller]
