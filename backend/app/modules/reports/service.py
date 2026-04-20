@@ -171,7 +171,7 @@ class ReportsService:
         """
         
         # 1. Calculate Sales Stats from Orders
-        orders = db.execute(text("SELECT products FROM orders WHERE status != 'Cancelled'")).mappings().all()
+        orders = db.execute(text("SELECT products FROM public.orders WHERE status != 'Cancelled'")).mappings().all()
         
         # Maps to store aggregated stats: { product_id: { qty: 0, revenue: 0.0 } }
         sales_stats = {}
@@ -214,7 +214,7 @@ class ReportsService:
 
         # 2. Fetch ALL Products from Catalog
         # This ensures even products with 0 sales appear in the report
-        products_query = text("SELECT id, name, stock, price FROM products")
+        products_query = text("SELECT id, name, stock, b2c_price as price FROM public.products")
         all_products = db.execute(products_query).mappings().all()
         
         inventory_data = []
@@ -267,7 +267,7 @@ class ReportsService:
             SELECT id, order_id, created_at, payment, status, customer_name, products, 
                    email, phone, city, state, pincode, hsn, sgst_percentage, cgst_percentage, original_price,
                    address
-            FROM orders 
+            FROM public.orders 
             WHERE status != 'Cancelled' 
             ORDER BY created_at DESC
         """)
@@ -368,12 +368,11 @@ class ReportsService:
 
     @staticmethod
     def get_all_reports(db: Session):
-        # Master record counts helper
-        def get_count(table):
-            try:
-                return db.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() or 0
-            except:
-                return 0
+        from app.modules.auth.models import User
+        from app.modules.orders.models import Order, B2BApplication, B2CApplication, Delivery
+        from app.modules.refunds.models import Refund
+        from app.modules.exchanges.models import Exchange
+        from app.modules.products.models import Product
 
         return {
             "inventory": ReportsService.get_sales_inventory(db),
@@ -382,13 +381,13 @@ class ReportsService:
             "payments": ReportsService.get_payment_stats(db),
             "returns": ReportsService.get_return_analysis(db),
             "master_counts": {
-                "users": get_count("users"),
-                "b2b": get_count("b2b_applications"),
-                "b2c": get_count("b2c_applications"),
-                "orders": get_count("orders"),
-                "deliveries": get_count("deliveries"),
-                "refunds": get_count("refund_requests"),
-                "exchanges": get_count("exchange_requests"),
-                "products": get_count("products")
+                "users": db.query(User).count(),
+                "b2b": db.query(B2BApplication).count(),
+                "b2c": db.query(B2CApplication).count(),
+                "orders": db.query(Order).count(),
+                "deliveries": db.query(Delivery).count(),
+                "refunds": db.query(Refund).count(),
+                "exchanges": db.query(Exchange).count(),
+                "products": db.query(Product).count()
             }
         }
