@@ -634,6 +634,28 @@ export const ReportsView: React.FC = () => {
           </div>
         </div>
 
+        {/* System Records Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h5 className="text-slate-400 text-[9px] font-bold uppercase">Registered Users</h5>
+            <div className="text-xl font-bold text-slate-700">{allReportsData?.master_counts?.users || 0}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h5 className="text-slate-400 text-[9px] font-bold uppercase">B2B Partners</h5>
+            <div className="text-xl font-bold text-slate-700">{allReportsData?.master_counts?.b2b || 0}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h5 className="text-slate-400 text-[9px] font-bold uppercase">Deliveries</h5>
+            <div className="text-xl font-bold text-slate-700">{allReportsData?.master_counts?.deliveries || 0}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h5 className="text-slate-400 text-[9px] font-bold uppercase">Refunds/Exchanges</h5>
+            <div className="text-xl font-bold text-slate-700">
+              {(allReportsData?.master_counts?.refunds || 0) + (allReportsData?.master_counts?.exchanges || 0)}
+            </div>
+          </div>
+        </div>
+
         {/* Analytics Charts Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Payment Mix */}
