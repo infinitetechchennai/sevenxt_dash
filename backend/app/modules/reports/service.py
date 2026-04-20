@@ -258,14 +258,15 @@ class ReportsService:
     def get_sales_details(db: Session):
         """
         Returns a flattened list of all sales items across all orders.
-        Matches the 'Sale Reports' tab requirements.
-        Excludes Cancelled orders.
-        Return keys are in camelCase for frontend compatibility.
         """
+        from app.modules.orders.gst_utils import compute_gst
+        from app.modules.orders.models import B2CApplication
+        
         # Fetch all non-cancelled orders with necessary fields
         query = text("""
             SELECT id, order_id, created_at, payment, status, customer_name, products, 
-                   email, phone, city, state, pincode, hsn, sgst_percentage, cgst_percentage, original_price
+                   email, phone, city, state, pincode, hsn, sgst_percentage, cgst_percentage, original_price,
+                   address
             FROM public.orders 
             WHERE status != 'Cancelled' 
             ORDER BY created_at DESC
@@ -291,6 +292,22 @@ class ReportsService:
             if not isinstance(products_data, list):
                 continue
                 
+            # Resolve email if missing or dummy
+            resolve_email = order['email']
+            if not resolve_email or 'example.com' in resolve_email:
+                try:
+                    if order['phone']:
+                        clean_phone = order['phone'].replace('+91', '').replace(' ', '').strip()[-10:]
+                        b2c = db.query(B2CApplication).filter(
+                            (B2CApplication.phone_number == clean_phone) |
+                            (B2CApplication.phone_number == f"+91{clean_phone}") |
+                            (B2CApplication.phone_number == order['phone'])
+                        ).first()
+                        if b2c and b2c.email:
+                            resolve_email = b2c.email
+                except:
+                    pass
+
             for item in products_data:
                 if not isinstance(item, dict): 
                     continue
@@ -303,6 +320,23 @@ class ReportsService:
                 qty = int(item.get('quantity') or item.get('qty') or 1)
                 final_total = price * qty
                 
+                # GST Calculation
+                state_str = " ".join([str(order['state'] or ""), 
+                                      str(order['city'] or ""), 
+                                      str(order['address'] or "")]).strip()
+                breakdown = compute_gst(final_total, state_str)
+                
+                sgst = float(order['sgst_percentage'] or 0)
+                cgst = float(order['cgst_percentage'] or 0)
+                
+                # If DB has 0 but breakdown says intra, use breakdown
+                if sgst == 0 and cgst == 0 and breakdown['gst_type'] == 'intra':
+                    sgst = breakdown['sgst_rate']
+                    cgst = breakdown['cgst_rate']
+                elif sgst == 0 and cgst == 0 and breakdown['gst_type'] == 'inter':
+                    # Maybe it's IGST?
+                    pass
+
                 # Construct unique key for frontend key prop
                 unique_key = f"{order['id']}-{item_id}"
                 
@@ -313,15 +347,17 @@ class ReportsService:
                     "paymentMethod": order['payment'],
                     "status": order['status'],
                     "storeName": order['customer_name'],
-                    "email": order['email'],
+                    "email": resolve_email,
                     "phone": order['phone'],
                     "city": order['city'],
                     "state": order['state'],
                     "pincode": order['pincode'],
-                    "hsn": order['hsn'],
-                    "sgst": float(order['sgst_percentage'] or 0),
-                    "cgst": float(order['cgst_percentage'] or 0),
-                    "salesRep": 'Super Market', # Static as per request/example
+                    "address": order['address'],
+                    "hsn": order['hsn'] or item.get('hsn') or item.get('hsn_code'),
+                    "sgst": sgst,
+                    "cgst": cgst,
+                    "igst": breakdown.get('igst_rate', 0.0) if breakdown['gst_type'] == 'inter' else 0.0,
+                    "salesRep": 'Super Market',
                     "itemId": item_id,
                     "productName": item.get('name'),
                     "finalTotal": final_total,
@@ -329,3 +365,10 @@ class ReportsService:
                 })
         
         return sales_details
+
+    @staticmethod
+    def get_all_reports(db: Session):
+        return {
+            "inventory": ReportsService.get_sales_inventory(db),
+            "sales": ReportsService.get_sales_details(db)
+        }

@@ -9,10 +9,11 @@ import { exportToExcel } from '../utils/excelExport';
 const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#1e40af'];
 
 export const ReportsView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'sales'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'sales' | 'all'>('inventory');
   // State for fetched data
   const [inventoryDataState, setInventoryDataState] = useState<any[]>([]);
   const [salesDetailsState, setSalesDetailsState] = useState<any[]>([]);
+  const [allReportsData, setAllReportsData] = useState<{ inventory: any[], sales: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -39,8 +40,9 @@ export const ReportsView: React.FC = () => {
     loadData();
   }, [activeTab]); // Load data when tab changes to avoid over-fetching if we want lazy loading, but simple is fine too.
 
-  const handleExportInventory = () => {
-    const dataToExport = inventoryData.tableData.map(item => ({
+  const handleExportInventory = (data?: any[]) => {
+    const source = data || inventoryData.tableData;
+    const dataToExport = source.map(item => ({
       'Item ID': item.id,
       'Product Name': item.name,
       'Price (₹)': item.price,
@@ -49,11 +51,12 @@ export const ReportsView: React.FC = () => {
       'Orders Placed': item.ordersPlaced,
       'Total Revenue (₹)': item.totalRevenue
     }));
-    exportToExcel(dataToExport, 'Sales_Inventory_Report', 'Inventory');
+    return dataToExport;
   };
 
-  const handleExportSales = () => {
-    const dataToExport = salesReportData.tableData.map(row => ({
+  const handleExportSales = (data?: any[]) => {
+    const source = data || salesReportData.tableData;
+    const dataToExport = source.map(row => ({
       'Order Date': new Date(row.orderDate).toLocaleDateString(),
       'Order ID': row.orderId,
       'Item ID': row.itemId,
@@ -65,15 +68,47 @@ export const ReportsView: React.FC = () => {
       'Store Name': row.storeName,
       'Customer Email': row.email || 'N/A',
       'Customer Phone': row.phone || 'N/A',
+      'Full Address': row.address || 'N/A',
       'City': row.city || 'N/A',
       'State': row.state || 'N/A',
       'Pincode': row.pincode || 'N/A',
       'HSN Code': row.hsn || 'N/A',
       'SGST (%)': row.sgst || 0,
       'CGST (%)': row.cgst || 0,
+      'IGST (%)': row.igst || 0,
       'Sales Representative': row.salesRep
     }));
-    exportToExcel(dataToExport, 'Sales_Report', 'Sales');
+    return dataToExport;
+  };
+
+  const downloadInventoryReport = () => {
+    const data = handleExportInventory();
+    exportToExcel(data, 'Sales_Inventory_Report', 'Inventory');
+  };
+
+  const downloadSalesReport = () => {
+    const data = handleExportSales();
+    exportToExcel(data, 'Sales_Report', 'Sales');
+  };
+
+  const handleExportAll = async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.getReportsAll();
+      const inventorySheet = {
+        sheetName: 'Inventory Report',
+        data: handleExportInventory(data.inventory)
+      };
+      const salesSheet = {
+        sheetName: 'Sales Report',
+        data: handleExportSales(data.sales)
+      };
+      exportToExcel([inventorySheet, salesSheet], 'Complete_Systems_Report');
+    } catch (error) {
+      console.error("Failed to export all reports:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadData = async () => {
@@ -82,9 +117,14 @@ export const ReportsView: React.FC = () => {
       if (activeTab === 'inventory') {
         const data = await apiService.getSalesInventory();
         setInventoryDataState(data || []);
-      } else {
+      } else if (activeTab === 'sales') {
         const data = await apiService.getSalesDetails();
         setSalesDetailsState(data || []);
+      } else if (activeTab === 'all') {
+        const data = await apiService.getReportsAll();
+        setAllReportsData(data);
+        setInventoryDataState(data.inventory || []);
+        setSalesDetailsState(data.sales || []);
       }
     } catch (error) {
       console.error("Failed to load reports data:", error);
@@ -306,7 +346,7 @@ export const ReportsView: React.FC = () => {
                     />
                   </div>
                   <button
-                    onClick={handleExportInventory}
+                    onClick={downloadInventoryReport}
                     className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-bold hover:bg-green-700 transition-colors"
                     title="Export to Excel"
                   >
@@ -500,7 +540,7 @@ export const ReportsView: React.FC = () => {
             )}
           </div>
           <button 
-            onClick={handleExportSales}
+            onClick={downloadSalesReport}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs font-bold"
           >
             <Download size={14} /> Export Excel
@@ -552,6 +592,65 @@ export const ReportsView: React.FC = () => {
     </div>
   );
 
+  const renderAllReportsTab = () => {
+    const totalInventoryItems = inventoryDataState.length;
+    const totalSalesCount = inventoryDataState.reduce((acc, curr) => acc + (curr.ordersPlaced || 0), 0);
+    const totalRevenue = inventoryDataState.reduce((acc, curr) => acc + (curr.totalRevenue || 0), 0);
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200">
+            <h4 className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Total Catalog Items</h4>
+            <div className="text-3xl font-bold">{totalInventoryItems}</div>
+            <div className="mt-4 flex items-center gap-2 text-blue-100 text-xs">
+              <span className="bg-blue-400/30 px-2 py-0.5 rounded">Inventory Data</span>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-2xl text-white shadow-lg shadow-emerald-200">
+            <h4 className="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-1">Total Sales (Units)</h4>
+            <div className="text-3xl font-bold">{totalSalesCount}</div>
+            <div className="mt-4 flex items-center gap-2 text-emerald-100 text-xs">
+              <span className="bg-emerald-400/30 px-2 py-0.5 rounded">All-Time Performance</span>
+            </div>
+          </div>
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-6 rounded-2xl text-white shadow-lg shadow-amber-200">
+            <h4 className="text-amber-100 text-xs font-bold uppercase tracking-wider mb-1">Gross Revenue</h4>
+            <div className="text-3xl font-bold">₹{totalRevenue.toLocaleString()}</div>
+            <div className="mt-4 flex items-center gap-2 text-amber-100 text-xs">
+              <span className="bg-amber-400/30 px-2 py-0.5 rounded">Live Billing Data</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
+          <div className="max-w-md mx-auto space-y-6">
+            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600">
+              <Download size={40} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">Complete Master Report</h3>
+              <p className="text-slate-500 text-sm mt-2">
+                Download a consolidated Excel workbook containing both Sales Inventory and Transaction Details with full GST and Address metadata.
+              </p>
+            </div>
+            <button
+              onClick={handleExportAll}
+              disabled={loading}
+              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {loading ? <RefreshCw className="animate-spin" size={20} /> : <Download size={20} />}
+              {loading ? "Preparing Data..." : "Download Master Report (Multi-Sheet)"}
+            </button>
+            <p className="text-[10px] text-slate-400">
+              Note: This report generates separate sheets for Inventory and Sales.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen bg-[#F8FAFC] overflow-hidden font-sans">
       {/* Header */}
@@ -582,12 +681,19 @@ export const ReportsView: React.FC = () => {
           >
             Sales Reports
           </button>
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'all' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          >
+            All Reports Summary
+          </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-[1400px] mx-auto">
-          {activeTab === 'inventory' ? renderInventoryTab() : renderSalesTab()}
+          {activeTab === 'inventory' ? renderInventoryTab() : 
+           activeTab === 'sales' ? renderSalesTab() : renderAllReportsTab()}
         </div>
       </div>
     </div>

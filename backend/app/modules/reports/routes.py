@@ -49,3 +49,7 @@ def get_inventory(db: Session = Depends(get_db)):
 @router.get("/sales-details")
 def get_sales_details_route(db: Session = Depends(get_db)):
     return ReportsService.get_sales_details(db)
+
+@router.get("/all")
+def get_all_reports_route(db: Session = Depends(get_db)):
+    return ReportsService.get_all_reports(db)

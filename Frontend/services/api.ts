@@ -605,6 +605,10 @@ class ApiService {
     return this.request("/api/v1/reports/sales-details");
   }
 
+  async getReportsAll(): Promise<any> {
+    return this.request("/api/v1/reports/all");
+  }
+
   /* =======================
       CAMPAIGNS
   ======================= */
