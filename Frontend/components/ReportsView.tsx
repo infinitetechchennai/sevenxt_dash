@@ -13,7 +13,13 @@ export const ReportsView: React.FC = () => {
   // State for fetched data
   const [inventoryDataState, setInventoryDataState] = useState<any[]>([]);
   const [salesDetailsState, setSalesDetailsState] = useState<any[]>([]);
-  const [allReportsData, setAllReportsData] = useState<{ inventory: any[], sales: any[] } | null>(null);
+  const [allReportsData, setAllReportsData] = useState<{ 
+    inventory: any[], 
+    sales: any[],
+    delivery?: any,
+    payments?: any,
+    returns?: any
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -597,55 +603,289 @@ export const ReportsView: React.FC = () => {
     const totalSalesCount = inventoryDataState.reduce((acc, curr) => acc + (curr.ordersPlaced || 0), 0);
     const totalRevenue = inventoryDataState.reduce((acc, curr) => acc + (curr.totalRevenue || 0), 0);
 
+    // Prepare Payment Mix Chart Data
+    const paymentData = allReportsData?.payments ? Object.entries(allReportsData.payments).map(([name, value]) => ({ name, value })) : [];
+    // Prepare Delivery Stats Chart Data
+    const deliveryData = allReportsData?.delivery ? Object.entries(allReportsData.delivery).map(([name, value]) => ({ name, value })) : [];
+
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+        {/* Top Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Catalog Items</h4>
+            <div className="text-2xl font-bold text-slate-900">{totalInventoryItems}</div>
+            <div className="mt-2 text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full inline-block">Live Inventory</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Units Sold</h4>
+            <div className="text-2xl font-bold text-slate-900">{totalSalesCount}</div>
+            <div className="mt-2 text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full inline-block">Total Volume</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Revenue</h4>
+            <div className="text-2xl font-bold text-slate-900">₹{totalRevenue.toLocaleString()}</div>
+            <div className="mt-2 text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-full inline-block">Gross Sales</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Active Returns</h4>
+            <div className="text-2xl font-bold text-slate-900">{allReportsData?.returns?.total_returns || 0}</div>
+            <div className="mt-2 text-[10px] text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-full inline-block">Return Rate: {allReportsData?.returns?.return_rate || 0}%</div>
+          </div>
+        </div>
+
+        {/* Analytics Charts Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl text-white shadow-lg shadow-blue-200">
-            <h4 className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Total Catalog Items</h4>
-            <div className="text-3xl font-bold">{totalInventoryItems}</div>
-            <div className="mt-4 flex items-center gap-2 text-blue-100 text-xs">
-              <span className="bg-blue-400/30 px-2 py-0.5 rounded">Inventory Data</span>
+          {/* Payment Mix */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-4 uppercase">
+              <div className="w-1 h-3 bg-blue-500 rounded-full"></div> Payment Mix
+            </h3>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={paymentData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
+                    {paymentData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <RechartsTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-2 space-y-1">
+              {paymentData.map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-500">{item.name}</span>
+                  <span className="font-bold text-slate-700">{item.value} Orders</span>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-2xl text-white shadow-lg shadow-emerald-200">
-            <h4 className="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-1">Total Sales (Units)</h4>
-            <div className="text-3xl font-bold">{totalSalesCount}</div>
-            <div className="mt-4 flex items-center gap-2 text-emerald-100 text-xs">
-              <span className="bg-emerald-400/30 px-2 py-0.5 rounded">All-Time Performance</span>
+
+          {/* Top Selling Chart */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-4 uppercase">
+              <div className="w-1 h-3 bg-orange-500 rounded-full"></div> Product Sales
+            </h3>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={inventoryData.chartData} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
+                    {inventoryData.chartData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <RechartsTooltip />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
+             <div className="mt-2 space-y-1 text-[10px]">
+                <div className="flex justify-between font-bold text-blue-600 mb-1 border-b border-slate-50 pb-1">
+                  <span>Top Performing Item</span>
+                  <span>Revenue Contribution</span>
+                </div>
+                {inventoryData.chartData.slice(0, 3).map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center">
+                    <span className="text-slate-500 truncate w-32">{item.name}</span>
+                    <span className="font-bold text-slate-700">₹{item.value.toLocaleString()}</span>
+                  </div>
+                ))}
+             </div>
           </div>
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-6 rounded-2xl text-white shadow-lg shadow-amber-200">
-            <h4 className="text-amber-100 text-xs font-bold uppercase tracking-wider mb-1">Gross Revenue</h4>
-            <div className="text-3xl font-bold">₹{totalRevenue.toLocaleString()}</div>
-            <div className="mt-4 flex items-center gap-2 text-amber-100 text-xs">
-              <span className="bg-amber-400/30 px-2 py-0.5 rounded">Live Billing Data</span>
+
+          {/* Delivery Stats */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-4 uppercase">
+              <div className="w-1 h-3 bg-emerald-500 rounded-full"></div> Delivery Funnel
+            </h3>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={deliveryData} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value">
+                    {deliveryData.map((_, index) => <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#f59e0b', '#64748b'][index % 4]} />)}
+                  </Pie>
+                  <RechartsTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+             <div className="mt-2 space-y-1">
+              {deliveryData.slice(0, 4).map((item, idx) => (
+                <div key={idx} className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-500 capitalize">{item.name.replace('_', ' ')}</span>
+                  <span className="font-bold text-slate-700">{item.value} Units</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm">
-          <div className="max-w-md mx-auto space-y-6">
-            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto text-blue-600">
-              <Download size={40} />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-slate-800">Complete Master Report</h3>
-              <p className="text-slate-500 text-sm mt-2">
-                Download a consolidated Excel workbook containing both Sales Inventory and Transaction Details with full GST and Address metadata.
+        {/* Master Report Download Section */}
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="space-y-2 text-center md:text-left">
+              <h3 className="text-xl font-bold">Consolidated Data Vault</h3>
+              <p className="text-blue-100 text-xs max-w-lg opacity-90">
+                Generate a comprehensive master export containing detailed inventory metrics and transaction-level sales data with full tax and customer metadata.
               </p>
             </div>
             <button
               onClick={handleExportAll}
               disabled={loading}
-              className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              className="px-8 py-4 bg-white text-blue-600 rounded-2xl font-bold shadow-2xl hover:bg-slate-50 transition-all flex items-center gap-3 disabled:opacity-50 min-w-[280px] justify-center"
             >
               {loading ? <RefreshCw className="animate-spin" size={20} /> : <Download size={20} />}
-              {loading ? "Preparing Data..." : "Download Master Report (Multi-Sheet)"}
+              {loading ? "Crunching All Data..." : "Export Full Master Report"}
             </button>
-            <p className="text-[10px] text-slate-400">
-              Note: This report generates separate sheets for Inventory and Sales.
-            </p>
-          </div>
+        </div>
+
+        {/* FULL DATA TABLES SECTION */}
+        <div className="space-y-12 pb-20">
+            {/* Inventory Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-bold">01</div>
+                <h2 className="text-lg font-bold text-slate-800">Sales Inventory Master Table</h2>
+              </div>
+              {renderInventoryTableContent(true)}
+            </div>
+
+            {/* Sales Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-bold">02</div>
+                <h2 className="text-lg font-bold text-slate-800">Transaction Details Master Table</h2>
+              </div>
+              {renderSalesTableContent(true)}
+            </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Helper functions to reuse table parts
+  const renderInventoryTableContent = (isAllTab = false) => {
+    // Reusing existing table logic
+    const filteredItems = inventoryData.tableData.filter(item => {
+      const matchesSearch = item.name?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
+        String(item.id).includes(inventorySearch);
+      let matchesStock = true;
+      if (stockFilter === 'available') matchesStock = item.stock > 0;
+      if (stockFilter === 'out_of_stock') matchesStock = item.stock <= 0;
+      return matchesSearch && matchesStock;
+    });
+
+    const currentItems = isAllTab ? filteredItems.slice(0, 100) : filteredItems.slice(0, 20); // Show more in all tab
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+           {!isAllTab && <h3 className="font-bold text-slate-800 text-sm">Inventory Details</h3>}
+           <div className={`flex gap-2 ${isAllTab ? 'w-full justify-between' : ''}`}>
+               <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search inventory..."
+                    className="pl-8 pr-4 py-1.5 text-xs border border-slate-200 rounded-md bg-white w-full"
+                    value={inventorySearch}
+                    onChange={(e) => setInventorySearch(e.target.value)}
+                  />
+               </div>
+               <div className="flex gap-2">
+                <select className="px-2 py-1.5 text-xs border border-slate-200 rounded-md" value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}>
+                    <option value="all">Stock: All</option>
+                    <option value="available">Available</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                </select>
+                <button onClick={downloadInventoryReport} className="p-2 bg-green-50 text-green-600 rounded-md border border-green-100"><Download size={14} /></button>
+               </div>
+           </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Item ID</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Product Name</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Stock</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Orders</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Revenue</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {currentItems.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50">
+                  <td className="px-5 py-3 text-xs text-slate-500 font-mono">{item.id}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-800">{item.name}</td>
+                  <td className="px-5 py-3"><span className={`text-[10px] font-bold ${item.stock > 0 ? 'text-emerald-500' : 'text-red-500'}`}>{item.stock > 0 ? 'INSTOCK' : 'OUTSTOCK'}</span></td>
+                  <td className="px-5 py-3 text-xs text-slate-600 font-bold">{item.ordersPlaced}</td>
+                  <td className="px-5 py-3 text-xs text-slate-900 font-bold">₹{item.totalRevenue?.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {isAllTab && filteredItems.length > 100 && <div className="p-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50/30">Showing Top 100 Items — Export for full list</div>}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSalesTableContent = (isAllTab = false) => {
+    const currentRows = isAllTab ? salesReportData.tableData.slice(0, 100) : salesReportData.tableData;
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+           {!isAllTab && <h3 className="font-bold text-slate-800 text-sm">Transaction Logs</h3>}
+           <div className={`flex gap-2 ${isAllTab ? 'w-full justify-between' : ''}`}>
+               <div className="relative flex-1 max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search transactions..."
+                    className="pl-8 pr-4 py-1.5 text-xs border border-slate-200 rounded-md bg-white w-full"
+                    value={salesSearch}
+                    onChange={(e) => setSalesSearch(e.target.value)}
+                  />
+               </div>
+               <div className="flex gap-2">
+                <select className="px-2 py-1.5 text-xs border border-slate-200 rounded-md" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="">Status: All</option>
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                </select>
+                <button onClick={downloadSalesReport} className="p-2 bg-green-50 text-green-600 rounded-md border border-green-100"><Download size={14} /></button>
+               </div>
+           </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Order ID</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Item</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {currentRows.map((row) => (
+                <tr key={row.uniqueKey} className="hover:bg-slate-50/50">
+                  <td className="px-5 py-3 text-[10px] text-slate-500 whitespace-nowrap">{new Date(row.orderDate).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 text-xs font-mono text-slate-600">{row.orderId}</td>
+                  <td className="px-5 py-3 text-xs text-slate-800 font-medium">{row.storeName}</td>
+                  <td className="px-5 py-3 text-[10px] text-slate-500 max-w-[150px] truncate">{row.productName}</td>
+                  <td className="px-5 py-3 text-xs text-slate-900 font-bold">₹{row.finalTotal?.toLocaleString()}</td>
+                  <td className="px-5 py-3">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-100 text-slate-600">
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {isAllTab && salesReportData.tableData.length > 100 && <div className="p-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50/30">Showing Latest 100 Transactions — Export for full history</div>}
         </div>
       </div>
     );

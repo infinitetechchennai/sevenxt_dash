@@ -370,5 +370,8 @@ class ReportsService:
     def get_all_reports(db: Session):
         return {
             "inventory": ReportsService.get_sales_inventory(db),
-            "sales": ReportsService.get_sales_details(db)
+            "sales": ReportsService.get_sales_details(db),
+            "delivery": ReportsService.get_delivery_stats(db),
+            "payments": ReportsService.get_payment_stats(db),
+            "returns": ReportsService.get_return_analysis(db)
         }
