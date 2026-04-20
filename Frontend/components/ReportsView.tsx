@@ -89,6 +89,22 @@ export const ReportsView: React.FC = () => {
     return dataToExport;
   };
 
+  const handleExportFinance = (data?: any[]) => {
+    const source = data || allReportsData?.finance?.transactions || [];
+    return source.map((item: any) => ({
+      'Date': new Date(item.created_at).toLocaleDateString(),
+      'Payment ID': item.razorpay_payment_id || 'N/A',
+      'Order ID': item.internal_order_id || 'N/A',
+      'Amount (₹)': Number(item.amount).toFixed(2),
+      'Gateway Fee (₹)': Number(item.fee || 0).toFixed(2),
+      'GST On Fee (₹)': Number(item.tax || 0).toFixed(2),
+      'Customer Email': item.user_email || 'N/A',
+      'Customer Phone': item.customer_contact || 'N/A',
+      'Method': item.method || 'N/A',
+      'Status': item.status
+    }));
+  };
+
   const downloadInventoryReport = () => {
     const data = handleExportInventory();
     exportToExcel(data, 'Sales_Inventory_Report', 'Inventory');
@@ -111,7 +127,11 @@ export const ReportsView: React.FC = () => {
         sheetName: 'Sales Report',
         data: handleExportSales(data.sales)
       };
-      exportToExcel([inventorySheet, salesSheet], 'Complete_Systems_Report');
+      const financeSheet = {
+        sheetName: 'Finance Logs',
+        data: handleExportFinance(data.finance?.transactions)
+      };
+      exportToExcel([inventorySheet, salesSheet, financeSheet], 'Complete_Systems_Report');
     } catch (error) {
       console.error("Failed to export all reports:", error);
     } finally {
