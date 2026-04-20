@@ -18,7 +18,9 @@ export const ReportsView: React.FC = () => {
     sales: any[],
     delivery?: any,
     payments?: any,
-    returns?: any
+    returns?: any,
+    finance?: { transactions: any[], summary: any },
+    master_counts?: any
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -637,8 +639,8 @@ export const ReportsView: React.FC = () => {
         {/* System Records Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <h5 className="text-slate-400 text-[9px] font-bold uppercase">Registered Users</h5>
-            <div className="text-xl font-bold text-slate-700">{allReportsData?.master_counts?.users || 0}</div>
+            <h5 className="text-slate-400 text-[9px] font-bold uppercase">B2C Customers</h5>
+            <div className="text-xl font-bold text-slate-700">{allReportsData?.master_counts?.b2c || 0}</div>
           </div>
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <h5 className="text-slate-400 text-[9px] font-bold uppercase">B2B Partners</h5>
@@ -775,6 +777,63 @@ export const ReportsView: React.FC = () => {
               </div>
               {renderSalesTableContent(true)}
             </div>
+
+            {/* Finance Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold">03</div>
+                <h2 className="text-lg font-bold text-slate-800">Finance Logs Master Table</h2>
+              </div>
+              {renderFinanceTableContent()}
+            </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFinanceTableContent = () => {
+    const transactions = allReportsData?.finance?.transactions || [];
+    const displayRows = transactions.slice(0, 100);
+
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+           <h3 className="font-bold text-slate-800 text-sm">Finance & Payments</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Payment ID</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Gateway Fee</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                <th className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {displayRows.length > 0 ? displayRows.map((item: any, idx: number) => (
+                <tr key={idx} className="hover:bg-slate-50/50">
+                  <td className="px-5 py-3 text-[10px] text-slate-500">{new Date(item.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-3 text-xs font-mono text-indigo-600">{item.razorpay_payment_id || 'N/A'}</td>
+                  <td className="px-5 py-3 text-xs font-bold text-slate-900">₹{Number(item.amount).toFixed(2)}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">₹{Number(item.fee || 0).toFixed(2)}</td>
+                  <td className="px-5 py-3 text-xs text-slate-600 truncate max-w-[150px]" title={item.user_email}>{item.user_email || 'N/A'}</td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                      item.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {item.status}
+                    </span>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-400 text-xs">No records found</td></tr>
+              )}
+            </tbody>
+          </table>
+          {transactions.length > 100 && <div className="p-4 text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest bg-slate-50/30">Showing Latest 100 Items</div>}
         </div>
       </div>
     );

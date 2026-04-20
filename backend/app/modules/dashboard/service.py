@@ -21,11 +21,11 @@ class DashboardService:
             SELECT 
                 (SELECT COALESCE(SUM(amount), 0)::float FROM public.transactions WHERE status = 'SUCCESS' AND created_at >= NOW() - INTERVAL '{interval}') as revenue,
                 COUNT(*)::int as orders,
+                (SELECT COUNT(*)::int FROM public.b2b_applications WHERE created_at >= NOW() - INTERVAL '{interval}') as b2b_users,
                 (
                     (SELECT COUNT(*)::int FROM public.users WHERE created_at >= NOW() - INTERVAL '{interval}') +
-                    (SELECT COUNT(*)::int FROM public.b2c_applications WHERE created_at >= NOW() - INTERVAL '{interval}') +
-                    (SELECT COUNT(*)::int FROM public.b2b_applications WHERE created_at >= NOW() - INTERVAL '{interval}')
-                ) as users,
+                    (SELECT COUNT(*)::int FROM public.b2c_applications WHERE created_at >= NOW() - INTERVAL '{interval}')
+                ) as b2c_users,
                 (SELECT COUNT(*)::int FROM public.exchanges WHERE created_at >= NOW() - INTERVAL '{interval}') as refunds
             FROM public.orders
             WHERE created_at >= NOW() - INTERVAL '{interval}';
@@ -122,7 +122,8 @@ class DashboardService:
             return {
                 "revenue": {"value": f"₹{kpis['revenue']:,}", "percent": "+12%", "trend": "up", "subtext": "vs last period"},
                 "orders": {"value": str(kpis['orders']), "percent": "+5%", "trend": "up", "subtext": "vs last period"},
-                "users": {"value": str(kpis['users']), "percent": "+8%", "trend": "up", "subtext": "new signups"},
+                "b2b_users": {"value": str(kpis['b2b_users']), "percent": "+8%", "trend": "up", "subtext": "partners"},
+                "b2c_users": {"value": str(kpis['b2c_users']), "percent": "+10%", "trend": "up", "subtext": "customers"},
                 "refunds": {"value": str(kpis['refunds']), "percent": "-2%", "trend": "down", "subtext": "vs last period"},
                 "chart": chart,
                 "bestSellers": sellers,

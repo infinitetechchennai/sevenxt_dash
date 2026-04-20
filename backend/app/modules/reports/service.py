@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
+from app.modules.finance.models import Transaction
 import logging
 
 logger = logging.getLogger(__name__)
@@ -380,6 +381,14 @@ class ReportsService:
             "delivery": ReportsService.get_delivery_stats(db),
             "payments": ReportsService.get_payment_stats(db),
             "returns": ReportsService.get_return_analysis(db),
+            "finance": {
+                "transactions": db.query(Transaction).order_by(Transaction.created_at.desc()).all(),
+                "summary": {
+                    "total_volume": db.query(func.sum(Transaction.amount)).filter(Transaction.status == 'SUCCESS').scalar() or 0,
+                    "total_tax": db.query(func.sum(Transaction.tax)).filter(Transaction.status == 'SUCCESS').scalar() or 0,
+                    "total_fee": db.query(func.sum(Transaction.fee)).filter(Transaction.status == 'SUCCESS').scalar() or 0
+                }
+            },
             "master_counts": {
                 "users": db.query(User).count(),
                 "b2b": db.query(B2BApplication).count(),

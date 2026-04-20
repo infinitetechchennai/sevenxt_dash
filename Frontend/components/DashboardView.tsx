@@ -102,10 +102,11 @@ export const DashboardView: React.FC<{ onNavigate: (view: string) => void }> = (
             </div>
 
             {/* KPI Cards Workflow */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <Card title="Total Revenue" value={stats.revenue.value} icon={IndianRupee} iconBg="bg-blue-600" onClick={() => onNavigate('FINANCE')} />
                 <Card title="Total Orders" value={stats.orders.value} icon={ShoppingCart} iconBg="bg-violet-600" onClick={() => onNavigate('ORDERS')} />
-                <Card title="Total Users" value={stats.users.value} icon={Users} iconBg="bg-emerald-600" onClick={() => onNavigate('USERS')} />
+                <Card title="B2B Users" value={stats.b2b_users.value} icon={Users} iconBg="bg-emerald-600" onClick={() => onNavigate('USERS')} />
+                <Card title="B2C Users" value={stats.b2c_users.value} icon={Users} iconBg="bg-teal-600" onClick={() => onNavigate('USERS')} />
                 <Card title="Refunds" value={stats.refunds.value} icon={RefreshCcw} iconBg="bg-rose-600" onClick={() => onNavigate('REFUNDS')} />
             </div>
 
