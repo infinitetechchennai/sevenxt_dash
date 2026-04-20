@@ -39,6 +39,43 @@ export const ReportsView: React.FC = () => {
     loadData();
   }, [activeTab]); // Load data when tab changes to avoid over-fetching if we want lazy loading, but simple is fine too.
 
+  const handleExportInventory = () => {
+    const dataToExport = inventoryData.tableData.map(item => ({
+      'Item ID': item.id,
+      'Product Name': item.name,
+      'Price (₹)': item.price,
+      'Stock Status': item.stock > 0 ? 'Available' : 'Out of Stock',
+      'Available Stock': item.stock,
+      'Orders Placed': item.ordersPlaced,
+      'Total Revenue (₹)': item.totalRevenue
+    }));
+    exportToExcel(dataToExport, 'Sales_Inventory_Report', 'Inventory');
+  };
+
+  const handleExportSales = () => {
+    const dataToExport = salesReportData.tableData.map(row => ({
+      'Order Date': new Date(row.orderDate).toLocaleDateString(),
+      'Order ID': row.orderId,
+      'Item ID': row.itemId,
+      'Product Name': row.productName,
+      'Quantity': row.quantity,
+      'Total (₹)': row.finalTotal,
+      'Payment Method': row.paymentMethod,
+      'Status': row.status,
+      'Store Name': row.storeName,
+      'Customer Email': row.email || 'N/A',
+      'Customer Phone': row.phone || 'N/A',
+      'City': row.city || 'N/A',
+      'State': row.state || 'N/A',
+      'Pincode': row.pincode || 'N/A',
+      'HSN Code': row.hsn || 'N/A',
+      'SGST (%)': row.sgst || 0,
+      'CGST (%)': row.cgst || 0,
+      'Sales Representative': row.salesRep
+    }));
+    exportToExcel(dataToExport, 'Sales_Report', 'Sales');
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -269,6 +306,13 @@ export const ReportsView: React.FC = () => {
                     />
                   </div>
                   <button
+                    onClick={handleExportInventory}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-bold hover:bg-green-700 transition-colors"
+                    title="Export to Excel"
+                  >
+                    <Download size={14} /> Export
+                  </button>
+                  <button
                     onClick={() => { setInventorySearch(''); setStockFilter('all'); setRevenueFilter('all'); setInventorySort('revenue_desc'); setInventoryPage(1); }}
                     className="p-1 px-2 border border-slate-200 rounded-md bg-white text-slate-500 hover:text-slate-800"
                     title="Reset All"
@@ -455,6 +499,12 @@ export const ReportsView: React.FC = () => {
               </button>
             )}
           </div>
+          <button 
+            onClick={handleExportSales}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-xs font-bold"
+          >
+            <Download size={14} /> Export Excel
+          </button>
           <button className="p-1.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors"><RefreshCw size={14} /></button>
           <button className="p-1.5 bg-slate-700 text-white rounded-md hover:bg-slate-800 transition-colors"><Filter size={14} /></button>
         </div>

@@ -214,7 +214,7 @@ class ReportsService:
 
         # 2. Fetch ALL Products from Catalog
         # This ensures even products with 0 sales appear in the report
-        products_query = text("SELECT id, name, stock FROM public.products")
+        products_query = text("SELECT id, name, stock, price FROM public.products")
         all_products = db.execute(products_query).mappings().all()
         
         inventory_data = []
@@ -228,6 +228,7 @@ class ReportsService:
             inventory_data.append({
                 "id": p_id,
                 "name": p['name'],
+                "price": float(p['price'] or 0),
                 "stock": p['stock'], # Real stock from Product Menu
                 "ordersPlaced": stats['qty'],
                 "totalRevenue": stats['revenue']
@@ -263,7 +264,8 @@ class ReportsService:
         """
         # Fetch all non-cancelled orders with necessary fields
         query = text("""
-            SELECT id, order_id, created_at, payment, status, customer_name, products 
+            SELECT id, order_id, created_at, payment, status, customer_name, products, 
+                   email, phone, city, state, pincode, hsn, sgst_percentage, cgst_percentage, original_price
             FROM public.orders 
             WHERE status != 'Cancelled' 
             ORDER BY created_at DESC
@@ -311,6 +313,14 @@ class ReportsService:
                     "paymentMethod": order['payment'],
                     "status": order['status'],
                     "storeName": order['customer_name'],
+                    "email": order['email'],
+                    "phone": order['phone'],
+                    "city": order['city'],
+                    "state": order['state'],
+                    "pincode": order['pincode'],
+                    "hsn": order['hsn'],
+                    "sgst": float(order['sgst_percentage'] or 0),
+                    "cgst": float(order['cgst_percentage'] or 0),
                     "salesRep": 'Super Market', # Static as per request/example
                     "itemId": item_id,
                     "productName": item.get('name'),
