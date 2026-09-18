@@ -1283,26 +1283,154 @@ const InvoiceModal = ({ order, onClose }: { order: any, onClose: () => void }) =
     ? parseFloat(order.amount.replace(/[^0-9.-]+/g, ""))
     : order.amount;
 
-  // Registered states and their GSTINs
-  const REGISTERED_STATES: Record<string, string> = {
-    "tamil nadu": "33ABLCS5237N1ZU",
-    // Add more states here when company registers in new states
+  // Base PAN suffix & default GSTIN
+  const BASE_PAN_SUFFIX = "ABLCS5237N1ZU";
+  const DEFAULT_GSTIN = "33ABLCS5237N1ZU";
+
+  // Official 2-digit GST state codes
+  const STATE_GST_CODES: Record<string, string> = {
+    "jammu and kashmir": "01",
+    "jammu & kashmir": "01",
+    "himachal pradesh": "02",
+    "punjab": "03",
+    "chandigarh": "04",
+    "uttarakhand": "05",
+    "haryana": "06",
+    "delhi": "07",
+    "rajasthan": "08",
+    "uttar pradesh": "09",
+    "bihar": "10",
+    "sikkim": "11",
+    "arunachal pradesh": "12",
+    "nagaland": "13",
+    "manipur": "14",
+    "mizoram": "15",
+    "tripura": "16",
+    "meghalaya": "17",
+    "assam": "18",
+    "west bengal": "19",
+    "jharkhand": "20",
+    "odisha": "21",
+    "orissa": "21",
+    "chhattisgarh": "22",
+    "madhya pradesh": "23",
+    "gujarat": "24",
+    "daman and diu": "26",
+    "dadra and nagar haveli": "26",
+    "dadra & nagar haveli": "26",
+    "maharashtra": "27",
+    "karnataka": "29",
+    "goa": "30",
+    "lakshadweep": "31",
+    "kerala": "32",
+    "tamil nadu": "33",
+    "tamilnadu": "33",
+    "puducherry": "34",
+    "pondicherry": "34",
+    "andaman and nicobar islands": "35",
+    "andaman & nicobar": "35",
+    "telangana": "36",
+    "andhra pradesh": "37",
+    "ladakh": "38",
+  };
+
+  const CITY_STATE_CODES: Record<string, string> = {
+    "bengaluru": "29",
+    "bangalore": "29",
+    "silkboard": "29",
+    "whitefield": "29",
+    "koramangala": "29",
+    "indiranagar": "29",
+    "chennai": "33",
+    "madras": "33",
+    "coimbatore": "33",
+    "madurai": "33",
+    "trichy": "33",
+    "salem": "33",
+    "mumbai": "27",
+    "bombay": "27",
+    "pune": "27",
+    "nagpur": "27",
+    "thane": "27",
+    "navi mumbai": "27",
+    "hyderabad": "36",
+    "secunderabad": "36",
+    "kolkata": "19",
+    "calcutta": "19",
+    "new delhi": "07",
+    "gurgaon": "06",
+    "gurugram": "06",
+    "faridabad": "06",
+    "noida": "09",
+    "greater noida": "09",
+    "ghaziabad": "09",
+    "lucknow": "09",
+    "kanpur": "09",
+    "varanasi": "09",
+    "kochi": "32",
+    "cochin": "32",
+    "trivandrum": "32",
+    "thiruvananthapuram": "32",
+    "calicut": "32",
+    "kozhikode": "32",
+    "ahmedabad": "24",
+    "surat": "24",
+    "vadodara": "24",
+    "rajkot": "24",
+    "jaipur": "08",
+    "jodhpur": "08",
+    "udaipur": "08",
+    "patna": "10",
+    "bhopal": "23",
+    "indore": "23",
+    "bhubaneswar": "21",
+    "cuttack": "21",
+    "ranchi": "20",
+    "jamshedpur": "20",
+    "guwahati": "18",
+    "dehradun": "05",
+    "shimla": "02",
+    "srinagar": "01",
+    "jammu": "01",
+    "visakhapatnam": "37",
+    "vizag": "37",
+    "vijayawada": "37",
   };
 
   // Detect buyer state from order
   const buyerState = (
     order.state ||
     order.address ||
+    order.city ||
     ''
   ).toLowerCase();
 
-  // Check if intra-state
-  const matchedState = Object.keys(REGISTERED_STATES)
-    .find(s => buyerState.includes(s));
-  const isIntraState = !!matchedState;
-  const sellerGstin = matchedState
-    ? REGISTERED_STATES[matchedState]
-    : "33ABLCS5237N1ZU";
+  // Find state code
+  let detectedCode = "33";
+  let matched = false;
+
+  for (const [stateName, code] of Object.entries(STATE_GST_CODES)) {
+    if (buyerState.includes(stateName) || buyerState.replace(/\s+/g, '').includes(stateName.replace(/\s+/g, ''))) {
+      detectedCode = code;
+      matched = true;
+      break;
+    }
+  }
+
+  if (!matched) {
+    for (const [cityName, code] of Object.entries(CITY_STATE_CODES)) {
+      if (buyerState.includes(cityName)) {
+        detectedCode = code;
+        matched = true;
+        break;
+      }
+    }
+  }
+
+  // With warehouse in the state, this is Intra-State supply
+  const isIntraState = true;
+  const sellerGstin = `${detectedCode}${BASE_PAN_SUFFIX}`;
+
 
   // Always use 18% total GST
   const GST_RATE = 0.18;

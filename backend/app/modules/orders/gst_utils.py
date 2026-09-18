@@ -35,73 +35,186 @@ from typing import Dict, Any
 # ---------------------------------------------------------------------------
 # Registered States & their GSTINs
 # ---------------------------------------------------------------------------
-# Add more states here when/if the company gets registered in additional states.
-# Key must be the EXACT state name as received from the mobile app / order data
-# (comparison is case-insensitive – see _normalize below).
+BASE_PAN_SUFFIX = "ABLCS5237N1ZU"
+DEFAULT_GSTIN = "33ABLCS5237N1ZU"   # Tamil Nadu — default fallback
 
-REGISTERED_STATES: Dict[str, str] = {
-    "tamil nadu": "33ABLCS5237N1ZU",
-    # "karnataka": "29ABLCS5237N1ZU",  # Example — fill in when registered
+# Official 2-digit GST state codes for all Indian States & Union Territories
+STATE_GST_CODES: Dict[str, str] = {
+    "jammu and kashmir": "01",
+    "jammu & kashmir": "01",
+    "himachal pradesh": "02",
+    "punjab": "03",
+    "chandigarh": "04",
+    "uttarakhand": "05",
+    "haryana": "06",
+    "delhi": "07",
+    "rajasthan": "08",
+    "uttar pradesh": "09",
+    "bihar": "10",
+    "sikkim": "11",
+    "arunachal pradesh": "12",
+    "nagaland": "13",
+    "manipur": "14",
+    "mizoram": "15",
+    "tripura": "16",
+    "meghalaya": "17",
+    "assam": "18",
+    "west bengal": "19",
+    "jharkhand": "20",
+    "odisha": "21",
+    "orissa": "21",
+    "chhattisgarh": "22",
+    "madhya pradesh": "23",
+    "gujarat": "24",
+    "daman and diu": "26",
+    "dadra and nagar haveli": "26",
+    "dadra & nagar haveli": "26",
+    "maharashtra": "27",
+    "karnataka": "29",
+    "goa": "30",
+    "lakshadweep": "31",
+    "kerala": "32",
+    "tamil nadu": "33",
+    "tamilnadu": "33",
+    "puducherry": "34",
+    "pondicherry": "34",
+    "andaman and nicobar islands": "35",
+    "andaman & nicobar": "35",
+    "telangana": "36",
+    "andhra pradesh": "37",
+    "ladakh": "38",
 }
 
-DEFAULT_GSTIN = "33ABLCS5237N1ZU"   # Tamil Nadu — used for inter-state
+# Key city and regional aliases mapped to state codes
+CITY_STATE_CODES: Dict[str, str] = {
+    "bengaluru": "29",
+    "bangalore": "29",
+    "silkboard": "29",
+    "whitefield": "29",
+    "koramangala": "29",
+    "indiranagar": "29",
+    "chennai": "33",
+    "madras": "33",
+    "coimbatore": "33",
+    "madurai": "33",
+    "trichy": "33",
+    "salem": "33",
+    "mumbai": "27",
+    "bombay": "27",
+    "pune": "27",
+    "nagpur": "27",
+    "thane": "27",
+    "navi mumbai": "27",
+    "hyderabad": "36",
+    "secunderabad": "36",
+    "kolkata": "19",
+    "calcutta": "19",
+    "new delhi": "07",
+    "gurgaon": "06",
+    "gurugram": "06",
+    "faridabad": "06",
+    "noida": "09",
+    "greater noida": "09",
+    "ghaziabad": "09",
+    "lucknow": "09",
+    "kanpur": "09",
+    "varanasi": "09",
+    "kochi": "32",
+    "cochin": "32",
+    "trivandrum": "32",
+    "thiruvananthapuram": "32",
+    "calicut": "32",
+    "kozhikode": "32",
+    "ahmedabad": "24",
+    "surat": "24",
+    "vadodara": "24",
+    "rajkot": "24",
+    "jaipur": "08",
+    "jodhpur": "08",
+    "udaipur": "08",
+    "patna": "10",
+    "bhopal": "23",
+    "indore": "23",
+    "bhubaneswar": "21",
+    "cuttack": "21",
+    "ranchi": "20",
+    "jamshedpur": "20",
+    "guwahati": "18",
+    "dehradun": "05",
+    "shimla": "02",
+    "srinagar": "01",
+    "jammu": "01",
+    "visakhapatnam": "37",
+    "vizag": "37",
+    "vijayawada": "37",
+}
+
+# Pre-generate dictionary of registered states and their GSTINs
+REGISTERED_STATES: Dict[str, str] = {
+    state: f"{code}{BASE_PAN_SUFFIX}"
+    for state, code in STATE_GST_CODES.items()
+}
 
 # GST split (always 18% total)
-_CGST_RATE  = 9.0   # % — was wrongly 8% before, now corrected to 9%
+_CGST_RATE  = 9.0   # %
 _SGST_RATE  = 9.0   # %
 _IGST_RATE  = 18.0  # %
 _TOTAL_RATE = 18.0  # %
 
 
-# All known aliases for Tamil Nadu (covers typos, abbreviations, etc.)
-_TN_ALIASES = {
-    "tamil nadu", "tamilnadu", "tamil-nadu", "tamilnad", "t.n",
-    "tn", "tamilnadu state", "tamilnadu,", "tamilnadu.",
-}
-
 def _normalize(state: str) -> str:
     return (state or "").strip().lower()
 
 
-def _is_registered_state(normalized_state: str, registered_key: str) -> bool:
-    """Check if normalized_state matches registered_key using multiple strategies."""
-    s = normalized_state
-    k = _normalize(registered_key)
-    if not k:
-        return False
-    # 1. Exact match
-    if s == k:
-        return True
-    # 2. Registered key contained in state string (e.g. state is "tamil nadu india")
-    if k in s:
-        return True
-    # 3. Remove spaces and compare (tamilnadu == tamilnadu)
-    if s.replace(" ", "").replace("-", "") == k.replace(" ", "").replace("-", ""):
-        return True
-    # 4. Check individual words in the state string against known aliases
-    for word in s.replace(",", " ").replace(".", " ").split():
-        clean = word.strip()
-        if clean in _TN_ALIASES:
-            return True
-    return False
+def find_state_code(buyer_state: str) -> str:
+    """Detect the 2-digit GST state code from an address/state string."""
+    s = _normalize(buyer_state)
+    if not s:
+        return "33"  # Default Tamil Nadu
+
+    # 1. Check direct state names
+    for state_name, code in STATE_GST_CODES.items():
+        # Check whole word / substring
+        if state_name in s:
+            return code
+        clean_state = state_name.replace(" ", "").replace("-", "")
+        clean_s = s.replace(" ", "").replace("-", "")
+        if clean_state in clean_s:
+            return code
+
+    # 2. Check city / regional synonyms
+    for city_name, code in CITY_STATE_CODES.items():
+        if city_name in s:
+            return code
+
+    # 3. Check individual tokens
+    for token in s.replace(",", " ").replace(".", " ").split():
+        clean_token = token.strip()
+        if clean_token in CITY_STATE_CODES:
+            return CITY_STATE_CODES[clean_token]
+        if clean_token in STATE_GST_CODES:
+            return STATE_GST_CODES[clean_token]
+
+    return "33"
 
 
 def get_seller_gstin(buyer_state: str) -> str:
-    """Return the correct seller GSTIN based on the buyer's state."""
-    s = _normalize(buyer_state)
-    for key, gstin in REGISTERED_STATES.items():
-        if _is_registered_state(s, key):
-            return gstin
-    return DEFAULT_GSTIN
+    """
+    Return the correct seller GSTIN based on the buyer's state.
+    Uses the 2-digit state code of the local warehouse + company PAN suffix.
+    """
+    code = find_state_code(buyer_state)
+    return f"{code}{BASE_PAN_SUFFIX}"
 
 
 def is_intra_state(buyer_state: str) -> bool:
-    """True when buyer's state is one of our registered states."""
-    s = _normalize(buyer_state)
-    for key in REGISTERED_STATES.keys():
-        if _is_registered_state(s, key):
-            return True
-    return False
+    """
+    True when orders are fulfilled from the local state warehouse to customers
+    in that state, resulting in intra-state taxation (CGST + SGST).
+    """
+    code = find_state_code(buyer_state)
+    return bool(code)
+
 
 
 def compute_gst(total_amount: float, buyer_state: str) -> Dict[str, Any]:
