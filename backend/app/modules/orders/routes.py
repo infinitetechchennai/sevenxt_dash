@@ -112,6 +112,78 @@ def read_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     
     return result
 
+@router.post("", response_model=schemas.OrderResponse, status_code=201)
+def create_order(order_data: schemas.OrderCreate, db: Session = Depends(get_db)):
+    """Create a new order for testing, customer app, or API integrations"""
+    from app.modules.orders.models import Order
+    from app.modules.orders.order_id_generator import generate_order_id
+    from app.modules.orders.service import get_order_tax_meta
+
+    new_order_id = order_data.order_id or generate_order_id(db)
+
+    order = Order(
+        order_id=new_order_id,
+        customer_type=order_data.customer_type or "B2C",
+        customer_name=order_data.customer_name or "Test Customer",
+        products=order_data.products or [],
+        amount=order_data.amount or 0.0,
+        payment=order_data.payment or "Paid",
+        status=order_data.status or "Processing",
+        awb_number=order_data.awb_number,
+        address=order_data.address or "123 Anna Salai, T. Nagar",
+        email=order_data.email or "customer@example.com",
+        phone=order_data.phone or "+919876543210",
+        city=order_data.city or "Chennai",
+        state=order_data.state or "Tamil Nadu",
+        pincode=order_data.pincode or "600017",
+        height=int(order_data.height) if order_data.height is not None else 10,
+        weight=int(order_data.weight) if order_data.weight is not None else 500,
+        breadth=int(order_data.breadth) if order_data.breadth is not None else 10,
+        length=int(order_data.length) if order_data.length is not None else 10,
+        hsn="61091000",
+        sgst_percentage=order_data.sgst_percentage if order_data.sgst_percentage is not None else 9.0,
+        cgst_percentage=order_data.cgst_percentage if order_data.cgst_percentage is not None else 9.0,
+        razorpay_order_id=order_data.razorpay_order_id or f"order_{new_order_id}"
+    )
+
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+
+    tax_meta = get_order_tax_meta(order)
+
+    return {
+        "id": order.id,
+        "order_id": order.order_id,
+        "order_number": order.order_id,
+        "razorpay_order_id": order.razorpay_order_id,
+        "gst_type": tax_meta["gst_type"],
+        "seller_gstin": tax_meta["seller_gstin"],
+        "igst_percentage": tax_meta["igst_percentage"],
+        "customer_type": order.customer_type,
+        "customer_name": order.customer_name,
+        "user_id": None,
+        "products": order.products,
+        "amount": float(order.amount) if order.amount else None,
+        "payment": order.payment,
+        "status": order.status,
+        "awb_number": order.awb_number,
+        "address": order.address,
+        "email": order.email,
+        "phone": order.phone,
+        "city": order.city,
+        "state": order.state,
+        "pincode": order.pincode,
+        "height": order.height,
+        "weight": order.weight,
+        "breadth": order.breadth,
+        "length": order.length,
+        "sgst_percentage": float(order.sgst_percentage) if order.sgst_percentage is not None else 0.0,
+        "cgst_percentage": float(order.cgst_percentage) if order.cgst_percentage is not None else 0.0,
+        "created_at": order.created_at,
+        "updated_at": order.updated_at,
+    }
+
 @router.get("/deliveries", response_model=List[schemas.DeliveryResponse])
 def read_deliveries(
     skip: int = 0, 

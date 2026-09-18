@@ -3,7 +3,7 @@ from typing import Optional, Any
 from datetime import datetime
 
 class OrderBase(BaseModel):
-    order_id : str
+    order_id: Optional[str] = None
     order_number: Optional[str] = None
     razorpay_order_id: Optional[str] = None
     gst_type: Optional[str] = None
