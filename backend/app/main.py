@@ -14,6 +14,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import models to register them with Base
+from app.modules.auth.models import EmployeeUser, User, AdminUser
+from app.modules.orders.models import Order, OrderItem, B2BApplication, B2CApplication
+from app.modules.products.models import Product
 from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog
 from app.modules.exchanges.models import Exchange
@@ -101,6 +104,26 @@ async def startup_event():
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database tables created/verified successfully")
+        
+        # Ensure default admin account exists
+        try:
+            from sqlalchemy.orm import Session
+            from app.modules.auth.service import get_password_hash
+            with Session(engine) as db:
+                existing_admin = db.query(AdminUser).filter(AdminUser.email == "admin@admin.com").first()
+                if not existing_admin:
+                    new_admin = AdminUser(
+                        name="Super Admin",
+                        email="admin@admin.com",
+                        password=get_password_hash("admin123"),
+                        role="admin",
+                        status="active"
+                    )
+                    db.add(new_admin)
+                    db.commit()
+                    logger.info("✅ Default admin user created: admin@admin.com / admin123")
+        except Exception as admin_err:
+            logger.warning(f"Could not check/create default admin: {admin_err}")
         
         # FIX FOR LIVE RENDER DB: Add missing columns to b2b_applications
         try:
