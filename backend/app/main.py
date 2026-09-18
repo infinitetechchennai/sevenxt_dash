@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Import models to register them with Base
 from app.modules.auth.models import EmployeeUser, User, AdminUser
-from app.modules.orders.models import Order, OrderItem, B2BApplication, B2CApplication
+from app.modules.orders.models import Order, B2BApplication, B2CApplication
 from app.modules.products.models import Product
 from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog

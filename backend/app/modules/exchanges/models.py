@@ -12,7 +12,7 @@ class Exchange(Base):
     order_id = Column(String(50), ForeignKey("orders.order_id", ondelete="CASCADE"), nullable=False, index=True)
     
     # New Columns
-    order_item_id = Column(Integer, ForeignKey("order_items.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    order_item_id = Column(Integer, nullable=True)
     customer = Column(String(50), nullable=True)
     email = Column(String(100), nullable=True)
     type = Column(String(20), nullable=True)
