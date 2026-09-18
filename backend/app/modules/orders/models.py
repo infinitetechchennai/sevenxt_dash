@@ -67,18 +67,13 @@ class Order(Base):
     length = Column(Integer, nullable=True)
     
     # HSN Code
-    hsn = Column(String(20), nullable=True)
-
-    # GST Percentages
-    sgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
-    cgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)
-    razorpay_order_id = Column(String(50), nullable=True)
+    hsn = Column(String(20), nullable=True)  # HSN code
 
     # GST and Pricing fields
     original_price = Column(DECIMAL(10, 2), nullable=True)  # Price before tax
-    sgst_percentage = Column(DECIMAL(5, 2), nullable=True)  # SGST percentage (e.g., 9.00 for 9%)
-    cgst_percentage = Column(DECIMAL(5, 2), nullable=True)  # CGST percentage (e.g., 9.00 for 9%)
-    hsn = Column(String(20), nullable=True)  # HSN code
+    sgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)  # SGST percentage (e.g., 9.00 for 9%)
+    cgst_percentage = Column(DECIMAL(5, 2), nullable=True, default=0.00)  # CGST percentage (e.g., 9.00 for 9%)
+    razorpay_order_id = Column(String(50), nullable=True)
 
     #return AWb number annd label
     # return_awb_number = Column(String(255), nullable=True)
