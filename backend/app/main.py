@@ -15,13 +15,17 @@ logger = logging.getLogger(__name__)
 
 # Import models to register them with Base
 from app.modules.auth.models import EmployeeUser, User, AdminUser
-from app.modules.orders.models import Order, B2BApplication, B2CApplication
-from app.modules.products.models import Product
+from app.modules.orders.models import Order, Delivery, B2BApplication, B2CApplication
+from app.modules.products.models import Product, ProductAttribute, ProductVariant
 from app.modules.refunds.models import Refund
 from app.modules.activity_logs.models import ActivityLog
 from app.modules.exchanges.models import Exchange
 from app.modules.reviews.models import ProductReview
 from app.modules.orders.order_id_generator import OrderSequence  # noqa: F401 — ensures table is created
+from app.modules.finance.models import Transaction
+from app.modules.settings.models import Setting
+from app.modules.campaigns.models import Coupon, FlashDeal
+from app.modules.cms.models import CMSPage, CMSCategoryBanner, CMSBanner, CMSNotification, AppNotification
 
 # Import all routers
 from app.modules.auth import routes as auth_routes

@@ -17,6 +17,7 @@ class DashboardService:
         interval = intervals.get(timeframe.lower(), "30 days")
 
         # 2. Main KPI Metrics
+        # 2. Main KPI Metrics
         kpi_query = text(f"""
             SELECT 
                 (SELECT COALESCE(SUM(amount), 0)::float FROM public.transactions WHERE status = 'SUCCESS' AND created_at >= NOW() - INTERVAL '{interval}') as revenue,
@@ -37,12 +38,11 @@ class DashboardService:
                 SUM(CASE WHEN customer_type = 'B2C' THEN amount ELSE 0 END)::float as b2c
             FROM public.orders
             WHERE created_at >= NOW() - INTERVAL '{interval}'
-            GROUP BY name, DATE_TRUNC('day', created_at)
+            GROUP BY TO_CHAR(created_at, 'Mon DD'), DATE_TRUNC('day', created_at)
             ORDER BY DATE_TRUNC('day', created_at);
         """)
 
-        # 4. Best Selling Products (Including Tax - proportional to order amount)
-        # Handles both 'quantity' and 'qty' field names
+        # 4. Best Selling Products (safe PostgreSQL JSON extraction)
         sellers_query = text(f"""
             WITH product_revenue AS (
                 SELECT 
@@ -51,7 +51,14 @@ class DashboardService:
                     ((p->>'price')::float * COALESCE((p->>'quantity')::int, (p->>'qty')::int, 0)) as product_subtotal,
                     o.amount as order_total,
                     o.id as order_id
-                FROM public.orders o, jsonb_array_elements(o.products) AS p
+                FROM public.orders o
+                CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE 
+                        WHEN o.products IS NOT NULL AND jsonb_typeof(o.products::jsonb) = 'array' 
+                        THEN o.products::jsonb 
+                        ELSE '[]'::jsonb 
+                    END
+                ) AS p
                 WHERE o.created_at >= NOW() - INTERVAL '{interval}'
             ),
             order_subtotals AS (
@@ -87,46 +94,58 @@ class DashboardService:
             WHERE created_at >= NOW() - INTERVAL '{interval}';
         """)
         
+        kpis = {"revenue": 0.0, "orders": 0, "b2b_users": 0, "b2c_users": 0, "refunds": 0}
         try:
-            kpis = db.execute(kpi_query).mappings().first()
-            chart = db.execute(chart_query).mappings().all()
-            sellers = db.execute(sellers_query).mappings().all()
-            delivery_stats = db.execute(delivery_query).mappings().first()
-            
-            # Calculate delivery percentages (On Time = Delivered, Late = Pending/In Transit)
-            total_deliveries = delivery_stats['total']
-            if total_deliveries > 0:
-                delivered_count = delivery_stats['delivered']
-                pending_count = delivery_stats['pending']
-                
-                # Build porter_data, only include categories with values > 0
-                porter_data = []
-                if delivered_count > 0:
-                    porter_data.append({"name": "Delivered", "value": delivered_count, "color": "#10B981"})
-                if pending_count > 0:
-                    porter_data.append({"name": "Pending", "value": pending_count, "color": "#EF4444"})
-                
-                # If somehow both are 0 (shouldn't happen if total > 0), use fallback
-                if not porter_data:
-                    porter_data = [
-                        {"name": "No Data", "value": 1, "color": "#9CA3AF"}
-                    ]
-            else:
-                # Fallback to default if no delivery data
-                porter_data = [
-                    {"name": "No Deliveries", "value": 1, "color": "#9CA3AF"}
-                ]
-
-            return {
-                "revenue": {"value": f"₹{kpis['revenue']:,}", "percent": "+12%", "trend": "up", "subtext": "vs last period"},
-                "orders": {"value": str(kpis['orders']), "percent": "+5%", "trend": "up", "subtext": "vs last period"},
-                "b2b_users": {"value": str(kpis['b2b_users']), "percent": "+8%", "trend": "up", "subtext": "partners"},
-                "b2c_users": {"value": str(kpis['b2c_users']), "percent": "+10%", "trend": "up", "subtext": "customers"},
-                "refunds": {"value": str(kpis['refunds']), "percent": "-2%", "trend": "down", "subtext": "vs last period"},
-                "chart": chart,
-                "bestSellers": sellers,
-                "porter": porter_data
-            }
+            res = db.execute(kpi_query).mappings().first()
+            if res:
+                kpis = dict(res)
         except Exception as e:
-            logger.error(f"Dashboard Service Error: {e}")
-            return None
+            logger.error(f"Dashboard Service KPI Error: {e}")
+
+        chart = []
+        try:
+            chart = [dict(row) for row in db.execute(chart_query).mappings().all()]
+        except Exception as e:
+            logger.error(f"Dashboard Service Chart Error: {e}")
+
+        sellers = []
+        try:
+            sellers = [dict(row) for row in db.execute(sellers_query).mappings().all()]
+        except Exception as e:
+            logger.error(f"Dashboard Service Sellers Error: {e}")
+
+        delivery_stats = {"delivered": 0, "pending": 0, "total": 0}
+        try:
+            res = db.execute(delivery_query).mappings().first()
+            if res:
+                delivery_stats = dict(res)
+        except Exception as e:
+            logger.error(f"Dashboard Service Delivery Error: {e}")
+
+        total_deliveries = delivery_stats.get('total', 0) or 0
+        delivered_count = delivery_stats.get('delivered', 0) or 0
+        pending_count = delivery_stats.get('pending', 0) or 0
+        porter_data = []
+        if delivered_count > 0:
+            porter_data.append({"name": "Delivered", "value": delivered_count, "color": "#10B981"})
+        if pending_count > 0:
+            porter_data.append({"name": "Pending", "value": pending_count, "color": "#EF4444"})
+        if not porter_data:
+            porter_data = [{"name": "No Deliveries", "value": 1, "color": "#9CA3AF"}]
+
+        revenue_val = kpis.get("revenue", 0.0) or 0.0
+        orders_val = kpis.get("orders", 0) or 0
+        b2b_val = kpis.get("b2b_users", 0) or 0
+        b2c_val = kpis.get("b2c_users", 0) or 0
+        refunds_val = kpis.get("refunds", 0) or 0
+
+        return {
+            "revenue": {"value": f"₹{revenue_val:,.2f}" if isinstance(revenue_val, (int, float)) else f"₹{revenue_val}", "percent": "+12%", "trend": "up", "subtext": "vs last period"},
+            "orders": {"value": str(orders_val), "percent": "+5%", "trend": "up", "subtext": "vs last period"},
+            "b2b_users": {"value": str(b2b_val), "percent": "+8%", "trend": "up", "subtext": "partners"},
+            "b2c_users": {"value": str(b2c_val), "percent": "+10%", "trend": "up", "subtext": "customers"},
+            "refunds": {"value": str(refunds_val), "percent": "-2%", "trend": "down", "subtext": "vs last period"},
+            "chart": chart,
+            "bestSellers": sellers,
+            "porter": porter_data
+        }
