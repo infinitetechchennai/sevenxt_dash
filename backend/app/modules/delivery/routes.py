@@ -386,7 +386,7 @@ async def schedule_pickup(
             delhivery_pickup_result = client.request_pickup(
                 pickup_date=pickup_date_str,
                 pickup_time=pickup_time_str,
-                pickup_location="sevenxt",          # Your registered warehouse name
+                pickup_location=os.getenv("DELHIVERY_PICKUP_LOCATION", "sevenxt"),  # Set via env var
                 expected_package_count=int(expected_package_count),
             )
 

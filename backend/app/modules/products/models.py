@@ -30,11 +30,11 @@ class Product(Base):
     b2b_offer_start_date = Column(DateTime, nullable=True)
     b2b_offer_end_date = Column(DateTime, nullable=True)
     
-    info = Column(Text(length=4294967295), nullable=True)
-    description = Column(Text(length=4294967295), nullable=True)  # Detailed product description
+    info = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)  # Detailed product description
     status = Column(String(50), default="Draft") # Active, Draft, Archived
     stock = Column(Integer, default=0)
-    image = Column(Text(length=4294967295), nullable=True) # LONGTEXT
+    image = Column(Text, nullable=True) # Text for base64 or long image URLs
     
     rating = Column(Float, default=0.0)
     # reviews = Column(Integer, default=0)

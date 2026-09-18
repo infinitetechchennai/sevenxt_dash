@@ -4,6 +4,8 @@ import os
 from datetime import datetime
 from typing import Tuple, Optional
 
+PICKUP_LOCATION_NAME = os.getenv("DELHIVERY_PICKUP_LOCATION", "sevenxt")
+
 
 class DelhiveryClient:
     def __init__(self, token: str, is_production: bool = False):
@@ -92,8 +94,8 @@ class DelhiveryClient:
         payload_data = {
             "shipments": [shipment_payload],
             "pickup_location": {
-                # MUST MATCH EXACT NAME CREATED IN DELHIVERY
-                "name": "sevenxt"
+                # MUST MATCH EXACT NAME CREATED IN DELHIVERY (set via DELHIVERY_PICKUP_LOCATION env var)
+                "name": PICKUP_LOCATION_NAME
             },
         }
         
@@ -172,7 +174,7 @@ class DelhiveryClient:
 
         payload_data = {
             "shipments": shipments_list,  # ← ALL orders in ONE call
-            "pickup_location": {"name": "sevenxt"},
+            "pickup_location": {"name": PICKUP_LOCATION_NAME},
         }
 
         print(f"[BULK SHIPMENT] Payload has {len(shipments_list)} shipments")
@@ -198,7 +200,7 @@ class DelhiveryClient:
         self,
         pickup_date: str,           # Format: "YYYY-MM-DD"
         pickup_time: str,           # Format: "HH:MM:SS"
-        pickup_location: str = "sevenxt",   # Registered warehouse name in Delhivery
+        pickup_location: str = PICKUP_LOCATION_NAME,   # Registered warehouse name in Delhivery
         expected_package_count: int = 1,    # Number of packages to pick up
     ) -> dict:
         """
@@ -422,7 +424,7 @@ class DelhiveryClient:
         payload = {
             "pickup_time": pickup_data.get("pickup_time"),
             "pickup_date": pickup_data.get("pickup_date"),
-            "pickup_location": pickup_data.get("pickup_location", "sevenxt"),
+            "pickup_location": pickup_data.get("pickup_location", PICKUP_LOCATION_NAME),
             "expected_package_count": pickup_data.get("expected_package_count", 1),
         }
 
