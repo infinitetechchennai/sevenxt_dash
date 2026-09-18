@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         "https://sevenxt.in",
         "https://www.sevenxt.in",
         "https://sevenxt-dash.vercel.app",
+        "https://sevenxt-admin-dashboard.onrender.com",
     ]
 
     # ========================================
