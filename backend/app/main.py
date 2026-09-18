@@ -56,6 +56,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,17 +72,16 @@ app.add_middleware(
 async def cors_preflight_handler(request: Request, call_next):
     if request.method == "OPTIONS":
         origin = request.headers.get("origin", "")
-        if origin in settings.CORS_ORIGINS:
-            return Response(
-                status_code=200,
-                headers={
-                    "Access-Control-Allow-Origin": origin,
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Max-Age": "600",
-                },
-            )
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": origin or "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "600",
+            },
+        )
     return await call_next(request)
 
 # ========================================
@@ -214,3 +214,27 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+@app.get("/init-db")
+def init_db():
+    try:
+        from sqlalchemy.orm import Session
+        from app.modules.auth.service import get_password_hash
+        Base.metadata.create_all(bind=engine)
+        with Session(engine) as db:
+            existing = db.query(AdminUser).filter(AdminUser.email == "admin@admin.com").first()
+            if not existing:
+                admin = AdminUser(
+                    name="Super Admin",
+                    email="admin@admin.com",
+                    password=get_password_hash("admin123"),
+                    role="admin",
+                    status="active"
+                )
+                db.add(admin)
+                db.commit()
+                return {"status": "success", "message": "Tables created and admin@admin.com created with password admin123!"}
+            return {"status": "success", "message": "Tables verified and admin@admin.com already exists!"}
+    except Exception as e:
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
