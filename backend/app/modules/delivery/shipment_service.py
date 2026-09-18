@@ -85,12 +85,15 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         item_name = delivery.item_name or "Product"
         quantity = delivery.quantity or 1
 
+    # Determine weight in KG for Delhivery API
+    raw_weight = float(order.weight or 500)
+    weight_in_kg = (raw_weight / 1000.0) if raw_weight > 20.0 else raw_weight
+    if weight_in_kg <= 0.0:
+        weight_in_kg = 0.5
+
     # Determine Service Type (Express vs Surface)
-    # Default to Express (Air)
     service_type = "E"
-    
-    # Rule: If weight is greater than 10kg, use Surface (Road)
-    if order.weight and float(order.weight) > 10.0:
+    if weight_in_kg > 10.0:
         service_type = "S"
 
     order_data = {
@@ -107,7 +110,7 @@ def create_shipment_for_order(db: Session, order: Order) -> Optional[str]:
         "length": float(order.length),
         "breadth": float(order.breadth),
         "height": float(order.height),
-        "weight": float(order.weight),
+        "weight": weight_in_kg,
         "item_name": item_name,
         "quantity": quantity,
         "service_type": service_type,
