@@ -75,7 +75,7 @@ export const B2BView: React.FC = () => {
     }
   };
 
-  const handleStatusChange = async (id: number, newStatus: string) => {
+  const handleStatusChange = async (id: number | string, newStatus: string) => {
     const statusLabels: Record<string, string> = { approved: 'Approve', rejected: 'Reject', suspended: 'Suspend' };
     const result = await Swal.fire({
       title: `${statusLabels[newStatus] || 'Update'} Business?`,

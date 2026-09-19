@@ -671,7 +671,7 @@ class ApiService {
     return this.request("/api/v1/b2b/users");
   }
 
-  async updateB2BStatus(id: number, data: { status: string }): Promise<any> {
+  async updateB2BStatus(id: number | string, data: { status: string }): Promise<any> {
     return this.request(`/api/v1/b2b/verify/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
