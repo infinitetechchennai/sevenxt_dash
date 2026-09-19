@@ -88,7 +88,7 @@ export const AdminResetPasswordView: React.FC = () => {
             );
 
             setSuccess(
-                `Password for ${response.email} has been reset successfully!`
+                `Password for ${response.email && response.email !== 'unknown' ? response.email : selectedUser.email} has been reset successfully!`
             );
             setNewPassword('');
             setConfirmPassword('');

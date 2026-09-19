@@ -78,42 +78,115 @@ def create_employee(db: Session, employee_data: dict) -> Union[EmployeeUser, Adm
         db.refresh(new_employee)
         return new_employee
 
-def reset_user_password(db: Session, user_id: int, new_password: str) -> bool:
-    """Reset a user's password (admin action)"""
-    # Try employee first
-    employee = db.query(EmployeeUser).filter(
-        EmployeeUser.id == user_id,
-        EmployeeUser.deleted_at.is_(None)
-    ).first()
-    
-    if employee:
-        employee.password = get_password_hash(new_password)
-        db.commit()
-        return True
-        
-    # Try admin
-    admin = db.query(AdminUser).filter(
-        AdminUser.id == user_id,
-        AdminUser.deleted_at.is_(None)
-    ).first()
-    
-    if admin:
-        admin.password = get_password_hash(new_password)
-        db.commit()
-        return True
-        
-    # Try regular user
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.deleted_at.is_(None)
-    ).first()
-    
-    if user:
-        user.password = get_password_hash(new_password)
-        db.commit()
-        return True
-        
-    return False
+def reset_user_password(db: Session, user_id: Any, new_password: str) -> tuple[bool, str]:
+    """Reset a user's password (admin action) across employee, admin, regular user, and auth_users"""
+    from app.modules.orders.models import B2CApplication, B2BApplication
+    from sqlalchemy import text
+    import bcrypt
+
+    str_id = str(user_id).strip()
+    # Strip prefix if any (e.g. B2C-..., B2B-..., Admin-..., Staff-...)
+    for prefix in ["B2C-", "B2B-", "Admin-", "Staff-", "b2c-", "b2b-", "admin-", "staff-"]:
+        if str_id.startswith(prefix):
+            str_id = str_id[len(prefix):].strip()
+            break
+
+    # 1. Try EmployeeUser
+    if str_id.isdigit():
+        int_id = int(str_id)
+        employee = db.query(EmployeeUser).filter(
+            EmployeeUser.id == int_id,
+            EmployeeUser.deleted_at.is_(None)
+        ).first()
+        if employee:
+            employee.password = get_password_hash(new_password)
+            db.commit()
+            return True, employee.email or "Employee"
+
+        # 2. Try AdminUser
+        admin = db.query(AdminUser).filter(
+            AdminUser.id == int_id,
+            AdminUser.deleted_at.is_(None)
+        ).first()
+        if admin:
+            admin.password = get_password_hash(new_password)
+            db.commit()
+            return True, admin.email or "Admin"
+
+        # 3. Try User
+        user = db.query(User).filter(
+            User.id == int_id,
+            User.deleted_at.is_(None)
+        ).first()
+        if user:
+            user.password = get_password_hash(new_password)
+            db.commit()
+            return True, user.email or "User"
+
+    # 4. Try auth_users (B2C & B2B mobile customer users)
+    bcrypt_hash = bcrypt.hashpw((new_password[:72]).encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    # 4a. Match auth_users directly by UUID / ID
+    try:
+        row = db.execute(text("SELECT id, email FROM auth_users WHERE id::text = :uid"), {"uid": str_id}).mappings().first()
+        if row:
+            db.execute(text("UPDATE auth_users SET password_hash = :ph WHERE id::text = :uid"), {"ph": bcrypt_hash, "uid": str_id})
+            db.commit()
+            return True, row['email'] or "Customer"
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Error checking auth_users by ID: {e}")
+
+    # 4b. Match via b2c_applications ID -> auth_users email
+    try:
+        b2c_row = db.execute(text("SELECT email FROM b2c_applications WHERE id::text = :uid"), {"uid": str_id}).mappings().first()
+        if b2c_row and b2c_row['email']:
+            row = db.execute(text("SELECT id, email FROM auth_users WHERE email = :email"), {"email": b2c_row['email']}).mappings().first()
+            if row:
+                db.execute(text("UPDATE auth_users SET password_hash = :ph WHERE email = :email"), {"ph": bcrypt_hash, "email": b2c_row['email']})
+                db.commit()
+                return True, b2c_row['email']
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Error checking B2C application: {e}")
+
+    # 4c. Match via b2b_applications ID -> auth_users email
+    try:
+        b2b_row = db.execute(text("SELECT email FROM b2b_applications WHERE id::text = :uid"), {"uid": str_id}).mappings().first()
+        if b2b_row and b2b_row['email']:
+            row = db.execute(text("SELECT id, email FROM auth_users WHERE email = :email"), {"email": b2b_row['email']}).mappings().first()
+            if row:
+                db.execute(text("UPDATE auth_users SET password_hash = :ph WHERE email = :email"), {"ph": bcrypt_hash, "email": b2b_row['email']})
+                db.commit()
+                return True, b2b_row['email']
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Error checking B2B application: {e}")
+
+    # 4d. Check if user_id is an email address
+    if "@" in str_id:
+        try:
+            emp = db.query(EmployeeUser).filter(EmployeeUser.email == str_id).first()
+            if emp:
+                emp.password = get_password_hash(new_password)
+                db.commit()
+                return True, emp.email
+            adm = db.query(AdminUser).filter(AdminUser.email == str_id).first()
+            if adm:
+                adm.password = get_password_hash(new_password)
+                db.commit()
+                return True, adm.email
+            row = db.execute(text("SELECT id, email FROM auth_users WHERE email = :email"), {"email": str_id}).mappings().first()
+            if row:
+                db.execute(text("UPDATE auth_users SET password_hash = :ph WHERE email = :email"), {"ph": bcrypt_hash, "email": str_id})
+                db.commit()
+                return True, row['email']
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Error checking by email: {e}")
+
+    return False, "unknown"
+
 
 from app.modules.orders.models import B2CApplication, B2BApplication
 

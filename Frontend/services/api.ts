@@ -164,9 +164,9 @@ class ApiService {
   // -------------- ADMIN PASSWORD RESET ----------------
 
   /** 🔑 Admin Reset User Password */
-  async adminResetPassword(userId: number, newPassword: string): Promise<{
+  async adminResetPassword(userId: number | string, newPassword: string): Promise<{
     message: string;
-    user_id: number;
+    user_id: number | string;
     email: string;
     password_updated: boolean;
   }> {

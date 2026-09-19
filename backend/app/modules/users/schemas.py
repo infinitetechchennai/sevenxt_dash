@@ -93,8 +93,10 @@ class EmployeeResponse(BaseModel):
 
 class ResetPasswordResponse(BaseModel):
     message: str
-    status: str
+    user_id: Union[int, str]
+    email: Optional[str] = "unknown"
+    password_updated: bool = True
 
 class ResetPasswordAdminRequest(BaseModel):
-    user_id: int
+    user_id: Union[int, str]
     new_password: str

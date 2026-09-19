@@ -139,6 +139,43 @@ def reset_password_otp(
         )
     
     return {"message": "Password has been reset successfully"}
+ 
+@router.post("/admin/reset-password")
+def auth_admin_reset_password(
+    request: dict,
+    db: Session = Depends(get_db),
+    current_employee: Any = Depends(get_current_employee)
+):
+    """Admin endpoint to reset a user's password directly (Auth route alias)"""
+    if getattr(current_employee, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can reset user passwords"
+        )
+    
+    user_id = request.get("user_id")
+    new_password = request.get("new_password")
+    if not user_id or not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="user_id and new_password are required"
+        )
+        
+    from app.modules.users import service as users_service
+    success, email = users_service.reset_user_password(db, user_id, new_password)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or failed to reset password"
+        )
+
+    return {
+        "message": "Password reset successfully",
+        "user_id": user_id,
+        "email": email,
+        "password_updated": True
+    }
 
 # ========== PROFILE PICTURE UPLOAD ==========
 

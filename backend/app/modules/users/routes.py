@@ -272,21 +272,13 @@ def admin_reset_password(
         )
     
     # Reset password
-    success = service.reset_user_password(db, request.user_id, request.new_password)
+    success, email = service.reset_user_password(db, request.user_id, request.new_password)
     
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found or failed to reset"
+            detail="User not found or failed to reset password"
         )
-    
-    # Fetch user email for response
-    email = "unknown"
-    emp = db.query(EmployeeUser).filter(EmployeeUser.id == request.user_id).first()
-    if emp: email = emp.email
-    else:
-        usr = db.query(User).filter(User.id == request.user_id).first()
-        if usr: email = usr.email
 
     return {
         "message": "Password reset successfully",
