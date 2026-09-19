@@ -8,17 +8,17 @@ class B2BStatusUpdate(BaseModel):
     status: str
 
 class B2BResponse(BaseModel):
-    id: UUID
-    bussiness_name: str
-    gstin: str
-    pan: str
-    email: str
-    phone_number: Union[str, int]
+    id: Union[UUID, str]
+    bussiness_name: Optional[str] = None
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[Union[str, int]] = None
     gst_certificate_url: Optional[str] = None
     business_license_url: Optional[str] = None
-    status: str
+    status: Optional[str] = "Pending"
     state: Optional[str] = None
     registration_date: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

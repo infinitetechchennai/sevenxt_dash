@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union
 import requests
 from requests.auth import HTTPBasicAuth
 from pydantic import BaseModel
@@ -30,8 +30,8 @@ def read_b2b_users(db: Session = Depends(get_db)):
 
 # 2. UPDATE STATUS (Existing workflow)
 @router.put("/verify/{id}", response_model=schemas.B2BResponse)
-def verify_b2b_user(id: UUID, status_update: schemas.B2BStatusUpdate, db: Session = Depends(get_db)):
-    updated_user = service.update_status(db, id, status_update.status)
+def verify_b2b_user(id: Union[UUID, str], status_update: schemas.B2BStatusUpdate, db: Session = Depends(get_db)):
+    updated_user = service.update_status(db, str(id), status_update.status)
     if not updated_user:
         raise HTTPException(status_code=404, detail="B2B Application not found")
     return updated_user

@@ -10,7 +10,7 @@ class B2BApplication(Base):
     
     # We map 'bussiness_name' (used in code/frontend) 
     # to 'business_name' (the real column in your database)
-    bussiness_name = Column("business_name", String(255), nullable=False)
+    bussiness_name = Column("business_name", String(255), nullable=True)
     
     gstin = Column(String(15), nullable=False)
     pan = Column(String(10), nullable=False)
