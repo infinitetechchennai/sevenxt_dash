@@ -4,6 +4,16 @@ import os
 from datetime import datetime
 from typing import Tuple, Optional
 
+# Load .env file for local development (no-op on Render where env vars are set directly)
+try:
+    from dotenv import load_dotenv
+    import pathlib
+    _env_path = pathlib.Path(__file__).resolve().parents[3] / ".env"
+    load_dotenv(dotenv_path=_env_path, override=True)
+except ImportError:
+    pass
+
+
 PICKUP_LOCATION_NAME = os.getenv("DELHIVERY_PICKUP_LOCATION", "sevenxt")
 
 

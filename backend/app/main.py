@@ -211,9 +211,10 @@ app.include_router(settings_routes.router, prefix=API_PREFIX)
 def root():
     return {
         "message": "SevenXT Admin API is running",
-        "version": "2.0.0",
+        "version": "2.0.1-state-gstin",
         "status": "healthy"
     }
+
 
 @app.get("/health")
 def health_check():
