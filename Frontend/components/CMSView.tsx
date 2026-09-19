@@ -191,9 +191,9 @@ const CMSView: React.FC = () => {
       );
 
       if (!res.ok) throw new Error(`Upload failed with status: ${res.status}`);
-      const data = await res.json();
-
+      const catObj = CATEGORIES.find(c => c.id === selectedCategory);
       await updateCMSCategoryBanner(selectedCategory as any, {
+        category: catObj?.name || "",
         image_url: data.url
       } as any);
 
