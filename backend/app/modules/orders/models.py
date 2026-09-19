@@ -9,7 +9,7 @@ class B2BApplication(Base):
     __tablename__ = "b2b_applications"
     __table_args__ = {'extend_existing': True}
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(UUID(as_uuid=True), nullable=True)
     business_name = Column(Text, nullable=False)
     gstin = Column(String(20), nullable=False)
@@ -22,7 +22,7 @@ class B2BApplication(Base):
     state = Column(String(100), nullable=True)
     registration_date = Column(String(50), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    address_id = Column(UUID(as_uuid=True), nullable=True)
+    address_id = Column(String(255), nullable=True)
 
 class B2CApplication(Base):
     __tablename__ = "b2c_applications"

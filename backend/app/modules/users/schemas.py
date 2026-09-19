@@ -10,7 +10,7 @@ class B2BStatus(str, Enum):
     REJECTED = "rejected"
 
 class B2CUserResponse(BaseModel):
-    id: UUID
+    id: Union[str, UUID]
     full_name: Optional[str]
     email: Optional[str]
     phone_number: Optional[Union[str, int]]
@@ -20,7 +20,7 @@ class B2CUserResponse(BaseModel):
         from_attributes = True
 
 class B2BUserResponse(BaseModel):
-    id: UUID
+    id: Union[str, UUID]
     business_name: Optional[str]
     gstin: Optional[str]
     pan: Optional[str]

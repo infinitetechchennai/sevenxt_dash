@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import cast as sa_cast, String, text
 from typing import List, Optional, Union, Any
 from app.modules.auth.models import EmployeeUser, User, AdminUser
 from app.modules.auth.service import get_password_hash
@@ -206,26 +207,43 @@ def update_user(db: Session, user_id: Any, user_type: str, update_data: dict) ->
             target = db.query(EmployeeUser).filter(EmployeeUser.id == int_id).first()
     elif user_type == 'B2B':
         logger.info(f"Looking for B2B Application with ID {user_id}")
-        target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
+        target = db.query(B2BApplication).filter(sa_cast(B2BApplication.id, String) == str(user_id)).first()
+        if not target:
+            target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
         if target:
             # Map frontend 'name' to B2BApplication 'business_name'
-            if 'name' in update_data and not hasattr(target, 'name'):
-                update_data['business_name'] = update_data.pop('name')
+            if 'name' in update_data:
+                name_val = update_data.pop('name')
+                if hasattr(target, 'business_name'):
+                    target.business_name = name_val
+                if hasattr(target, 'bussiness_name'):
+                    target.bussiness_name = name_val
     elif user_type == 'B2C':
         logger.info(f"Looking for B2C Application with ID {user_id}")
-        target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
+        target = db.query(B2CApplication).filter(sa_cast(B2CApplication.id, String) == str(user_id)).first()
+        if not target:
+            try:
+                target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
+            except Exception:
+                pass
         if target:
             # Map frontend 'name' to B2CApplication 'full_name'
             if 'name' in update_data and not hasattr(target, 'name'):
                 update_data['full_name'] = update_data.pop('name')
     else:
         logger.info(f"Looking for User with ID {user_id}")
-        target = db.query(User).filter(User.id == str(user_id)).first()
+        if str(user_id).isdigit():
+            target = db.query(User).filter(User.id == int(user_id)).first()
+        else:
+            target = db.query(User).filter(sa_cast(User.id, String) == str(user_id)).first()
         
     if not target:
         # Fallback to User table if not found
         try:
-            target = db.query(User).filter(User.id == str(user_id)).first()
+            if str(user_id).isdigit():
+                target = db.query(User).filter(User.id == int(user_id)).first()
+            else:
+                target = db.query(User).filter(sa_cast(User.id, String) == str(user_id)).first()
         except Exception:
             pass
 
@@ -271,11 +289,18 @@ def delete_user_by_type(db: Session, user_id: Any, user_type: str) -> bool:
         else:
             target = db.query(EmployeeUser).filter(EmployeeUser.id == int_id).first()
     elif user_type == 'B2B':
-        target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
+        target = db.query(B2BApplication).filter(sa_cast(B2BApplication.id, String) == str(user_id)).first()
+        if not target:
+            target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
     elif user_type == 'B2C':
-        target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
+        target = db.query(B2CApplication).filter(sa_cast(B2CApplication.id, String) == str(user_id)).first()
+        if not target:
+            target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
     else:
-        target = db.query(User).filter(User.id == str(user_id)).first()
+        if str(user_id).isdigit():
+            target = db.query(User).filter(User.id == int(user_id)).first()
+        else:
+            target = db.query(User).filter(sa_cast(User.id, String) == str(user_id)).first()
         
     if target:
         db.delete(target)
