@@ -45,7 +45,7 @@ def read_users(
 
 @router.delete("/{user_id}")
 def delete_user(
-    user_id: int, 
+    user_id: str, 
     type: str = None,
     db: Session = Depends(get_db),
     current_user: Union[EmployeeUser, AdminUser] = Depends(get_current_employee)
@@ -127,7 +127,7 @@ def delete_user(
 
 @router.put("/{user_id}")
 def update_user(
-    user_id: int,
+    user_id: str,
     user_data: schemas.UserUpdate,
     user_type: str = Query(..., alias="type"), # Use alias to match frontend query param 'type'
     db: Session = Depends(get_db),

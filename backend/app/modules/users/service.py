@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Any
 from app.modules.auth.models import EmployeeUser, User, AdminUser
 from app.modules.auth.service import get_password_hash
 from datetime import datetime
@@ -115,30 +115,52 @@ def reset_user_password(db: Session, user_id: int, new_password: str) -> bool:
         
     return False
 
-def update_user(db: Session, user_id: int, user_type: str, update_data: dict) -> Optional[Union[EmployeeUser, AdminUser, User]]:
+from app.modules.orders.models import B2CApplication, B2BApplication
+
+def update_user(db: Session, user_id: Any, user_type: str, update_data: dict) -> Optional[Any]:
     """Update a user/employee by ID and type"""
     logger.info(f"UPDATE_USER called: user_id={user_id}, user_type={user_type}, update_data={update_data}")
     target = None
     
     # Identify target table
     if user_type in ['Admin', 'Staff']:
-        # Check Admin
+        int_id = int(user_id) if str(user_id).isdigit() else user_id
         if user_type == 'Admin':
-            logger.info(f"Looking for Admin with ID {user_id}")
-            target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+            logger.info(f"Looking for Admin with ID {int_id}")
+            target = db.query(AdminUser).filter(AdminUser.id == int_id).first()
         else:
-            logger.info(f"Looking for Staff (EmployeeUser) with ID {user_id}")
-            target = db.query(EmployeeUser).filter(EmployeeUser.id == user_id).first()
+            logger.info(f"Looking for Staff (EmployeeUser) with ID {int_id}")
+            target = db.query(EmployeeUser).filter(EmployeeUser.id == int_id).first()
+    elif user_type == 'B2B':
+        logger.info(f"Looking for B2B Application with ID {user_id}")
+        target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
+        if target:
+            # Map frontend 'name' to B2BApplication 'business_name'
+            if 'name' in update_data and not hasattr(target, 'name'):
+                update_data['business_name'] = update_data.pop('name')
+    elif user_type == 'B2C':
+        logger.info(f"Looking for B2C Application with ID {user_id}")
+        target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
+        if target:
+            # Map frontend 'name' to B2CApplication 'full_name'
+            if 'name' in update_data and not hasattr(target, 'name'):
+                update_data['full_name'] = update_data.pop('name')
     else:
-        # B2B / B2C
-        logger.info(f"Looking for B2B/B2C User with ID {user_id}")
-        target = db.query(User).filter(User.id == user_id).first()
+        logger.info(f"Looking for User with ID {user_id}")
+        target = db.query(User).filter(User.id == str(user_id)).first()
         
+    if not target:
+        # Fallback to User table if not found
+        try:
+            target = db.query(User).filter(User.id == str(user_id)).first()
+        except Exception:
+            pass
+
     if not target:
         logger.error(f"Target user not found: user_id={user_id}, user_type={user_type}")
         return None
     
-    logger.info(f"Found target: {target.__class__.__name__} - {target.email}")
+    logger.info(f"Found target: {target.__class__.__name__}")
         
     # Update fields
     for key, value in update_data.items():
@@ -159,29 +181,28 @@ def update_user(db: Session, user_id: int, user_type: str, update_data: dict) ->
         db.rollback()
         raise
 
-from app.modules.orders.models import B2CApplication, B2BApplication
-
 def get_all_b2c_users(db: Session):
     return db.query(B2CApplication).all()
 
 def get_all_b2b_users(db: Session):
     return db.query(B2BApplication).all()
 
-def delete_user_by_type(db: Session, user_id: int, user_type: str) -> bool:
+def delete_user_by_type(db: Session, user_id: Any, user_type: str) -> bool:
     """Delete a user/employee by ID and type"""
     target = None
     
     if user_type in ['Admin', 'Staff']:
+        int_id = int(user_id) if str(user_id).isdigit() else user_id
         if user_type == 'Admin':
-            target = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+            target = db.query(AdminUser).filter(AdminUser.id == int_id).first()
         else:
-            target = db.query(EmployeeUser).filter(EmployeeUser.id == user_id).first()
+            target = db.query(EmployeeUser).filter(EmployeeUser.id == int_id).first()
     elif user_type == 'B2B':
-        target = db.query(B2BApplication).filter(B2BApplication.id == user_id).first()
+        target = db.query(B2BApplication).filter(B2BApplication.id == str(user_id)).first()
     elif user_type == 'B2C':
-        target = db.query(B2CApplication).filter(B2CApplication.id == user_id).first()
+        target = db.query(B2CApplication).filter(B2CApplication.id == str(user_id)).first()
     else:
-        target = db.query(User).filter(User.id == user_id).first()
+        target = db.query(User).filter(User.id == str(user_id)).first()
         
     if target:
         db.delete(target)

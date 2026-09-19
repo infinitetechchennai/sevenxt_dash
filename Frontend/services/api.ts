@@ -133,17 +133,18 @@ class ApiService {
 
   /** 🗑️ Delete User */
   async deleteUser(id: string, type: string): Promise<void> {
-    // ID comes as "Admin-1", we need just "1"
-    const numericId = id.split('-')[1];
-    return this.request<void>(`/api/v1/users/${numericId}?type=${type}`, {
+    // ID may come as "Admin-1" or "B2B-2600aa28-9f98-42f0-9311-b8642a163346"
+    const cleanId = id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
+    return this.request<void>(`/api/v1/users/${cleanId}?type=${type}`, {
       method: "DELETE",
     });
   }
 
   /** ✏️ Update User */
   async updateUser(id: string, type: string, userData: any): Promise<any> {
-    const numericId = id.split('-')[1];
-    return this.request<any>(`/api/v1/users/${numericId}?type=${type}`, {
+    // ID may come as "Admin-1" or "B2B-2600aa28-9f98-42f0-9311-b8642a163346"
+    const cleanId = id.includes('-') ? id.substring(id.indexOf('-') + 1) : id;
+    return this.request<any>(`/api/v1/users/${cleanId}?type=${type}`, {
       method: "PUT",
       body: JSON.stringify(userData),
     });

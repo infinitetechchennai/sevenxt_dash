@@ -187,12 +187,21 @@ const CMSView: React.FC = () => {
         }
       );
 
-      if (!res.ok) throw new Error(`Upload failed with status: ${res.status}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Upload failed with status: ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
       const catObj = CATEGORIES.find(c => c.id === selectedCategory);
       await updateCMSCategoryBanner(selectedCategory as any, {
         category: catObj?.name || "",
         image_url: data.url
       } as any);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       await loadCategoryBanners();
       alert("Category banner updated successfully!");

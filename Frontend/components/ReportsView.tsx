@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { Download, Filter, RefreshCw, Search, ChevronDown, Calendar, Clock, RotateCcw, Globe, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import { apiService, API_BASE_URL } from '../services/api';
-import { exportToExcel } from '../utils/excelExport';
+import { exportToExcel, ExcelSheet } from '../utils/excelExport';
 
 const COLORS = ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#1e40af'];
 
@@ -23,6 +23,8 @@ export const ReportsView: React.FC = () => {
     master_counts?: any
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isExportingMaster, setIsExportingMaster] = useState(false);
+  const [exportProgressText, setExportProgressText] = useState('');
 
   // Filters
   const [startDate, setStartDate] = useState('');
@@ -48,32 +50,66 @@ export const ReportsView: React.FC = () => {
     loadData();
   }, [activeTab]); // Load data when tab changes to avoid over-fetching if we want lazy loading, but simple is fine too.
 
+  // Formatting Helpers for Excel Export
+  const formatReportDate = (val: any) => {
+    if (!val) return 'N/A';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleString('en-IN');
+    } catch {
+      return String(val);
+    }
+  };
+
+  const formatReportDateOnly = (val: any) => {
+    if (!val) return 'N/A';
+    try {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleDateString('en-IN');
+    } catch {
+      return String(val);
+    }
+  };
+
+  const formatReportCurrency = (val: any) => {
+    const num = Number(val);
+    return isNaN(num) ? '0.00' : num.toFixed(2);
+  };
+
   const handleExportInventory = (data?: any[]) => {
     const source = data || inventoryData.tableData;
+    if (!source || source.length === 0) {
+      return [{ 'Status': 'No inventory metrics recorded' }];
+    }
     const dataToExport = source.map(item => ({
-      'Item ID': item.id,
-      'Product Name': item.name,
-      'Price (₹)': item.price,
+      'Item ID': item.id || 'N/A',
+      'Product Name': item.name || 'N/A',
+      'Price (₹)': formatReportCurrency(item.price),
       'Stock Status': item.stock > 0 ? 'Available' : 'Out of Stock',
-      'Available Stock': item.stock,
-      'Orders Placed': item.ordersPlaced,
-      'Total Revenue (₹)': item.totalRevenue
+      'Available Stock': item.stock || 0,
+      'Orders Placed': item.ordersPlaced || 0,
+      'Total Revenue (₹)': formatReportCurrency(item.totalRevenue)
     }));
     return dataToExport;
   };
 
   const handleExportSales = (data?: any[]) => {
     const source = data || salesReportData.tableData;
+    if (!source || source.length === 0) {
+      return [{ 'Status': 'No sales records recorded' }];
+    }
     const dataToExport = source.map(row => ({
-      'Order Date': new Date(row.orderDate).toLocaleDateString(),
-      'Order ID': row.orderId,
-      'Item ID': row.itemId,
-      'Product Name': row.productName,
-      'Quantity': row.quantity,
-      'Total (₹)': row.finalTotal,
-      'Payment Method': row.paymentMethod,
-      'Status': row.status,
-      'Store Name': row.storeName,
+      'Order Date': row.orderDate ? formatReportDateOnly(row.orderDate) : 'N/A',
+      'Order ID': row.orderId || 'N/A',
+      'Item ID': row.itemId || 'N/A',
+      'Product Name': row.productName || 'N/A',
+      'Quantity': row.quantity || 1,
+      'Total (₹)': formatReportCurrency(row.finalTotal),
+      'Payment Method': row.paymentMethod || 'N/A',
+      'Status': row.status || 'N/A',
+      'Store Name': row.storeName || 'SevenXT Store',
       'Customer Email': row.email || 'N/A',
       'Customer Phone': row.phone || 'N/A',
       'Full Address': row.address || 'N/A',
@@ -84,24 +120,300 @@ export const ReportsView: React.FC = () => {
       'SGST (%)': row.sgst || 0,
       'CGST (%)': row.cgst || 0,
       'IGST (%)': row.igst || 0,
-      'Sales Representative': row.salesRep
+      'Sales Representative': row.salesRep || 'SevenXT'
     }));
     return dataToExport;
   };
 
   const handleExportFinance = (data?: any[]) => {
     const source = data || allReportsData?.finance?.transactions || [];
-    return source.map((item: any) => ({
-      'Date': new Date(item.created_at).toLocaleDateString(),
-      'Payment ID': item.razorpay_payment_id || 'N/A',
-      'Order ID': item.internal_order_id || 'N/A',
-      'Amount (₹)': Number(item.amount).toFixed(2),
-      'Gateway Fee (₹)': Number(item.fee || 0).toFixed(2),
-      'GST On Fee (₹)': Number(item.tax || 0).toFixed(2),
-      'Customer Email': item.user_email || 'N/A',
-      'Customer Phone': item.customer_contact || 'N/A',
-      'Method': item.method || 'N/A',
-      'Status': item.status
+    if (!source || source.length === 0) {
+      return [{ 'Status': 'No payment transactions recorded' }];
+    }
+    return source.map((item: any) => {
+      const amount = Number(item.amount || 0);
+      const fee = Number(item.fee || 0);
+      const tax = Number(item.tax || 0);
+      const net = amount - fee - tax;
+      return {
+        'Transaction Date': formatReportDate(item.created_at),
+        'Payment ID / Ref': item.razorpay_payment_id || item.transaction_id || (item.id ? `TXN-${item.id}` : 'N/A'),
+        'Order ID': item.internal_order_id || item.order_id || 'N/A',
+        'Payment Method': item.method || 'N/A',
+        'Payment Status': item.status || 'Success',
+        'Gross Amount (₹)': amount.toFixed(2),
+        'Gateway Fee (₹)': fee.toFixed(2),
+        'GST on Fee (₹)': tax.toFixed(2),
+        'Net Settlement (₹)': net.toFixed(2),
+        'Customer Email': item.user_email || 'N/A',
+        'Customer Phone': item.customer_contact || 'N/A'
+      };
+    });
+  };
+
+  const mapOrdersToExport = (orders: any[]) => {
+    if (!orders || orders.length === 0) {
+      return [{ 'Status': 'No orders recorded' }];
+    }
+    return orders.map((order: any) => {
+      let itemsSummary = '';
+      let itemCount = 0;
+      try {
+        let products = order.products;
+        if (typeof products === 'string') {
+          try {
+            products = JSON.parse(products);
+          } catch {
+            products = JSON.parse(products.replace(/'/g, '"').replace(/None/g, 'null'));
+          }
+        }
+        if (Array.isArray(products)) {
+          itemCount = products.length;
+          itemsSummary = products.map((p: any) => {
+            const name = p.name || p.title || p.product_name || 'Item';
+            const qty = p.quantity || p.qty || 1;
+            const price = p.price ? ` (₹${p.price})` : '';
+            return `${name} x${qty}${price}`;
+          }).join('; ');
+        } else if (products && typeof products === 'object') {
+          itemCount = 1;
+          itemsSummary = `${products.name || 'Item'} x${products.quantity || 1}`;
+        }
+      } catch {
+        itemsSummary = order.item_name || 'N/A';
+      }
+
+      return {
+        'Order ID': order.order_number || order.order_id || (order.id ? `ORD-${order.id}` : 'N/A'),
+        'Order Date & Time': formatReportDate(order.created_at),
+        'Customer Name': order.customer_name || order.customer || (order.user_id ? `User #${order.user_id}` : 'N/A'),
+        'Customer Email': order.email || order.user_email || 'N/A',
+        'Customer Phone': order.phone || order.phone_number || 'N/A',
+        'Order Status': order.status || 'Pending',
+        'Payment Method': order.payment || order.payment_method || 'N/A',
+        'Payment Status': order.payment_status || (order.payment?.toLowerCase().includes('cash') ? 'Pending COD' : 'Paid'),
+        'Order Amount (₹)': formatReportCurrency(order.amount || order.total_amount),
+        'Shipping Fee (₹)': formatReportCurrency(order.delivery_charge || order.shipping_fee),
+        'Total Items Count': itemCount || order.quantity || 1,
+        'Purchased Items': itemsSummary || order.item_name || 'N/A',
+        'Delivery Type': order.type || (order.city?.toLowerCase() === 'chennai' ? 'Local Delivery' : 'Outstation Delivery'),
+        'Tracking / AWB': order.tracking_number || order.awb_number || 'N/A',
+        'Delivery Address': order.full_address || order.address || 'N/A',
+        'City': order.city || 'N/A',
+        'State': order.state || 'N/A',
+        'Pincode': order.pincode || 'N/A'
+      };
+    });
+  };
+
+  const mapDeliveriesToExport = (deliveries: any[]) => {
+    if (!deliveries || deliveries.length === 0) {
+      return [{ 'Status': 'No delivery manifests recorded' }];
+    }
+    return deliveries.map((d: any) => {
+      const isLocal = d.city?.toLowerCase() === 'chennai';
+      return {
+        'Delivery ID': d.id || 'N/A',
+        'Order Number': d.order_number || (d.order_id ? `ORD-${d.order_id}` : 'N/A'),
+        'Delivery Channel': isLocal ? 'Local Fleet (Chennai)' : 'Outstation Courier',
+        'Courier Partner': d.courier_partner || (isLocal ? 'Porter / Local' : 'Delhivery'),
+        'AWB / Tracking Number': d.awb_number || 'N/A',
+        'Delivery Status': d.delivery_status || 'Pending',
+        'Scheduled Pickup': d.schedule_pickup ? formatReportDate(d.schedule_pickup) : 'Not Scheduled',
+        'Customer Name': d.customer_name || 'N/A',
+        'Customer Phone': d.phone || 'N/A',
+        'Customer Email': d.email || 'N/A',
+        'Order Amount (₹)': formatReportCurrency(d.amount),
+        'Payment Mode': d.payment || 'N/A',
+        'Package Weight (kg)': d.weight || 0.5,
+        'Package Dimensions (cm)': `${d.length || 10} x ${d.breadth || 10} x ${d.height || 10}`,
+        'Item Summary': d.item_name || `Quantity: ${d.quantity || 1}`,
+        'Shipping Address': d.full_address || 'N/A',
+        'City': d.city || 'N/A',
+        'State': d.state || 'N/A',
+        'Pincode': d.pincode || 'N/A',
+        'Manifest Date': formatReportDate(d.created_at)
+      };
+    });
+  };
+
+  const mapRefundsToExport = (refunds: any[]) => {
+    if (!refunds || refunds.length === 0) {
+      return [{ 'Status': 'No refund requests recorded' }];
+    }
+    return refunds.map((item: any) => ({
+      'Refund ID': item.id || 'N/A',
+      'Order ID': item.order_number || item.order_id || 'N/A',
+      'Customer Name': item.customer_name || 'N/A',
+      'Refund Amount (₹)': formatReportCurrency(item.amount),
+      'Refund Reason': item.reason || 'N/A',
+      'Refund Status': item.status || 'Pending',
+      'Return Delivery Status': item.return_delivery_status || 'N/A',
+      'Return AWB Number': item.awb_number || item.return_awb_number || 'N/A',
+      'Admin Notes': item.admin_notes || item.rejection_reason || 'N/A',
+      'Requested Date': formatReportDate(item.created_at),
+      'Updated Date': formatReportDate(item.updated_at)
+    }));
+  };
+
+  const mapExchangesToExport = (exchanges: any[]) => {
+    if (!exchanges || exchanges.length === 0) {
+      return [{ 'Status': 'No exchange requests recorded' }];
+    }
+    return exchanges.map((item: any) => ({
+      'Exchange ID': item.id || 'N/A',
+      'Order ID': item.order_id || item.order_number || 'N/A',
+      'Customer Name': item.customer_name || 'N/A',
+      'Original Product': item.product_name || 'N/A',
+      'Variant / Color / Size': item.variant || item.color || item.size || 'N/A',
+      'Quantity': item.quantity || 1,
+      'Exchange Reason': item.reason || 'N/A',
+      'Exchange Status': item.status || 'Pending',
+      'Return AWB': item.return_awb_number || 'N/A',
+      'Replacement AWB': item.new_awb_number || 'N/A',
+      'Quality Check Notes': item.qc_notes || item.notes || 'N/A',
+      'Requested Date': formatReportDate(item.created_at),
+      'Updated Date': formatReportDate(item.updated_at)
+    }));
+  };
+
+  const mapUsersToExport = (users: any[]) => {
+    if (!users || users.length === 0) {
+      return [{ 'Status': 'No registered users recorded' }];
+    }
+    return users.map((u: any) => {
+      let type = 'Staff';
+      if (u.origin === 'admin' || u.role === 'admin' || u.type === 'Admin') {
+        type = 'Super Admin';
+      } else if (u.origin === 'b2b' || u.type === 'B2B') {
+        type = 'B2B Business';
+      } else if (u.origin === 'b2c' || u.type === 'B2C') {
+        type = 'B2C Customer';
+      } else if (u.type) {
+        type = u.type;
+      }
+
+      return {
+        'User ID': u.id || 'N/A',
+        'Full Name': u.full_name || u.business_name || u.name || 'N/A',
+        'Email': u.email || 'N/A',
+        'Phone Number': u.phone_number || u.phone || 'N/A',
+        'Account Type': type,
+        'Account Status': u.status || 'Active',
+        'Company / Store Name': u.company_name || u.business_name || u.storeName || 'N/A',
+        'GSTIN': u.gstin || u.gst_number || 'N/A',
+        'Address': u.address || 'N/A',
+        'City': u.city || 'N/A',
+        'State': u.state || 'N/A',
+        'Pincode': u.pincode || 'N/A',
+        'Staff Permissions': Array.isArray(u.permissions) ? u.permissions.join(', ') : (type === 'Super Admin' ? 'All Permissions' : 'Standard'),
+        'Registration Date': formatReportDateOnly(u.created_at || u.joinDate)
+      };
+    });
+  };
+
+  const mapProductsToExport = (products: any[]) => {
+    if (!products || products.length === 0) {
+      return [{ 'Status': 'No catalog products recorded' }];
+    }
+    return products.map((p: any) => {
+      const stock = Number(p.stock || 0);
+      return {
+        'Product ID': p.id || 'N/A',
+        'Product Name': p.name || 'N/A',
+        'Category': p.category || 'Uncategorized',
+        'Brand': p.brandName || p.brand || 'N/A',
+        'Stock Quantity': stock,
+        'Stock Health': stock > 5 ? 'In Stock' : (stock > 0 ? 'Low Stock' : 'Out of Stock'),
+        'B2C Selling Price (₹)': formatReportCurrency(p.b2cPrice),
+        'B2C MRP / Compare (₹)': formatReportCurrency(p.compareAtPrice || p.b2cPrice),
+        'B2C Offer (%)': p.b2cOfferPercentage || p.b2cDiscount || 0,
+        'B2B Wholesale Price (₹)': formatReportCurrency(p.b2bPrice),
+        'B2B MRP / Compare (₹)': formatReportCurrency(p.compareAtB2bPrice || p.b2bPrice),
+        'B2B Offer (%)': p.b2bOfferPercentage || p.b2bDiscount || 0,
+        'HSN Code': p.hsn || 'N/A',
+        'SGST (%)': p.sgst || 0,
+        'CGST (%)': p.cgst || 0,
+        'Customer Rating': p.rating || 0,
+        'Total Reviews': p.reviews || 0,
+        'Status': p.status || 'Active',
+        'Package Weight (kg)': p.weight || 0,
+        'Dimensions (cm)': `${p.length || 0}x${p.breadth || 0}x${p.height || 0}`,
+        'Image URL': p.image || 'N/A'
+      };
+    });
+  };
+
+  const mapCMSToExport = (banners: any[], catBanners: any[], pages: any[], notifs: any[]) => {
+    const rows: any[] = [];
+    
+    (banners || []).forEach((b: any) => {
+      rows.push({
+        'Content Module': 'Homepage Hero Banner',
+        'Title / Subject': b.title || 'Hero Banner',
+        'Target / Placement': b.position || 'Hero Slider',
+        'Status': b.status || 'Active',
+        'Media URL / Link': b.image || 'N/A',
+        'Details / Message Preview': 'Hero showcase slide',
+        'Date': formatReportDateOnly(b.created_at)
+      });
+    });
+
+    (catBanners || []).forEach((cb: any) => {
+      rows.push({
+        'Content Module': 'Category Banner',
+        'Title / Subject': cb.category || `Category #${cb.id}`,
+        'Target / Placement': `Category ID: ${cb.id}`,
+        'Status': 'Active',
+        'Media URL / Link': cb.image_url || cb.image || 'N/A',
+        'Details / Message Preview': 'Store category visual banner',
+        'Date': 'N/A'
+      });
+    });
+
+    (pages || []).forEach((pg: any) => {
+      const preview = pg.content ? (pg.content.length > 100 ? pg.content.slice(0, 100).replace(/\n/g, ' ') + '...' : pg.content.replace(/\n/g, ' ')) : 'N/A';
+      rows.push({
+        'Content Module': 'Static Legal / Policy Page',
+        'Title / Subject': pg.title || 'Page',
+        'Target / Placement': `Slug: ${pg.slug || pg.id}`,
+        'Status': pg.status || 'Published',
+        'Media URL / Link': 'N/A',
+        'Details / Message Preview': preview,
+        'Date': formatReportDateOnly(pg.updated_at || pg.created_at)
+      });
+    });
+
+    (notifs || []).forEach((n: any) => {
+      rows.push({
+        'Content Module': 'App Push Notification',
+        'Title / Subject': n.title || 'Notification',
+        'Target / Placement': `Audience: ${n.audience || 'All Users'}`,
+        'Status': 'Broadcasted',
+        'Media URL / Link': 'N/A',
+        'Details / Message Preview': n.message || 'N/A',
+        'Date': formatReportDate(n.created_at)
+      });
+    });
+
+    if (rows.length === 0) {
+      return [{ 'Status': 'No CMS content records found' }];
+    }
+    return rows;
+  };
+
+  const mapCampaignsToExport = (coupons: any[]) => {
+    if (!coupons || coupons.length === 0) {
+      return [{ 'Status': 'No promo coupons or campaigns found' }];
+    }
+    return coupons.map((c: any) => ({
+      'Coupon ID': c.id || 'N/A',
+      'Coupon Code': c.code || 'N/A',
+      'Discount Type': c.type || 'Percentage',
+      'Discount Value': c.value || '0',
+      'Target Audience': c.target || 'All Users',
+      'Expiry Date': c.expiry ? formatReportDateOnly(c.expiry) : 'No Expiry',
+      'Status': c.status || 'Active'
     }));
   };
 
@@ -116,26 +428,115 @@ export const ReportsView: React.FC = () => {
   };
 
   const handleExportAll = async () => {
-    setLoading(true);
+    setIsExportingMaster(true);
+    setExportProgressText('Gathering application data...');
     try {
-      const data = await apiService.getReportsAll();
-      const inventorySheet = {
-        sheetName: 'Inventory Report',
-        data: handleExportInventory(data.inventory)
-      };
-      const salesSheet = {
-        sheetName: 'Sales Report',
-        data: handleExportSales(data.sales)
-      };
-      const financeSheet = {
-        sheetName: 'Finance Logs',
-        data: handleExportFinance(data.finance?.transactions)
-      };
-      exportToExcel([inventorySheet, salesSheet, financeSheet], 'Complete_Systems_Report');
+      // Parallel fetch across all application modules
+      const [
+        ordersRes,
+        financeRes,
+        deliveriesRes,
+        refundsRes,
+        exchangesRes,
+        usersRes,
+        productsRes,
+        cmsBannersRes,
+        categoryBannersRes,
+        pagesRes,
+        notifsRes,
+        couponsRes,
+        reportsAllRes
+      ] = await Promise.allSettled([
+        apiService.fetchOrders(),
+        apiService.getTransactions(),
+        apiService.fetchDeliveries(),
+        apiService.fetchRefunds(),
+        apiService.fetchExchanges(),
+        apiService.getUsers(),
+        apiService.fetchProducts(),
+        apiService.getCMSBanners(),
+        apiService.getCMSCategoryBanners(),
+        apiService.getCMSPages(),
+        apiService.getAppNotifications(),
+        apiService.getCampaignCoupons(),
+        apiService.getReportsAll()
+      ]);
+
+      setExportProgressText('Formatting Excel sheets...');
+
+      const ordersData = ordersRes.status === 'fulfilled' && Array.isArray(ordersRes.value) ? ordersRes.value : [];
+      const financeData = financeRes.status === 'fulfilled' && Array.isArray(financeRes.value) ? financeRes.value : [];
+      const deliveriesData = deliveriesRes.status === 'fulfilled' && Array.isArray(deliveriesRes.value) ? deliveriesRes.value : [];
+      const refundsData = refundsRes.status === 'fulfilled' && Array.isArray(refundsRes.value) ? refundsRes.value : [];
+      const exchangesData = exchangesRes.status === 'fulfilled' && Array.isArray(exchangesRes.value) ? exchangesRes.value : [];
+      const usersData = usersRes.status === 'fulfilled' && Array.isArray(usersRes.value) ? usersRes.value : [];
+      const productsData = productsRes.status === 'fulfilled' && Array.isArray(productsRes.value) ? productsRes.value : [];
+      const cmsBanners = cmsBannersRes.status === 'fulfilled' && Array.isArray(cmsBannersRes.value) ? cmsBannersRes.value : [];
+      const categoryBanners = categoryBannersRes.status === 'fulfilled' && Array.isArray(categoryBannersRes.value) ? categoryBannersRes.value : [];
+      const cmsPages = pagesRes.status === 'fulfilled' && Array.isArray(pagesRes.value) ? pagesRes.value : [];
+      const appNotifs = notifsRes.status === 'fulfilled' && Array.isArray(notifsRes.value) ? notifsRes.value : [];
+      const couponsData = couponsRes.status === 'fulfilled' && Array.isArray(couponsRes.value) ? couponsRes.value : [];
+      const reportsAllData = reportsAllRes.status === 'fulfilled' ? reportsAllRes.value : allReportsData;
+
+      // Ensure finance has records either from dedicated endpoint or reportsAll aggregate
+      const finalFinance = financeData.length > 0 ? financeData : (reportsAllData?.finance?.transactions || []);
+
+      const masterSheets: ExcelSheet[] = [
+        {
+          sheetName: 'Orders',
+          data: mapOrdersToExport(ordersData)
+        },
+        {
+          sheetName: 'Payments & Finance',
+          data: mapFinanceToExport(finalFinance)
+        },
+        {
+          sheetName: 'Deliveries',
+          data: mapDeliveriesToExport(deliveriesData)
+        },
+        {
+          sheetName: 'Refunds',
+          data: mapRefundsToExport(refundsData)
+        },
+        {
+          sheetName: 'Exchanges',
+          data: mapExchangesToExport(exchangesData)
+        },
+        {
+          sheetName: 'Users & Customers',
+          data: mapUsersToExport(usersData)
+        },
+        {
+          sheetName: 'Products & Inventory',
+          data: mapProductsToExport(productsData)
+        },
+        {
+          sheetName: 'CMS Content',
+          data: mapCMSToExport(cmsBanners, categoryBanners, cmsPages, appNotifs)
+        },
+        {
+          sheetName: 'Coupons & Campaigns',
+          data: mapCampaignsToExport(couponsData)
+        },
+        {
+          sheetName: 'Sales Performance',
+          data: handleExportSales(reportsAllData?.sales)
+        },
+        {
+          sheetName: 'Inventory Metrics',
+          data: handleExportInventory(reportsAllData?.inventory)
+        }
+      ];
+
+      setExportProgressText('Generating Excel report...');
+      const dateStr = new Date().toISOString().split('T')[0];
+      await exportToExcel(masterSheets, `SevenXT_Full_Master_Report_${dateStr}`);
     } catch (error) {
       console.error("Failed to export all reports:", error);
+      alert("An error occurred while compiling the Full Master Report. Please try again.");
     } finally {
-      setLoading(false);
+      setIsExportingMaster(false);
+      setExportProgressText('');
     }
   };
 
@@ -765,16 +1166,16 @@ export const ReportsView: React.FC = () => {
             <div className="space-y-2 text-center md:text-left">
               <h3 className="text-xl font-bold">Consolidated Data Vault</h3>
               <p className="text-blue-100 text-xs max-w-lg opacity-90">
-                Generate a comprehensive master export containing detailed inventory metrics and transaction-level sales data with full tax and customer metadata.
+                Generate a comprehensive master export containing all modules across the application: Orders, Payments & Finance, Deliveries (Outstation & Local), Refunds, Exchanges, Users & Customers, Products & Inventory, CMS, Campaigns, and Sales Analytics.
               </p>
             </div>
             <button
               onClick={handleExportAll}
-              disabled={loading}
+              disabled={isExportingMaster || loading}
               className="px-8 py-4 bg-white text-blue-600 rounded-2xl font-bold shadow-2xl hover:bg-slate-50 transition-all flex items-center gap-3 disabled:opacity-50 min-w-[280px] justify-center"
             >
-              {loading ? <RefreshCw className="animate-spin" size={20} /> : <Download size={20} />}
-              {loading ? "Crunching All Data..." : "Export Full Master Report"}
+              {isExportingMaster ? <RefreshCw className="animate-spin" size={20} /> : <Download size={20} />}
+              {isExportingMaster ? (exportProgressText || "Exporting All Modules...") : "Export Full Master Report"}
             </button>
         </div>
 
