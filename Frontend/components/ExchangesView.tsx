@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, RefreshCw, CheckCircle, XCircle, Clock, Truck, Search, AlertCircle, Camera, X, ArrowRight, RotateCcw, Copy, Check, Download } from 'lucide-react';
+import { Package, RefreshCw, CheckCircle, XCircle, Clock, Truck, Search, AlertCircle, Camera, X, ArrowRight, RotateCcw, Copy, Check, Download, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { apiService, API_BASE_URL } from '../services/api';
 import { exportToExcel } from '../utils/excelExport';
 
@@ -41,6 +41,8 @@ const ExchangesView: React.FC = () => {
     // Modals
     const [proofModalOpen, setProofModalOpen] = useState(false);
     const [selectedProof, setSelectedProof] = useState<string | null>(null);
+    const [proofImages, setProofImages] = useState<string[]>([]);
+    const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
     const [proofError, setProofError] = useState(false);
     const [qcModalOpen, setQcModalOpen] = useState(false);
     const [selectedExchange, setSelectedExchange] = useState<Exchange | null>(null);
@@ -155,32 +157,71 @@ const ExchangesView: React.FC = () => {
     };
 
 
-    const handleViewProof = (path: string) => {
-        let imageUrl = path?.trim();
-        if (!imageUrl) return;
+    const parseProofImages = (path: any): string[] => {
+        if (!path) return [];
+        if (Array.isArray(path)) {
+            return path
+                .map(item => (typeof item === 'string' ? item.trim() : ''))
+                .filter(url => url.startsWith('http'));
+        }
+        let raw = String(path).trim();
+        if (!raw) return [];
 
         try {
-            // Handle JSON array format like ["https://res.cloudinary.com/..."] or escaped variants
-            if (imageUrl.startsWith('"') && imageUrl.endsWith('"')) {
-                imageUrl = imageUrl.slice(1, -1);
+            if (raw.startsWith('"') && raw.endsWith('"') && (raw.includes('[') || raw.includes('http'))) {
+                raw = raw.slice(1, -1);
             }
-            if (imageUrl.startsWith('[')) {
-                imageUrl = imageUrl.replace(/\\"/g, '"');
-                const parsed = JSON.parse(imageUrl);
-                imageUrl = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : imageUrl;
+            if (raw.startsWith('[')) {
+                raw = raw.replace(/\\"/g, '"');
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const urls = parsed
+                        .map(item => (typeof item === 'string' ? item.trim() : ''))
+                        .filter(url => url.startsWith('http'));
+                    if (urls.length > 0) return urls;
+                }
             }
-            // Extract URL if embedded inside a string
-            const urlMatch = imageUrl.match(/https?:\/\/[^\s"'\]\\]+/);
-            if (urlMatch) {
-                imageUrl = urlMatch[0];
+            const matched = raw.match(/https?:\/\/[^\s"'\]\\]+/g);
+            if (matched && matched.length > 0) {
+                return matched;
             }
         } catch (e) {
-            console.error('Failed to parse proof URL:', e);
+            console.error('Failed to parse proof images:', e);
         }
+        return raw.startsWith('http') ? [raw] : [];
+    };
 
+    const handleViewProof = (path: string) => {
+        const images = parseProofImages(path);
+        if (images.length === 0) return;
+
+        setProofImages(images);
+        setActiveImageIndex(0);
+        setSelectedProof(images[0]);
         setProofError(false);
-        setSelectedProof(imageUrl);
         setProofModalOpen(true);
+    };
+
+    const handleNextImage = () => {
+        if (proofImages.length <= 1) return;
+        const nextIndex = (activeImageIndex + 1) % proofImages.length;
+        setActiveImageIndex(nextIndex);
+        setSelectedProof(proofImages[nextIndex]);
+        setProofError(false);
+    };
+
+    const handlePrevImage = () => {
+        if (proofImages.length <= 1) return;
+        const prevIndex = (activeImageIndex - 1 + proofImages.length) % proofImages.length;
+        setActiveImageIndex(prevIndex);
+        setSelectedProof(proofImages[prevIndex]);
+        setProofError(false);
+    };
+
+    const handleSelectImage = (index: number) => {
+        setActiveImageIndex(index);
+        setSelectedProof(proofImages[index]);
+        setProofError(false);
     };
 
     const getStatusColor = (status: string) => {
@@ -433,12 +474,25 @@ const ExchangesView: React.FC = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         {item.proof_image_path ? (
-                                            <button
-                                                onClick={() => handleViewProof(item.proof_image_path!)}
-                                                className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors"
-                                            >
-                                                <Camera size={14} /> View
-                                            </button>
+                                            (() => {
+                                                const proofs = parseProofImages(item.proof_image_path);
+                                                return proofs.length > 0 ? (
+                                                    <button
+                                                        onClick={() => handleViewProof(item.proof_image_path!)}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold transition-colors shadow-sm"
+                                                    >
+                                                        <Camera size={14} className="text-blue-600" />
+                                                        <span>View</span>
+                                                        {proofs.length > 1 && (
+                                                            <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                                                {proofs.length}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">No proof</span>
+                                                );
+                                            })()
                                         ) : (
                                             <span className="text-gray-400 text-xs">No proof</span>
                                         )}
@@ -530,28 +584,119 @@ const ExchangesView: React.FC = () => {
 
             {/* Proof Image Modal */}
             {proofModalOpen && selectedProof && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-xl overflow-hidden max-w-lg w-full relative shadow-2xl">
-                        <button
-                            onClick={() => setProofModalOpen(false)}
-                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full transition-colors z-10"
-                        >
-                            <X size={20} />
-                        </button>
-                        <div className="bg-gray-100 p-1 flex items-center justify-center min-h-[300px]">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full relative shadow-2xl flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50/90">
+                            <div className="flex items-center gap-2">
+                                <Camera size={18} className="text-blue-600" />
+                                <h3 className="font-bold text-sm text-gray-900">
+                                    Customer Proof Images
+                                </h3>
+                                {proofImages.length > 1 && (
+                                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                                        {activeImageIndex + 1} of {proofImages.length}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={selectedProof}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline px-2.5 py-1 rounded bg-blue-50 transition-colors"
+                                    title="Open original full resolution image in new tab"
+                                >
+                                    <ExternalLink size={13} /> Full Size
+                                </a>
+                                <button
+                                    onClick={() => setProofModalOpen(false)}
+                                    className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-200 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Main Image Stage */}
+                        <div className="bg-slate-950 relative flex items-center justify-center min-h-[320px] max-h-[58vh] p-3 overflow-hidden select-none">
                             {proofError ? (
-                                <div className="flex flex-col items-center gap-3 py-10 text-gray-400">
-                                    <Camera size={40} className="opacity-40" />
-                                    <p className="text-sm font-medium">Image no longer available</p>
-                                    <p className="text-xs text-gray-400">This proof was uploaded to an old server and cannot be retrieved.</p>
+                                <div className="flex flex-col items-center gap-3 py-16 text-gray-400">
+                                    <Camera size={44} className="opacity-40" />
+                                    <p className="text-sm font-medium text-gray-300">Image no longer available</p>
+                                    <p className="text-xs text-gray-500">This proof cannot be retrieved or the link has expired.</p>
                                 </div>
                             ) : (
                                 <img
-                                    src={selectedProof!}
-                                    alt="Proof"
-                                    className="max-w-full max-h-[60vh] object-contain rounded"
+                                    src={selectedProof}
+                                    alt={`Proof ${activeImageIndex + 1}`}
+                                    className="max-w-full max-h-[54vh] object-contain rounded-lg shadow-lg transition-all duration-150"
                                     onError={() => setProofError(true)}
                                 />
+                            )}
+
+                            {/* Left / Right Arrow Controls */}
+                            {proofImages.length > 1 && (
+                                <>
+                                    <button
+                                        onClick={handlePrevImage}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/90 text-white p-2.5 rounded-full backdrop-blur-sm transition-all hover:scale-110 active:scale-95 shadow-xl"
+                                        title="Previous image"
+                                    >
+                                        <ChevronLeft size={22} />
+                                    </button>
+                                    <button
+                                        onClick={handleNextImage}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/90 text-white p-2.5 rounded-full backdrop-blur-sm transition-all hover:scale-110 active:scale-95 shadow-xl"
+                                        title="Next image"
+                                    >
+                                        <ChevronRight size={22} />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Thumbnail Carousel Bar */}
+                        {proofImages.length > 1 && (
+                            <div className="px-4 py-3 bg-gray-900 border-t border-gray-800 flex items-center gap-2.5 overflow-x-auto">
+                                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mr-1 shrink-0">
+                                    All ({proofImages.length}):
+                                </span>
+                                {proofImages.map((imgUrl, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => handleSelectImage(idx)}
+                                        className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-150 border-2 ${
+                                            activeImageIndex === idx
+                                                ? 'border-blue-500 scale-105 shadow-md shadow-blue-500/30'
+                                                : 'border-transparent opacity-60 hover:opacity-100 hover:border-gray-500'
+                                        }`}
+                                    >
+                                        <img
+                                            src={imgUrl}
+                                            alt={`Thumb ${idx + 1}`}
+                                            className="w-14 h-14 object-cover"
+                                            onError={(e) => {
+                                                (e.currentTarget as HTMLElement).style.display = 'none';
+                                            }}
+                                        />
+                                        <span className="absolute bottom-0 right-0 bg-black/75 text-[10px] text-white px-1 font-mono rounded-tl">
+                                            {idx + 1}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Footer Notes */}
+                        <div className="p-3.5 bg-white border-t border-gray-100 text-xs text-gray-500 flex items-center justify-between">
+                            <span>
+                                Uploaded by customer as proof of product condition or defect.
+                            </span>
+                            {proofImages.length > 1 && (
+                                <span className="text-gray-400 text-[11px]">
+                                    Click arrows or thumbnails to browse all images
+                                </span>
                             )}
                         </div>
                     </div>
