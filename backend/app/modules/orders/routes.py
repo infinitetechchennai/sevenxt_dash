@@ -815,14 +815,21 @@ def bulk_download_invoice_labels(order_ids: List[str], db: Session = Depends(get
             # Prepare order data for label generation
             order_data = {
                 "id": order.order_id,
+                "order_id": order.order_id,
+                "razorpay_order_id": getattr(order, "razorpay_order_id", None),
                 "awb_number": order.awb_number,
                 "customer": order.customer_name,
+                "customer_name": order.customer_name,
                 "address": order.address,
                 "city": order.city,
                 "state": order.state,
                 "pincode": order.pincode,
                 "phone": order.phone,
-                "date": order.created_at.strftime('%Y-%m-%d') if order.created_at else "",
+                "email": order.email,
+                "date": order.created_at.strftime('%d.%m.%Y') if order.created_at else "",
+                "amount": float(order.amount) if order.amount else 0.0,
+                "products": getattr(order, "products", None),
+                "hsn": getattr(order, "hsn", None),
             }
             
             # Generate invoice label PDF
@@ -908,17 +915,21 @@ def generate_label(order_id: str, db: Session = Depends(get_db)):
     # Prepare data dictionary for generator
     order_data = {
         "id": order.order_id,
-        "order_id": order.order_id,  # Add this for label_generator compatibility
+        "order_id": order.order_id,
         "razorpay_order_id": getattr(order, "razorpay_order_id", None),
         "awb_number": order.awb_number,
         "customer": order.customer_name,
+        "customer_name": order.customer_name,
         "address": order.address,
         "city": order.city,
         "state": order.state,
         "pincode": order.pincode,
         "phone": order.phone,
-        "date": order.created_at.strftime('%Y-%m-%d') if order.created_at else "",
+        "email": order.email,
+        "date": order.created_at.strftime('%d.%m.%Y') if order.created_at else "",
         "amount": float(order.amount) if order.amount else 0.0,
+        "products": getattr(order, "products", None),
+        "hsn": getattr(order, "hsn", None),
     }
     
     # Define output directory with absolute path
