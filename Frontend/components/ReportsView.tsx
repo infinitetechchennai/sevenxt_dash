@@ -125,7 +125,7 @@ export const ReportsView: React.FC = () => {
     return dataToExport;
   };
 
-  const handleExportFinance = (data?: any[]) => {
+  const mapFinanceToExport = (data?: any[]) => {
     const source = data || allReportsData?.finance?.transactions || [];
     if (!source || source.length === 0) {
       return [{ 'Status': 'No payment transactions recorded' }];
@@ -150,6 +150,8 @@ export const ReportsView: React.FC = () => {
       };
     });
   };
+
+  const handleExportFinance = mapFinanceToExport;
 
   const mapOrdersToExport = (orders: any[]) => {
     if (!orders || orders.length === 0) {
