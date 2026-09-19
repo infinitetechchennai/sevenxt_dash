@@ -855,8 +855,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({ initialSearchTerm = 
 
         const data = await response.json();
 
-        // Set the image URL from backend
-        const imageUrl = `${API_BASE_URL}${data.url}`;
+        // Set the image URL from backend (use directly if full URL, e.g. Cloudinary)
+        const rawUrl = data.url || '';
+        const imageUrl = rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`;
         setFormData(prev => ({ ...prev, image: imageUrl }));
 
       } catch (error) {
